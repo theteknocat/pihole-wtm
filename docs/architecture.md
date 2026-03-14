@@ -59,13 +59,15 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages four views: Overview, Query Log, Trackers, and Settings.
+**Vue Router** manages three views: Overview (status/health), Dashboard (summary charts and tables), and Query Log (enriched paginated log).
 
-**Pinia stores** hold application state: stats, query list with filters/pagination, tracker category/company data, and connection settings. Stores handle API calls and cache results in memory.
+**Pinia stores** hold application state: stats, query list with pagination, and tracker data. Stores handle API calls and cache results in memory.
 
-**Chart.js** (via `vue-chartjs`) powers all visualisations: the category doughnut chart, the query timeline area chart, and the top-companies bar chart.
+**PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
-**Tailwind CSS** provides utility-class styling.
+**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (companies by query share, categories by query share). No pie or doughnut charts.
+
+**Tailwind CSS** provides utility-class layout and spacing. Tailwind's dark mode uses the `class` strategy, toggled by `@vueuse/core`'s `useDark()` which defaults to the system preference and persists the user's choice to localStorage.
 
 ### Data Sources
 
