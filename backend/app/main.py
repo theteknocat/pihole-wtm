@@ -33,6 +33,6 @@ app.add_middleware(
 async def health() -> dict:
     return {
         "status": "ok",
-        "pihole_mode": settings.pihole_mode,
+        "pihole_api_url": settings.pihole_api_url,
         "version": "0.1.0",
     }
