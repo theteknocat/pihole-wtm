@@ -1,7 +1,6 @@
-import json
 from typing import Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,19 +22,9 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
-    # Allowed CORS origins — comma-separated or JSON array:
+    # Allowed CORS origins — comma-separated string:
     # CORS_ORIGINS=https://pihole-wtm.ddev.site:5174,http://localhost:5173
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:5174"]
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: object) -> object:
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                return json.loads(v)
-            return [url.strip() for url in v.split(",") if url.strip()]
-        return v
+    cors_origins: str = "http://localhost:5173,http://localhost:5174"
 
 
 settings = Settings()
