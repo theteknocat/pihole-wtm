@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
+    # Allowed CORS origins — set via env var as a JSON array, e.g.:
+    # CORS_ORIGINS='["https://pihole-wtm.ddev.site:5174"]'
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:5174"]
 
 
 settings = Settings()

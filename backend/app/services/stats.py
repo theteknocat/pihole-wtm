@@ -30,6 +30,7 @@ async def get_tracker_stats(
     # so we compute the next cursor ourselves using the oldest query ID in each batch.
     all_queries = []
     cursor: int | None = None
+    truncated = False
     for _ in range(_MAX_PAGES):
         batch, _ = await pihole.get_queries(limit=_PAGE_SIZE, cursor=cursor, from_ts=int(from_ts))
         if not batch:
@@ -42,8 +43,16 @@ async def get_tracker_stats(
 
         all_queries.extend(batch)
         cursor = batch[-1].id  # oldest ID in batch → next page goes further back
+    else:
+        # Loop exhausted _MAX_PAGES without hitting the time boundary
+        truncated = True
+        logger.warning(
+            "Stats query hit page cap (%d queries) — results for %dh window may be incomplete",
+            len(all_queries),
+            hours,
+        )
 
-    logger.debug("Fetched %d queries for %dh window", len(all_queries), hours)
+    logger.debug("Fetched %d queries for %dh window (truncated=%s)", len(all_queries), hours, truncated)
 
     total = len(all_queries)
 
@@ -96,5 +105,6 @@ async def get_tracker_stats(
         "total_queries": total,
         "tracker_queries": tracker_total,
         "tracker_percent": round(tracker_total / total * 100, 1) if total else 0.0,
+        "truncated": truncated,
         "by_category": by_category,
     }
