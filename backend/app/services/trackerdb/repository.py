@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 
@@ -60,7 +61,7 @@ class TrackerRepository:
             logger.warning("TrackerDB lookup failed for %s: %s", domain, e)
             return None
 
-    async def get_categories(self) -> list[dict]:
+    async def get_categories(self) -> list[dict[str, Any]]:
         """Return all categories with their domain counts."""
         try:
             async with aiosqlite.connect(self._path) as db:
