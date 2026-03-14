@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.models.pihole import EnrichedQuery
 from app.services.pihole.api_client import PiholeApiClient, PiholeAuthError, PiholeConnectionError
+from app.services.stats import get_tracker_stats
 from app.services.trackerdb.enricher import TrackerEnricher
 from app.services.trackerdb.loader import ensure_trackerdb, trackerdb_exists
 from app.services.trackerdb.repository import TrackerRepository
@@ -97,6 +98,16 @@ async def queries(
     ]
 
     return {"queries": [q.model_dump() for q in enriched], "cursor": next_cursor}
+
+
+@app.get("/api/stats/trackers")
+async def stats_trackers(
+    hours: int = Query(default=24, ge=1, le=168),
+) -> dict[str, Any]:
+    try:
+        return await get_tracker_stats(pihole, enricher, hours=hours)
+    except (PiholeAuthError, PiholeConnectionError) as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @app.get("/api/trackerdb/status")
