@@ -120,6 +120,7 @@ class PiholeApiClient:
         self,
         limit: int = 100,
         cursor: int | None = None,
+        from_ts: int | None = None,
     ) -> tuple[list[RawQuery], int | None]:
         """
         Fetch recent DNS queries from Pi-hole.
@@ -130,6 +131,8 @@ class PiholeApiClient:
         params: dict[str, Any] = {"length": limit}
         if cursor is not None:
             params["cursor"] = cursor
+        if from_ts is not None:
+            params["from"] = from_ts
 
         data = await self._get("/api/queries", params=params)
 
