@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.0",
     "httpx>=0.27",
-    "aiosqlite>=0.20",
+    "aiosqlite>=0.20",  # used for TrackerDB lookups
     "cachetools>=5.3",
 ]
 

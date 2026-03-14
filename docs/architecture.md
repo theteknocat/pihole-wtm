@@ -28,23 +28,17 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 │  │ /trackers   │             │                      │            │
 │  │ /settings   │             ▼                      ▼            │
 │  └─────────────┘    ┌────────────────┐    ┌────────────────────┐ │
-│                     │  PiholeClient  │    │  TrackerRepository │ │
-│                     │  (interface)   │    │  (trackerdb.db)    │ │
-│                     └───────┬────────┘    └────────────────────┘ │
-│                      ┌──────┴──────┐                             │
-│                      ▼             ▼                             │
-│              ┌──────────────┐ ┌──────────────┐                   │
-│              │SqliteClient  │ │ ApiClient    │                   │
-│              │(pihole-FTL   │ │(Pi-hole HTTP │                   │
-│              │  .db direct) │ │  API v5/v6)  │                   │
-│              └──────────────┘ └──────────────┘                   │
+│                     │  ApiClient     │    │  TrackerRepository │ │
+│                     │ (Pi-hole HTTP  │    │  (trackerdb.db)    │ │
+│                     │  API v5/v6)    │    └────────────────────┘ │
+│                     └───────┬────────┘                           │
 └──────────────────────────────────────────────────────────────────┘
-           │                              │
-           ▼                              ▼
-┌──────────────────────┐      ┌──────────────────────┐
-│  pihole-FTL.db       │      │  Pi-hole HTTP API    │
-│  (SQLite, read-only) │      │  http://pihole/api/* │
-└──────────────────────┘      └──────────────────────┘
+                              │
+                              ▼
+                  ┌──────────────────────┐
+                  │  Pi-hole HTTP API    │
+                  │  http://pihole/api/* │
+                  └──────────────────────┘
 ```
 
 ## Components
@@ -53,12 +47,9 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 
 **Routers** handle HTTP routing and input validation. Each router delegates to the `EnrichmentService` rather than touching data sources directly.
 
-**EnrichmentService** is the core orchestrator. It fetches raw queries from the `PiholeClient`, enriches each domain via the `TrackerEnricher`, and assembles the final response models.
+**EnrichmentService** is the core orchestrator. It fetches raw queries from the `ApiClient`, enriches each domain via the `TrackerEnricher`, and assembles the final response models.
 
-**PiholeClient** is an abstract interface with two concrete implementations:
-
-- `SqliteClient` — opens `pihole-FTL.db` directly with `aiosqlite`. Enables arbitrary SQL, date range queries, and bulk reads without API rate limits. Used when the database file is accessible on the filesystem.
-- `ApiClient` — communicates with the Pi-hole HTTP API using `httpx`. Supports Pi-hole v5 (legacy `api.php` endpoints) and v6 (REST API with session authentication). Used when Pi-hole is on a different host.
+**ApiClient** communicates with the Pi-hole HTTP API using `httpx`. Supports Pi-hole v5 (legacy `api.php` endpoints) and v6 (REST API with session authentication).
 
 **TrackerEnricher** takes a domain string and returns tracker metadata by querying the TrackerDB. Lookups walk from the most-specific hostname match to the registered domain (eTLD+1), enabling a match even for subdomains not explicitly listed. Results are cached with an LRU cache.
 
@@ -78,8 +69,6 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 
 ### Data Sources
 
-**`pihole-FTL.db`** is Pi-hole's primary SQLite database, managed by the FTL (Faster Than Light) DNS resolver. The `queries` table contains every DNS request with timestamp, domain, client, and resolution status codes.
-
 **`trackerdb.db`** is Ghostery's TrackerDB compiled to SQLite. It contains tables for trackers, organisations, categories, and domain patterns. Released periodically on GitHub at [ghostery/trackerdb](https://github.com/ghostery/trackerdb/releases).
 
 ## Data Flow
@@ -91,9 +80,8 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 
 2. FastAPI router validates query parameters, calls EnrichmentService
 
-3. EnrichmentService calls PiholeClient.get_queries(limit, offset, filters)
-   └─ SqliteClient: SELECT ... FROM queries WHERE ... (async, aiosqlite)
-   └─ ApiClient: GET /api/queries?... (async, httpx, with session token)
+3. EnrichmentService calls ApiClient.get_queries(limit, offset, filters)
+   └─ GET /api/queries?... (async, httpx, with session token)
 
 4. For each RawQuery, EnrichmentService calls TrackerEnricher.enrich(domain)
    └─ LRU cache hit? Return cached TrackerInfo immediately
@@ -121,17 +109,6 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that reads an
 2. Background coroutine sleeps for TRACKERDB_UPDATE_INTERVAL_HOURS, then repeats
 ```
 
-## Pi-hole Connection Modes
-
-The connection mode is selected at startup via the `PIHOLE_MODE` environment variable.
-
-| Mode     | When to use                                                              | How it works                                                                                             |
-| -------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `sqlite` | pihole-wtm on same host as Pi-hole, or Pi-hole DB mounted into container | Opens `pihole-FTL.db` directly with `aiosqlite`. Faster, richer query capability, no network dependency. |
-| `api`    | Pi-hole on a different host or container                                 | Authenticates to Pi-hole's REST API, polls endpoints. Works over any network.                            |
-
-Auto-detection is planned: the backend will attempt SQLite access first and fall back to the API if the file is not accessible.
-
 ## Caching Strategy
 
 **TrackerDB domain lookups** are cached with an in-process LRU cache (50,000 entries). Pi-hole query logs have a long-tailed domain distribution — the top few hundred domains account for the majority of queries. A large LRU cache means most per-query enrichment calls are O(1) dictionary lookups.
@@ -142,7 +119,6 @@ The cache is invalidated when TrackerDB is updated on disk.
 
 ## Security Considerations
 
-- The Pi-hole database is opened **read-only**. No writes are ever made to Pi-hole's data.
 - The Pi-hole API password is stored only in the environment/config; it is never logged and never returned by the pihole-wtm API.
 - `TRACKERDB_PATH` is validated to prevent path traversal.
 - TrackerDB downloads are verified against the GitHub release asset (not arbitrary URLs).

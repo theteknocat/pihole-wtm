@@ -34,14 +34,12 @@ pihole-wtm/
 │   │   │
 │   │   ├── services/
 │   │   │   ├── pihole/
-│   │   │   │   ├── base.py            # Abstract PiholeClient interface
-│   │   │   │   ├── sqlite_client.py   # Direct aiosqlite reader for pihole-FTL.db
 │   │   │   │   └── api_client.py      # httpx client for Pi-hole HTTP API (v5 + v6)
 │   │   │   ├── trackerdb/
 │   │   │   │   ├── loader.py          # Download/cache trackerdb.db from Ghostery releases
 │   │   │   │   ├── repository.py      # aiosqlite queries against trackerdb.db
 │   │   │   │   └── enricher.py        # Domain → TrackerInfo with subdomain fallback
-│   │   │   └── enrichment.py          # Orchestrates PiholeClient + TrackerEnricher
+│   │   │   └── enrichment.py          # Orchestrates ApiClient + TrackerEnricher
 │   │   │
 │   │   ├── models/
 │   │   │   ├── pihole.py              # Pydantic: RawQuery, SummaryStats
@@ -56,13 +54,11 @@ pihole-wtm/
 │   │
 │   └── tests/
 │       ├── conftest.py                # Shared fixtures: test app, mock clients
-│       ├── test_sqlite_client.py
 │       ├── test_api_client.py
 │       ├── test_enricher.py
 │       ├── test_routes_stats.py
 │       ├── test_routes_queries.py
 │       └── fixtures/
-│           ├── sample_ftl.db          # Minimal Pi-hole SQLite DB for tests
 │           └── sample_trackerdb.db    # Minimal TrackerDB for tests
 │
 ├── frontend/                          # Vue 3 + Vite TypeScript SPA

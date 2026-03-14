@@ -38,8 +38,9 @@ web_extra_daemons:
     directory: /var/www/html/frontend
 
 web_environment:
-  - PIHOLE_MODE=sqlite
-  - PIHOLE_SQLITE_PATH=/var/www/html/backend/tests/fixtures/sample_ftl.db
+  - PIHOLE_API_URL=http://pihole
+  - PIHOLE_API_PASSWORD=
+  - PIHOLE_API_VERSION=auto
   - TRACKERDB_PATH=/var/www/html/backend/data/trackerdb.db
   - APP_HOST=0.0.0.0
   - APP_PORT=8000

@@ -12,49 +12,9 @@ cp .env.example .env
 
 ## Pi-hole Connection
 
-### `PIHOLE_MODE`
-
-**Required.** Selects which Pi-hole client implementation to use.
-
-| Value    | Description                                                                                                                                                |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sqlite` | Read directly from Pi-hole's SQLite database file. Faster and richer for historical queries. Use when pihole-wtm has filesystem access to `pihole-FTL.db`. |
-| `api`    | Connect via the Pi-hole HTTP API. Use when Pi-hole is on a different host or container.                                                                    |
-
-**Default:** none (must be set explicitly)
-
----
-
-### `PIHOLE_SQLITE_PATH`
-
-Path to Pi-hole's FTL database file. Only used when `PIHOLE_MODE=sqlite`.
-
-**Default:** `/etc/pihole/pihole-FTL.db`
-
-**Example:**
-
-```text
-PIHOLE_SQLITE_PATH=/etc/pihole/pihole-FTL.db
-```
-
-In Docker deployments, mount the host file read-only:
-
-```yaml
-volumes:
-  - /etc/pihole/pihole-FTL.db:/pihole/pihole-FTL.db:ro
-```
-
-Then set:
-
-```text
-PIHOLE_SQLITE_PATH=/pihole/pihole-FTL.db
-```
-
----
-
 ### `PIHOLE_API_URL`
 
-Base URL of the Pi-hole web interface. Only used when `PIHOLE_MODE=api`.
+Base URL of the Pi-hole web interface.
 
 **Default:** `http://pihole`
 
@@ -72,7 +32,7 @@ Do not include a trailing slash or path. The backend appends `/api/...` paths au
 
 ### `PIHOLE_API_PASSWORD`
 
-Pi-hole web interface password. Used to obtain a session token for the Pi-hole v6 API, or the HMAC auth hash for the Pi-hole v5 API. Only used when `PIHOLE_MODE=api`.
+Pi-hole web interface password. Used to obtain a session token for the Pi-hole v6 API, or the HMAC auth hash for the Pi-hole v5 API.
 
 **Default:** empty (works if Pi-hole has no password set)
 
@@ -165,7 +125,7 @@ Host port that the nginx frontend container binds to, making the dashboard acces
 
 ### `PIHOLE_NETWORK`
 
-Name of the Docker network that Pi-hole is connected to. The backend container joins this network to reach Pi-hole's API by container name. Only relevant when `PIHOLE_MODE=api` and both are running in Docker.
+Name of the Docker network that Pi-hole is connected to. The backend container joins this network to reach Pi-hole's API by container name.
 
 **Default:** `pihole_default`
 
@@ -180,10 +140,9 @@ docker inspect <pihole-container-name> | grep NetworkMode
 
 ## Example `.env` Files
 
-### Docker Compose — Pi-hole API mode
+### Docker Compose
 
 ```bash
-PIHOLE_MODE=api
 PIHOLE_API_URL=http://pihole
 PIHOLE_API_PASSWORD=supersecretpassword
 PIHOLE_API_VERSION=v6
@@ -192,20 +151,11 @@ DASHBOARD_PORT=8080
 TRACKERDB_UPDATE_INTERVAL_HOURS=24
 ```
 
-### Docker Compose — Same-host SQLite mode
-
-```bash
-PIHOLE_MODE=sqlite
-PIHOLE_SQLITE_PATH=/pihole/pihole-FTL.db
-DASHBOARD_PORT=8080
-TRACKERDB_UPDATE_INTERVAL_HOURS=24
-```
-
 ### Bare-metal
 
 ```bash
-PIHOLE_MODE=sqlite
-PIHOLE_SQLITE_PATH=/etc/pihole/pihole-FTL.db
+PIHOLE_API_URL=http://192.168.1.1
+PIHOLE_API_PASSWORD=supersecretpassword
 TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
 APP_HOST=127.0.0.1
 APP_PORT=8000
