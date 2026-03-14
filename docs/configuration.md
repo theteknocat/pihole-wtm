@@ -130,20 +130,26 @@ Logging verbosity for both uvicorn and the Python logging module.
 
 ### `CORS_ORIGINS`
 
-List of allowed CORS origins for the browser frontend. Must be provided as a JSON array.
+List of allowed CORS origins for the browser frontend. Can be a comma-separated string or a JSON array.
 
 **Default:** `["http://localhost:5173", "http://localhost:5174"]`
 
 In production, set this to the origin your frontend is actually served from:
 
 ```text
-CORS_ORIGINS=["https://pihole-wtm.yourdomain.local"]
+CORS_ORIGINS=https://pihole-wtm.yourdomain.local
 ```
 
-In a ddev environment, include the ddev site URL:
+Multiple origins, comma-separated:
 
 ```text
-CORS_ORIGINS=["https://pihole-wtm.ddev.site:5174","http://localhost:5173"]
+CORS_ORIGINS=https://pihole-wtm.ddev.site:5174,http://localhost:5173
+```
+
+A JSON array is also accepted if you prefer:
+
+```text
+CORS_ORIGINS=["https://pihole-wtm.yourdomain.local"]
 ```
 
 ---
