@@ -9,25 +9,23 @@ from app.models.pihole import RawQuery, SummaryStats
 
 logger = logging.getLogger(__name__)
 
-# Pi-hole v6 query status codes → human-readable labels
-QUERY_STATUS = {
-    0: "unknown",
-    1: "blocked (gravity)",
-    2: "allowed (forwarded)",
-    3: "allowed (cached)",
-    4: "blocked (regex)",
-    5: "blocked (exact)",
-    6: "blocked (CNAME gravity)",
-    7: "blocked (CNAME regex)",
-    8: "blocked (CNAME exact)",
-    9: "blocked (rate limited)",
-    10: "allowed (special domain)",
-    11: "retried",
-    12: "retried (ignored)",
-    13: "allowed (cache stale)",
-    14: "blocked (denylist)",
-    15: "blocked (gravity CNAME)",
-    16: "blocked (denylist CNAME)",
+# Pi-hole v6 query status strings → human-readable labels
+QUERY_STATUS_LABELS: dict[str, str] = {
+    "FORWARDED": "allowed (forwarded)",
+    "CACHE": "allowed (cached)",
+    "CACHE_STALE": "allowed (cache stale)",
+    "SPECIAL_DOMAIN": "allowed (special domain)",
+    "GRAVITY": "blocked (gravity)",
+    "REGEX_PI": "blocked (regex)",
+    "DENYLIST": "blocked (denylist)",
+    "GRAVITY_CNAME": "blocked (CNAME gravity)",
+    "REGEX_CNAME": "blocked (CNAME regex)",
+    "DENYLIST_CNAME": "blocked (CNAME denylist)",
+    "RATE_LIMITED": "blocked (rate limited)",
+    "RETRIED": "retried",
+    "RETRIED_DNSSEC": "retried (DNSSEC)",
+    "IN_PROGRESS": "in progress",
+    "DBBUSY": "db busy",
 }
 
 
@@ -137,14 +135,15 @@ class PiholeApiClient:
 
         queries = []
         for q in data.get("queries", []):
+            status = q.get("status", "UNKNOWN")
             queries.append(
                 RawQuery(
                     id=q.get("id", 0),
                     timestamp=q.get("time", 0),
                     domain=q.get("domain", ""),
                     client=q.get("client", {}).get("ip", ""),
-                    status=q.get("status", 0),
-                    status_label=QUERY_STATUS.get(q.get("status", 0), "unknown"),
+                    status=status,
+                    status_label=QUERY_STATUS_LABELS.get(status, status.lower().replace("_", " ")),
                     query_type=q.get("type", ""),
                     reply_type=q.get("reply", {}).get("type"),
                     reply_time=q.get("reply", {}).get("time"),

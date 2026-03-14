@@ -12,11 +12,29 @@ class SummaryStats(BaseModel):
 
 class RawQuery(BaseModel):
     id: int
-    timestamp: int
+    timestamp: float
     domain: str
     client: str
-    status: int
+    status: str
     status_label: str
     query_type: str
     reply_type: str | None = None
     reply_time: float | None = None
+
+
+class EnrichedQuery(BaseModel):
+    # Core query fields
+    id: int
+    timestamp: float
+    domain: str
+    client: str
+    status: str
+    status_label: str
+    query_type: str
+    reply_type: str | None = None
+    reply_time: float | None = None
+    # Tracker enrichment — None if domain not found in TrackerDB
+    tracker_name: str | None = None
+    category: str | None = None
+    company_name: str | None = None
+    company_country: str | None = None
