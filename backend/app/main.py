@@ -4,13 +4,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.services.pihole.api_client import PiholeApiClient, PiholeAuthError, PiholeConnectionError
+
+pihole = PiholeApiClient()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     yield
-    # Shutdown
+    await pihole.close()
 
 
 app = FastAPI(
@@ -36,3 +38,22 @@ async def health() -> dict:
         "pihole_api_url": settings.pihole_api_url,
         "version": "0.1.0",
     }
+
+
+@app.get("/api/pihole/test")
+async def pihole_test() -> dict:
+    try:
+        return await pihole.test_connection()
+    except PiholeAuthError as e:
+        return {"connected": False, "error": str(e)}
+    except PiholeConnectionError as e:
+        return {"connected": False, "error": str(e)}
+
+
+@app.get("/api/pihole/summary")
+async def pihole_summary() -> dict:
+    try:
+        summary = await pihole.get_summary()
+        return summary.model_dump()
+    except (PiholeAuthError, PiholeConnectionError) as e:
+        return {"error": str(e)}
