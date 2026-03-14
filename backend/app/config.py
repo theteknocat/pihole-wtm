@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # TrackerDB
     trackerdb_path: str = "/app/data/trackerdb.db"
     trackerdb_update_interval_hours: int = 24
+    trackerdb_release: str = "latest"  # "latest" or a specific tag e.g. "202603111257"
 
     # Application server
     app_host: str = "0.0.0.0"

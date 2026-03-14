@@ -5,12 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.services.pihole.api_client import PiholeApiClient, PiholeAuthError, PiholeConnectionError
+from app.services.trackerdb.enricher import TrackerEnricher
+from app.services.trackerdb.loader import TrackerDbLoadError, ensure_trackerdb, trackerdb_exists
+from app.services.trackerdb.repository import TrackerRepository
 
 pihole = PiholeApiClient()
+tracker_repo = TrackerRepository()
+enricher = TrackerEnricher(tracker_repo)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await ensure_trackerdb()
     yield
     await pihole.close()
 
@@ -36,6 +42,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "pihole_api_url": settings.pihole_api_url,
+        "trackerdb_loaded": trackerdb_exists(),
         "version": "0.1.0",
     }
 
@@ -57,3 +64,20 @@ async def pihole_summary() -> dict:
         return summary.model_dump()
     except (PiholeAuthError, PiholeConnectionError) as e:
         return {"error": str(e)}
+
+
+@app.get("/api/trackerdb/status")
+async def trackerdb_status() -> dict:
+    return {
+        "loaded": trackerdb_exists(),
+        "cache": enricher.cache_info,
+        "categories": await tracker_repo.get_categories(),
+    }
+
+
+@app.get("/api/trackerdb/lookup")
+async def trackerdb_lookup(domain: str) -> dict:
+    result = await enricher.enrich(domain)
+    if result is None:
+        return {"domain": domain, "found": False}
+    return {"domain": domain, "found": True, **result.model_dump()}
