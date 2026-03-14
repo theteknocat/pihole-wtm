@@ -6,6 +6,10 @@ webserver_type: generic
 nodejs_version: "22"
 python_version: "3.12"
 
+webimage_extra_packages:
+  - python3-pip
+  - python3-venv
+
 web_extra_exposed_ports:
   - name: fastapi
     container_port: 8000
@@ -18,23 +22,11 @@ web_extra_exposed_ports:
 
 web_extra_daemons:
   - name: fastapi
-    command: >-
-      bash -c '
-        cd /var/www/html/backend &&
-        pip install uv --quiet &&
-        uv venv .venv --quiet &&
-        uv pip install -e . --python .venv/bin/python --quiet &&
-        .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      '
+    command: "/var/www/html/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     directory: /var/www/html/backend
 
   - name: vite
-    command: >-
-      bash -c '
-        cd /var/www/html/frontend &&
-        npm install --silent &&
-        npm run dev
-      '
+    command: "/var/www/html/frontend/node_modules/.bin/vite --host"
     directory: /var/www/html/frontend
 
 web_environment:
@@ -48,4 +40,8 @@ web_environment:
 
 hooks:
   post-start:
-    - exec: "mkdir -p /var/www/html/backend/data /var/www/html/backend/tests/fixtures"
+    - exec: "mkdir -p /var/www/html/backend/data"
+    - exec: "python3 -m venv /var/www/html/backend/.venv"
+    - exec: "/var/www/html/backend/.venv/bin/pip install uv --quiet"
+    - exec: "cd /var/www/html/backend && .venv/bin/uv pip install -e . --quiet"
+    - exec: "cd /var/www/html/frontend && npm install --silent"
