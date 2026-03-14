@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,7 +9,8 @@ class Settings(BaseSettings):
 
     # Pi-hole connection
     pihole_api_url: str = "http://pihole"
-    pihole_api_password: str = ""
+    pihole_api_password: SecretStr = SecretStr("")
+    # Note: "v5" is accepted by the validator but not yet implemented; only "v6" is supported
     pihole_api_version: Literal["v5", "v6", "auto"] = "auto"
 
     # TrackerDB
@@ -19,7 +21,7 @@ class Settings(BaseSettings):
     # Application server
     app_host: str = "0.0.0.0"
     app_port: int = 8000
-    log_level: str = "info"
+    log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
 
 
 settings = Settings()

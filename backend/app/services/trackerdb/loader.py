@@ -1,5 +1,5 @@
 import logging
-import os
+import sqlite3
 import time
 from pathlib import Path
 
@@ -64,27 +64,23 @@ def _validate_schema(db_path: Path) -> list[str]:
     Check that the DB contains the tables and columns we depend on.
     Returns a list of validation errors (empty = valid).
     """
-    import sqlite3
-
     errors: list[str] = []
     try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
+        with sqlite3.connect(str(db_path)) as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        existing_tables = {row[0] for row in cursor.fetchall()}
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            existing_tables = {row[0] for row in cursor.fetchall()}
 
-        for table, required_cols in REQUIRED_SCHEMA.items():
-            if table not in existing_tables:
-                errors.append(f"Missing table: {table}")
-                continue
-            cursor.execute(f"PRAGMA table_info({table})")  # noqa: S608
-            existing_cols = {row[1] for row in cursor.fetchall()}
-            missing = required_cols - existing_cols
-            if missing:
-                errors.append(f"Table '{table}' missing columns: {missing}")
-
-        conn.close()
+            for table, required_cols in REQUIRED_SCHEMA.items():
+                if table not in existing_tables:
+                    errors.append(f"Missing table: {table}")
+                    continue
+                cursor.execute(f"PRAGMA table_info({table})")  # noqa: S608
+                existing_cols = {row[1] for row in cursor.fetchall()}
+                missing = required_cols - existing_cols
+                if missing:
+                    errors.append(f"Table '{table}' missing columns: {missing}")
     except sqlite3.Error as e:
         errors.append(f"SQLite error during schema validation: {e}")
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -41,9 +42,10 @@ class PiholeConnectionError(Exception):
 class PiholeApiClient:
     def __init__(self) -> None:
         self._base_url = settings.pihole_api_url.rstrip("/")
-        self._password = settings.pihole_api_password
+        self._password = settings.pihole_api_password.get_secret_value()
         self._sid: str | None = None
         self._client = httpx.AsyncClient(timeout=10.0)
+        self._auth_lock = asyncio.Lock()
 
     async def _authenticate(self) -> None:
         """Obtain a session token from the Pi-hole v6 API."""
@@ -67,7 +69,9 @@ class PiholeApiClient:
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Make an authenticated GET request, re-authenticating if the session has expired."""
         if self._sid is None:
-            await self._authenticate()
+            async with self._auth_lock:
+                if self._sid is None:  # re-check after acquiring lock
+                    await self._authenticate()
 
         try:
             response = await self._client.get(
@@ -82,7 +86,9 @@ class PiholeApiClient:
             # Session expired — re-authenticate and retry once
             logger.debug("Session expired, re-authenticating")
             self._sid = None
-            await self._authenticate()
+            async with self._auth_lock:
+                if self._sid is None:
+                    await self._authenticate()
             try:
                 response = await self._client.get(
                     f"{self._base_url}{path}",
