@@ -4,21 +4,21 @@ pihole-wtm classifies domains using [Ghostery's TrackerDB](https://github.com/gh
 
 These categories appear throughout the dashboard as colour-coded badges and are the primary dimension for filtering and charting your query history.
 
+> **Note:** Category names used here are the canonical identifiers from the TrackerDB schema (e.g. `site_analytics`, not "analytics"). These are the values that appear in API responses and filters.
+
 ---
 
-## Advertising
+## advertising
 
-**What it is:** Technologies that serve, target, or measure commercial advertisements. This includes ad servers, retargeting pixels, demand-side platforms (DSPs), and attribution trackers.
+**What it is:** Technologies that serve, target, or measure commercial advertisements. Includes ad servers, retargeting pixels, demand-side platforms (DSPs), and attribution trackers.
 
 **Privacy implications:** Advertising trackers build detailed profiles of your browsing behaviour to serve targeted ads. They follow you across websites (cross-site tracking) to understand your interests, purchasing intent, and demographics. Many share data with hundreds of third-party data brokers.
 
 **Examples:** Google Ads (`doubleclick.net`, `googlesyndication.com`), Meta Ads (`facebook.net`), The Trade Desk, Criteo, AppNexus, Amazon Advertising
 
-**Common in:** Virtually every commercial website; highest density on news sites, e-commerce, and entertainment
-
 ---
 
-## Analytics
+## site_analytics
 
 **What it is:** Tools that measure website traffic, user behaviour, and conversion rates. Includes session recording, heatmaps, A/B testing platforms, and audience analytics.
 
@@ -26,23 +26,9 @@ These categories appear throughout the dashboard as colour-coded badges and are 
 
 **Examples:** Google Analytics (`google-analytics.com`), Adobe Analytics, Mixpanel, Amplitude, Hotjar, Heap, Segment
 
-**Common in:** Almost all commercial websites; less common on privacy-focused sites
-
 ---
 
-## Fingerprinting
-
-**What it is:** Techniques that identify individual users by combining browser and device characteristics (screen size, installed fonts, GPU rendering, browser version, etc.) without using cookies. This creates a persistent identifier that survives cookie clearing.
-
-**Privacy implications:** Fingerprinting is particularly invasive because it cannot be blocked by clearing cookies or using private browsing. It is used to track users across sessions, devices, and even incognito windows.
-
-**Examples:** FingerprintJS, BlueCava, Threatmetrix (LexisNexis), some components of major ad networks
-
-**Common in:** Financial services (for fraud detection), high-value e-commerce, some ad networks
-
----
-
-## Consent Management
+## consent
 
 **What it is:** Platforms that display cookie consent banners and record user consent choices. Required in the EU under GDPR and in other jurisdictions with similar laws.
 
@@ -50,35 +36,9 @@ These categories appear throughout the dashboard as colour-coded badges and are 
 
 **Examples:** OneTrust, Cookiebot, TrustArc, Quantcast Choice, Didomi, Sourcepoint
 
-**Common in:** European-facing websites; any site that displays a cookie banner
-
 ---
 
-## Hosting / Site Infrastructure
-
-**What it is:** Content delivery networks (CDNs), cloud infrastructure, and hosting providers that serve website content. Often the same provider serves both legitimate site content and third-party tracker scripts.
-
-**Privacy implications:** Lower privacy risk than advertising trackers, but CDN providers can observe traffic patterns across all sites they serve. Some CDN domains serve both content and tracker scripts, making blocking complex.
-
-**Examples:** Cloudflare, Fastly, Akamai, Amazon CloudFront, Netlify, Vercel
-
-**Common in:** Nearly all websites; shared CDN domains mean blocking can break legitimate functionality
-
----
-
-## Utilities
-
-**What it is:** General-purpose developer tools and infrastructure — error tracking, performance monitoring, feature flagging, A/B testing infrastructure, and similar services.
-
-**Privacy implications:** Moderate. These services often process technical data about errors and performance rather than detailed personal profiles, but they do receive IP addresses, device information, and may include session data.
-
-**Examples:** Sentry (`sentry.io`), Datadog, New Relic, LaunchDarkly, Optimizely, Bugsnag
-
-**Common in:** SaaS products, developer-facing tools, modern web applications
-
----
-
-## Customer Interaction
+## customer_interaction
 
 **What it is:** Live chat, customer support, and visitor engagement tools embedded on websites.
 
@@ -86,11 +46,39 @@ These categories appear throughout the dashboard as colour-coded badges and are 
 
 **Examples:** Intercom, Zendesk, Drift, HubSpot, Crisp, LiveChat, Freshdesk
 
-**Common in:** SaaS products, e-commerce, B2B websites
+---
+
+## hosting
+
+**What it is:** Content delivery networks (CDNs), cloud infrastructure, and hosting providers that serve website content.
+
+**Privacy implications:** Lower privacy risk than advertising trackers, but CDN providers can observe traffic patterns across all sites they serve. Some CDN domains serve both content and tracker scripts, making blocking complex.
+
+**Examples:** Cloudflare, Fastly, Akamai, Amazon CloudFront, Netlify, Vercel
 
 ---
 
-## Audio / Video Player
+## utilities
+
+**What it is:** General-purpose developer tools and infrastructure — error tracking, performance monitoring, feature flagging, and similar services.
+
+**Privacy implications:** Moderate. These services often process technical data about errors and performance rather than detailed personal profiles, but they do receive IP addresses, device information, and may include session data.
+
+**Examples:** Sentry (`sentry.io`), Datadog, New Relic, LaunchDarkly, Optimizely, Bugsnag
+
+---
+
+## social_media
+
+**What it is:** Social network widgets, share buttons, comment systems, and login integrations embedded on third-party sites.
+
+**Privacy implications:** Even if you don't interact with them, social media embeds (like/share buttons, login widgets) report your visit back to the social network, allowing cross-site tracking tied to your social identity.
+
+**Examples:** Facebook Like buttons, Twitter/X embeds, LinkedIn share buttons, Pinterest widgets, Disqus
+
+---
+
+## audio_video_player
 
 **What it is:** Embedded media players and streaming infrastructure. Includes video hosting platforms embedded on third-party sites.
 
@@ -98,43 +86,31 @@ These categories appear throughout the dashboard as colour-coded badges and are 
 
 **Examples:** YouTube embeds (`youtube.com`, `youtu.be`), Vimeo, JW Player, Brightcove, Wistia
 
-**Common in:** News sites, marketing sites, any site with embedded video
+---
+
+## extensions
+
+**What it is:** Browser extension infrastructure and related tracking services.
+
+**Privacy implications:** Can observe browsing behaviour directly within the browser context.
+
+**Examples:** Various browser extension update and telemetry endpoints
 
 ---
 
-## CDN (Tracker-Associated)
+## misc
 
-**What it is:** Content delivery network domains that are primarily or exclusively used to serve tracker scripts, as distinct from general hosting CDNs that serve both content and scripts.
+**What it is:** Trackers that don't fit neatly into other categories — a catch-all for miscellaneous tracking infrastructure.
 
-**Privacy implications:** These CDNs exist specifically to distribute tracker code efficiently. Blocking them is generally safe as they serve no legitimate user-facing content.
-
-**Examples:** Tracker-specific CDN endpoints operated by advertising networks
-
-**Common in:** Heavy advertising sites
+**Privacy implications:** Varies. Includes a mix of low-risk infrastructure and harder-to-classify tracking services.
 
 ---
 
-## Comments
+## pornvertising
 
-**What it is:** Third-party comment systems embedded on websites.
+**What it is:** Advertising networks that operate specifically within adult content platforms.
 
-**Privacy implications:** Comment systems track which articles you read (even if you don't comment), and social login options (Facebook, Google) allow cross-site tracking. Disqus in particular has faced criticism for its advertising data practices.
-
-**Examples:** Disqus, Facebook Comments, Commento, Hyvor Talk
-
-**Common in:** Blogs, news sites, content-heavy websites
-
----
-
-## Essential
-
-**What it is:** Infrastructure that is functionally necessary for websites to work — authentication services, payment processors, and core APIs. pihole-wtm flags these separately because blocking them may break websites.
-
-**Privacy implications:** Lower privacy concern than advertising trackers, though these services do process personal data. Authentication providers receive login information; payment processors handle financial data.
-
-**Examples:** Auth0, Stripe, PayPal, reCAPTCHA (`google.com/recaptcha`), Cloudflare bot protection
-
-**Common in:** Login-required sites, e-commerce
+**Privacy implications:** Similar to advertising trackers but specific to adult content sites. May involve particularly sensitive behavioural data.
 
 ---
 
