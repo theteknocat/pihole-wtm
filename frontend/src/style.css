@@ -16,8 +16,6 @@
   }
 }
 
-@tailwind components;
-
 @layer tailwind-utilities {
   @tailwind utilities;
 }

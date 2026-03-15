@@ -3,8 +3,18 @@ import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from 'chart.js'
 import App from './App.vue'
 import './style.css'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 
 const router = createRouter({
   history: createWebHistory(),

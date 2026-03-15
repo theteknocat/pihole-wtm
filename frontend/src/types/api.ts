@@ -1,0 +1,45 @@
+export interface TopDomain {
+  domain: string
+  query_count: number
+}
+
+export interface CompanyStat {
+  company_name: string
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+  top_domains: TopDomain[]
+}
+
+export interface CategoryStat {
+  category: string
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+  companies: CompanyStat[]
+}
+
+export interface TrackerStats {
+  window_hours: number
+  total_queries: number
+  tracker_queries: number
+  tracker_percent: number
+  truncated: boolean
+  by_category: CategoryStat[]
+}
+
+export interface EnrichedQuery {
+  id: number
+  timestamp: number
+  domain: string
+  client: string
+  status: string
+  status_label: string
+  query_type: string
+  reply_type: string | null
+  reply_time: number | null
+  tracker_name: string | null
+  category: string | null
+  company_name: string | null
+  company_country: string | null
+}

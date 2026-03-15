@@ -98,33 +98,38 @@ async def queries(
     limit: int = Query(default=100, ge=1, le=500),
     cursor: int | None = Query(default=None),
     status_type: Literal["allowed", "blocked"] | None = Query(default=None),
+    tracker_only: bool = Query(default=False),
 ) -> dict[str, Any]:
     try:
-        if status_type is None:
+        # Fast path: no filtering needed
+        if status_type is None and not tracker_only:
             raw_queries, next_cursor = await pihole.get_queries(limit=limit, cursor=cursor)
             return {"queries": [q.model_dump() for q in await _enrich(raw_queries)], "cursor": next_cursor}
 
-        # Filter by status: fetch pages until we have enough matching queries
-        filtered: list[RawQuery] = []
+        # Filtered path: page through results, enrich as we go, apply filters
+        results: list[EnrichedQuery] = []
         fetch_cursor = cursor
-        for _ in range(10):
+        for _ in range(20):  # cap at 2000 queries examined
             batch, fetch_cursor = await pihole.get_queries(limit=100, cursor=fetch_cursor)
             if not batch:
                 break
-            for q in batch:
-                is_blocked = q.status in BLOCKED_STATUSES
-                if (status_type == "blocked") == is_blocked:
-                    filtered.append(q)
-            if len(filtered) >= limit:
-                break
-            if fetch_cursor is None:
+            for q in await _enrich(batch):
+                if status_type == "blocked" and q.status not in BLOCKED_STATUSES:
+                    continue
+                if status_type == "allowed" and q.status in BLOCKED_STATUSES:
+                    continue
+                if tracker_only and q.category is None:
+                    continue
+                results.append(q)
+                if len(results) >= limit:
+                    break
+            if len(results) >= limit or fetch_cursor is None:
                 break
 
-        filtered = filtered[:limit]
     except (PiholeAuthError, PiholeConnectionError) as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    return {"queries": [q.model_dump() for q in await _enrich(filtered)], "cursor": None}
+    return {"queries": [q.model_dump() for q in results], "cursor": None}
 
 
 @app.get("/api/stats/trackers")
