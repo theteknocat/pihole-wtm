@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
     await ensure_trackerdb()
     await disconnect_db.load()
     await db.init()
+    await db.flag_heuristic_uncategorized_for_reenrichment()
 
     sync_task = asyncio.create_task(run_sync_loop(pihole, enricher, disconnect_db, db))
 

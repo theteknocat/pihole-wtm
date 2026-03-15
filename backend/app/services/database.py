@@ -156,6 +156,21 @@ class LocalDatabase:
                 rows = await cur.fetchall()
                 return [r[0] for r in rows]
 
+    async def flag_heuristic_uncategorized_for_reenrichment(self) -> int:
+        """
+        Mark heuristic-enriched domains that have no category for re-enrichment.
+        Called on startup so that newly added subdomain keyword mappings are
+        applied to domains that were previously enriched without a category.
+        Returns the number of domains flagged.
+        """
+        async with self._conn() as db:
+            cursor = await db.execute(
+                """UPDATE domains SET needs_reenrichment = 1
+                   WHERE enrichment_source = 'heuristic' AND category IS NULL"""
+            )
+            await db.commit()
+            return cursor.rowcount
+
     async def get_heuristic_domains(self) -> list[str]:
         """Return domains enriched only via the eTLD+1 heuristic — candidates for RDAP upgrade."""
         async with self._conn() as db:
@@ -270,8 +285,8 @@ class LocalDatabase:
 
         sql = f"""
             SELECT
-                COALESCE(d.category, 'Unknown')     AS category,
-                COALESCE(d.company_name, 'Unknown') AS company_name,
+                COALESCE(d.category, 'Uncategorized')     AS category,
+                COALESCE(d.company_name, 'Unknown')       AS company_name,
                 d.tracker_name,
                 q.domain,
                 COUNT(*)                            AS query_count,
@@ -312,7 +327,7 @@ class LocalDatabase:
         tracker_total = sum(
             entry["total"]
             for cat, companies in category_data.items()
-            if cat != "Unknown"
+            if cat != "Uncategorized"
             for entry in companies.values()
         )
 
