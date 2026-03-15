@@ -14,12 +14,15 @@ class RawQuery(BaseModel):
     id: int
     timestamp: float
     domain: str
-    client: str
+    client: str          # client IP address
+    client_name: str | None = None  # client hostname (if Pi-hole has rDNS/DHCP)
     status: str
     status_label: str
     query_type: str
     reply_type: str | None = None
     reply_time: float | None = None
+    upstream: str | None = None   # DNS resolver used (allowed queries only)
+    list_id: int | None = None    # Pi-hole internal blocklist reference
 
 
 class EnrichedQuery(RawQuery):

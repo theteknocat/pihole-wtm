@@ -156,11 +156,14 @@ class PiholeApiClient:
                     timestamp=q.get("time", 0),
                     domain=q.get("domain", ""),
                     client=q.get("client", {}).get("ip", ""),
+                    client_name=q.get("client", {}).get("name"),
                     status=status,
                     status_label=QUERY_STATUS_LABELS.get(status, status.lower().replace("_", " ")),
                     query_type=q.get("type", ""),
                     reply_type=q.get("reply", {}).get("type"),
                     reply_time=q.get("reply", {}).get("time"),
+                    upstream=q.get("upstream"),
+                    list_id=q.get("list_id"),
                 )
             )
 

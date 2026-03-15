@@ -34,6 +34,7 @@ web_environment:
   - PIHOLE_API_PASSWORD=
   - PIHOLE_API_VERSION=auto
   - TRACKERDB_PATH=/var/www/html/backend/data/trackerdb.db
+  - LOCAL_DB_PATH=/var/www/html/backend/data/pihole_wtm.db
   - APP_HOST=0.0.0.0
   - APP_PORT=8000
   - LOG_LEVEL=debug

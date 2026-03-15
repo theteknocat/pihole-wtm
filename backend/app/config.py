@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     trackerdb_update_interval_hours: int = 24
     trackerdb_release: str = "latest"  # "latest" or a specific tag e.g. "202603111257"
 
+    # Local database
+    local_db_path: str = "/app/data/pihole_wtm.db"
+    sync_interval_seconds: int = 60
+
     # Application server
     app_host: str = "0.0.0.0"
     app_port: int = 8000
