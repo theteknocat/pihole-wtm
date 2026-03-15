@@ -15,6 +15,8 @@ const top = computed(() =>
   [...props.data].sort((a, b) => b.query_count - a.query_count).slice(0, 15)
 )
 
+const chartHeight = computed(() => Math.max(288, top.value.length * 36))
+
 const pct = (n: number) =>
   props.totalTrackerQueries > 0 ? (n / props.totalTrackerQueries) * 100 : 0
 
@@ -71,6 +73,6 @@ const chartOptions = computed(() => {
     :data="chartData"
     :options="chartOptions"
     :key="isDark ? 'dark' : 'light'"
-    class="h-72"
+    :style="{ height: `${chartHeight}px` }"
   />
 </template>

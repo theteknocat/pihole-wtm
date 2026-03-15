@@ -19,6 +19,8 @@ const sorted = computed(() =>
   [...props.data].sort((a, b) => b.query_count - a.query_count)
 )
 
+const chartHeight = computed(() => Math.max(288, sorted.value.length * 40))
+
 const pct = (n: number) =>
   props.totalTrackerQueries > 0 ? (n / props.totalTrackerQueries) * 100 : 0
 
@@ -75,6 +77,6 @@ const chartOptions = computed(() => {
     :data="chartData"
     :options="chartOptions"
     :key="isDark ? 'dark' : 'light'"
-    class="h-72"
+    :style="{ height: `${chartHeight}px` }"
   />
 </template>
