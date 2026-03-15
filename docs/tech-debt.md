@@ -26,6 +26,22 @@ The `category_total()` helper is called once in the sort key and once when build
 
 ---
 
+## Frontend
+
+### Chart options duplicated across `CategoryBarChart` and `CompanyBarChart`
+
+Both components contain identical logic for computing `textColor`, `gridColor`, the tooltip callback, and scale/legend config. Extract to a `useChartOptions(totalTrackerQueries)` composable to keep it in one place.
+
+### `RecentQueriesTable` — `type` prop unused in template
+
+The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual differentiation. Either colour-code the rows/cells based on type (e.g. a coloured left border or status badge) or remove the prop if it turns out to not be needed.
+
+### `OverviewView` — non-2xx response from `/api/pihole/test` shows no error detail
+
+If the backend returns a 503, `res.json()` parses `{"detail": "..."}` as the pihole object. `pihole.connected` is `undefined` so the UI correctly shows "disconnected", but the backend error message is never displayed. Add a `res.ok` check and surface the `detail` field.
+
+---
+
 ## Performance
 
 ### `stats.py` — `/api/stats/trackers` has no caching
