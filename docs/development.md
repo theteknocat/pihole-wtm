@@ -35,26 +35,15 @@ This will:
 
 ### 3. Configure the Pi-hole connection
 
-For local development you have two options:
+Edit the `web_environment` section of `.ddev/config.yaml` to point to your Pi-hole:
 
-#### Option A — Use the fixture database (no Pi-hole required)
-
-A pre-populated `pihole-wtm.db` fixture at `backend/tests/fixtures/sample_pihole_wtm.db` contains a small set of synthetic enriched queries and is used by default in the ddev environment. No configuration needed.
-
-#### Option B — Point to a real Pi-hole
-
-Copy `.env.example` to `.env` in the project root and edit:
-
-```bash
-cp .env.example .env
+```yaml
+web_environment:
+  - PIHOLE_API_URL=http://192.168.1.1   # your Pi-hole's address
+  - PIHOLE_API_PASSWORD=your_password
 ```
 
-```bash
-PIHOLE_API_URL=http://192.168.1.1   # your Pi-hole's address
-PIHOLE_API_PASSWORD=your_password
-```
-
-Then restart ddev:
+Then restart ddev for the changes to take effect:
 
 ```bash
 ddev restart
@@ -127,13 +116,6 @@ ddev exec -d /var/www/html/frontend npm run lint
 ddev exec -d /var/www/html/frontend npm run type-check
 ```
 
-### All checks at once (via Makefile)
-
-```bash
-ddev exec make lint
-ddev exec make test
-```
-
 ### Restarting services
 
 If you change backend dependencies (`pyproject.toml`) or need a clean restart:
@@ -165,12 +147,6 @@ ddev exec -d /var/www/html/frontend npm install some-package
 ```
 
 Commit the updated `package.json` and `package-lock.json`.
-
-## Project-Specific ddev Commands
-
-```bash
-ddev pihole-wtm --help    # show available custom commands
-```
 
 ## Stopping the Environment
 

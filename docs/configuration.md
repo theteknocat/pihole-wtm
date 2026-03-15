@@ -40,11 +40,11 @@ This value is treated as a secret and will never appear in logs.
 
 ## Local Database
 
-### `DB_PATH`
+### `LOCAL_DB_PATH`
 
-Path where the local sync database (`pihole-wtm.db`) is stored. Created automatically on first run. The directory must be writable by the backend process.
+Path where the local sync database (`pihole_wtm.db`) is stored. Created automatically on first run. The directory must be writable by the backend process.
 
-**Default:** `/app/data/pihole-wtm.db`
+**Default:** `/app/data/pihole_wtm.db`
 
 In Docker deployments, mount a named volume to persist the database across restarts:
 
@@ -65,6 +65,18 @@ Lower values mean more up-to-date data but more frequent Pi-hole API calls. Valu
 
 ---
 
+## Disconnect.me
+
+### `DISCONNECT_UPDATE_INTERVAL_HOURS`
+
+How often the Disconnect.me tracking protection list is refreshed from GitHub. The list is loaded into memory on startup and re-fetched in the background when it becomes stale.
+
+**Default:** `24`
+
+Set to `0` to disable automatic updates (the list loaded on startup will be used indefinitely).
+
+---
+
 ## TrackerDB
 
 ### `TRACKERDB_PATH`
@@ -73,7 +85,7 @@ Path where the Ghostery TrackerDB SQLite file is stored. Downloaded automaticall
 
 **Default:** `/app/data/trackerdb.db`
 
-In Docker deployments this shares the same named volume as `DB_PATH`:
+In Docker deployments this shares the same named volume as `LOCAL_DB_PATH`:
 
 ```yaml
 volumes:
@@ -202,7 +214,7 @@ CORS_ORIGINS=http://your-host:8080
 ```bash
 PIHOLE_API_URL=http://192.168.1.1
 PIHOLE_API_PASSWORD=your-pihole-password
-DB_PATH=/var/lib/pihole-wtm/pihole-wtm.db
+LOCAL_DB_PATH=/var/lib/pihole-wtm/pihole_wtm.db
 TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
 APP_HOST=127.0.0.1
 APP_PORT=8000

@@ -2,7 +2,7 @@
 
 A standalone dashboard that brings tracker intelligence to your Pi-hole.
 
-> **Status: Early Development** — This project is in the planning and scaffolding phase. No stable release yet.
+> **Status: Active Development** — The core MVP is functional. Pi-hole query syncing, multi-source tracker enrichment, and the dashboard are working. Production deployment (Docker, nginx) is not yet ready.
 
 ## What It Does
 

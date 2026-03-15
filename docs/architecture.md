@@ -22,25 +22,26 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 │                  FastAPI Backend (port 8000)                     │
 │                                                                  │
 │  ┌─────────────┐                                                 │
-│  │   Routers   │──────────────────────────────┐                 │
-│  │ /stats      │                              │                 │
-│  │ /queries    │                              ▼                 │
-│  │ /debug      │         ┌────────────────────────────────────┐ │
-│  └─────────────┘         │     Local SQLite (pihole-wtm.db)   │ │
-│                          │                                    │ │
-│  ┌─────────────┐         │  ┌──────────┐  ┌──────────────┐   │ │
-│  │Sync Service │────────►│  │ queries  │  │   domains    │   │ │
-│  │(background) │         │  └──────────┘  └──────────────┘   │ │
-│  └──────┬──────┘         │  ┌──────────┐                     │ │
-│         │                │  │sync_state│                     │ │
-│         │ enrich         │  └──────────┘                     │ │
-│         ▼                └────────────────────────────────────┘ │
-│  ┌──────────────────────────────────────────────┐               │
-│  │             Enrichment Pipeline              │               │
-│  │  1. TrackerDB (primary, in-memory cached)    │               │
-│  │  2. Disconnect.me (secondary, planned)       │               │
-│  │  3. RDAP company lookup (async, planned)     │               │
-│  └──────────────────────────────────────────────┘               │
+│  │   Routers   │──────────────────────────────┐                  │
+│  │ /stats      │                              │                  │
+│  │ /queries    │                              ▼                  │
+│  │ /debug      │         ┌────────────────────────────────────┐  │
+│  └─────────────┘         │     Local SQLite (pihole-wtm.db)   │  │
+│                          │                                    │  │
+│  ┌─────────────┐         │  ┌──────────┐  ┌──────────────┐    │  │
+│  │Sync Service │────────►│  │ queries  │  │   domains    │    │  │
+│  │(background) │         │  └──────────┘  └──────────────┘    │  │
+│  └──────┬──────┘         │  ┌──────────┐                      │  │
+│         │                │  │sync_state│                      │  │
+│         │ enrich         │  └──────────┘                      │  │
+│         ▼                └────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────┐                │
+│  │             Enrichment Pipeline              │                │
+│  │  1. TrackerDB (primary, in-memory cached)    │                │
+│  │  2. Disconnect.me (secondary, in-memory)     │                │
+│  │  3. eTLD+1 heuristic (company + category)    │                │
+│  │  4. RDAP (background upgrade, periodic)      │                │
+│  └──────────────────────────────────────────────┘                │
 └──────────┬───────────────────────────────────────────────────────┘
            │ periodic sync (~60s)
            ▼
@@ -88,9 +89,11 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **`trackerdb.db`** is Ghostery's TrackerDB compiled to SQLite. It contains tables for trackers, organisations, categories, and domain patterns. Released periodically on GitHub at [ghostery/trackerdb](https://github.com/ghostery/trackerdb/releases).
 
-**Disconnect.me tracking protection lists** (planned) — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Used as a secondary enrichment source for domains not in TrackerDB.
+**Disconnect.me tracking protection lists** — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Loaded into memory on startup and refreshed every `DISCONNECT_UPDATE_INTERVAL_HOURS`. Used as a secondary enrichment source for domains not in TrackerDB.
 
-**RDAP** (planned) — Registration Data Access Protocol lookups provide registrant organisation names for domains not covered by TrackerDB or Disconnect.me. Results are cached per domain; lookups run asynchronously in the background.
+**eTLD+1 heuristic** — a lightweight fallback for domains not matched by TrackerDB or Disconnect.me. Extracts a company name from the registered domain label and infers a tracker category from well-known subdomain keywords (e.g. `telemetry.*` → "telemetry", `analytics.*` → "analytics"). Less reliable than a curated database but meaningfully better than showing nothing.
+
+**RDAP** — Registration Data Access Protocol lookups provide registrant organisation names for domains enriched only via the heuristic. Lookups run as a periodic background upgrade pass (every ~10 sync cycles), with a 0.5s delay per domain to stay within rate limits. Results are cached in-memory per registered domain.
 
 ## Data Flow
 
@@ -110,11 +113,16 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
       - Otherwise → discard (legitimate traffic, not relevant to this dashboard)
 
 4. Upsert domain into domains table if not already present
-   Set needs_reenrichment = 1 for new domains
 
 5. Run enrichment pipeline for new/unfilled domains:
-   TrackerDB lookup → Disconnect.me lookup → RDAP lookup (async, best-effort)
+   a. TrackerDB lookup (in-memory LRU cached)
+   b. Disconnect.me lookup (in-memory, if TrackerDB missed)
+   c. eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
+      (if both databases missed)
    Write category, company_name, tracker_name, enrichment_source to domains table
+
+   A separate periodic background pass (every ~10 sync cycles) upgrades heuristic-enriched
+   domains with registrant names from RDAP, one domain at a time with a 0.5s delay.
 
 6. Insert filtered queries into queries table
 

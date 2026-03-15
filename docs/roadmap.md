@@ -18,9 +18,9 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] Stats endpoint: `/api/stats/trackers` (category + company breakdown by time window)
 - [x] Queries endpoint: `/api/queries` (with status and tracker-only filtering)
 - [x] Debug endpoints: `/api/debug/raw-query`, `/api/debug/pihole`
-- [ ] Local SQLite sync database (`pihole-wtm.db`) with `queries`, `domains`, `sync_state` tables
-- [ ] `SyncService` — background coroutine, cursor-based pagination, filtered storage
-- [ ] Migrate stats and queries endpoints to read from local database
+- [x] Local SQLite sync database (`pihole-wtm.db`) with `queries`, `domains`, `sync_state` tables
+- [x] `SyncService` — background coroutine, cursor-based pagination, filtered storage
+- [x] Migrate stats and queries endpoints to read from local database
 - [ ] Background task for periodic TrackerDB refresh
 
 ### Phase 1 — Frontend
@@ -55,12 +55,13 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 ### Phase 2 — Backend
 
-- [ ] Disconnect.me tracking protection lists as secondary enrichment source
-- [ ] RDAP company name lookup for domains not covered by TrackerDB or Disconnect.me (async, cached)
-- [ ] `needs_reenrichment` background re-processing when new enrichment sources are added
+- [x] Disconnect.me tracking protection lists as secondary enrichment source
+- [x] eTLD+1 heuristic enrichment — company name from registered domain, category from subdomain keywords
+- [x] RDAP company name lookup for heuristic-enriched domains (background upgrade pass, cached)
+- [x] `needs_reenrichment` background re-processing when new enrichment sources are added
+- [x] Graceful handling of enrichment gaps — unlabelled domains show category "Uncategorized"
 - [ ] `GET /api/stats/timeline` — bucketed query/block counts over time (24h, 7d, 30d)
 - [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search
-- [ ] Graceful handling of enrichment gaps — unlabelled domains show category "Unknown"
 
 ### Phase 2 — Frontend
 
