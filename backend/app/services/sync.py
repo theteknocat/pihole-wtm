@@ -15,6 +15,7 @@ from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
 from app.services.database import LocalDatabase
 from app.services.disconnect.loader import DisconnectDB
+from app.services.heuristic import extract_company_name
 from app.services.pihole.api_client import BLOCKED_STATUSES, PiholeApiClient
 from app.services.trackerdb.enricher import TrackerEnricher
 
@@ -179,6 +180,18 @@ async def _reenrich_missing(
                 "company_country": result.company_country,
                 "source": source,
             })
+        else:
+            # eTLD+1 heuristic — company name only, no category
+            company_name = extract_company_name(domain)
+            if company_name:
+                updates.append({
+                    "domain": domain,
+                    "tracker_name": None,
+                    "category": None,
+                    "company_name": company_name,
+                    "company_country": None,
+                    "source": "heuristic",
+                })
 
     if updates:
         await db.batch_update_domain_enrichment(updates)
