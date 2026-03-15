@@ -17,6 +17,7 @@ from app.services.database import LocalDatabase
 from app.services.disconnect.loader import DisconnectDB
 from app.services.heuristic import extract_company_name
 from app.services.pihole.api_client import BLOCKED_STATUSES, PiholeApiClient
+from app.services.rdap import lookup_company as rdap_lookup
 from app.services.trackerdb.enricher import TrackerEnricher
 
 logger = logging.getLogger(__name__)
@@ -198,6 +199,36 @@ async def _reenrich_missing(
         logger.info("Re-enriched %d domains (%d still unenriched)", len(updates), len(unenriched) - len(updates))
 
 
+async def _rdap_reenrich(db: LocalDatabase) -> None:
+    """
+    Background upgrade pass: replace heuristic company names with proper
+    registered organization names from RDAP, one domain at a time with a
+    short delay to stay within rate limits.
+    """
+    domains = await db.get_heuristic_domains()
+    if not domains:
+        return
+
+    logger.info("RDAP: upgrading %d heuristic-enriched domains", len(domains))
+    upgraded = 0
+
+    for domain in domains:
+        company = await rdap_lookup(domain)
+        if company:
+            await db.batch_update_domain_enrichment([{
+                "domain": domain,
+                "tracker_name": None,
+                "category": None,
+                "company_name": company,
+                "company_country": None,
+                "source": "rdap",
+            }])
+            upgraded += 1
+        await asyncio.sleep(0.5)  # be polite to RDAP services
+
+    logger.info("RDAP: upgraded %d / %d domains", upgraded, len(domains))
+
+
 async def run_sync_loop(
     pihole: PiholeApiClient,
     enricher: TrackerEnricher,
@@ -207,9 +238,11 @@ async def run_sync_loop(
     """
     Long-running background task. Syncs once immediately on startup,
     then repeats every sync_interval_seconds. Also refreshes Disconnect.me
-    data when it becomes stale.
+    data when it becomes stale, and runs RDAP upgrade passes periodically.
     """
     logger.info("Sync service started (interval: %ds)", settings.sync_interval_seconds)
+    _rdap_cycle = 0
+    _RDAP_EVERY_N_CYCLES = 10  # run RDAP pass every 10 sync cycles (~10 minutes)
 
     while True:
         # Refresh Disconnect.me if stale
@@ -222,5 +255,14 @@ async def run_sync_loop(
                 logger.debug("Sync cycle complete: %d queries stored", stored)
         except Exception:
             logger.exception("Sync cycle failed — will retry next interval")
+
+        # Periodically upgrade heuristic domains with RDAP data
+        _rdap_cycle += 1
+        if _rdap_cycle >= _RDAP_EVERY_N_CYCLES:
+            _rdap_cycle = 0
+            try:
+                await _rdap_reenrich(db)
+            except Exception:
+                logger.exception("RDAP re-enrichment failed — will retry next cycle")
 
         await asyncio.sleep(settings.sync_interval_seconds)
