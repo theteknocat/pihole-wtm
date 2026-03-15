@@ -122,18 +122,17 @@ class LocalDatabase:
     async def batch_update_domain_enrichment(
         self,
         updates: list[dict[str, Any]],
-        source: str,
     ) -> None:
         """
         Batch-update enrichment for multiple domains in a single DB write.
         Each item in `updates` must have: domain, tracker_name, category,
-        company_name, company_country (all nullable except domain).
+        company_name, company_country, source (all nullable except domain/source).
         """
         now = time.time()
         rows = [
             (
                 u["tracker_name"], u["category"], u["company_name"],
-                u["company_country"], source, now, u["domain"],
+                u["company_country"], u["source"], now, u["domain"],
             )
             for u in updates
         ]

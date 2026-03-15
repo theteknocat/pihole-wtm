@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.services.database import LocalDatabase
+from app.services.disconnect.loader import DisconnectDB
 from app.services.pihole.api_client import (
     PiholeApiClient,
     PiholeAuthError,
@@ -20,22 +21,25 @@ from app.services.trackerdb.repository import TrackerRepository
 pihole: PiholeApiClient
 tracker_repo: TrackerRepository
 enricher: TrackerEnricher
+disconnect_db: DisconnectDB
 db: LocalDatabase
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pihole, tracker_repo, enricher, db
+    global pihole, tracker_repo, enricher, disconnect_db, db
 
     pihole = PiholeApiClient()
     tracker_repo = TrackerRepository()
     enricher = TrackerEnricher(tracker_repo)
+    disconnect_db = DisconnectDB()
     db = LocalDatabase()
 
     await ensure_trackerdb()
+    await disconnect_db.load()
     await db.init()
 
-    sync_task = asyncio.create_task(run_sync_loop(pihole, enricher, db))
+    sync_task = asyncio.create_task(run_sync_loop(pihole, enricher, disconnect_db, db))
 
     yield
 
