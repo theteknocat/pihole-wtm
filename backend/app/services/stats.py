@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from typing import Any
 
-from app.services.pihole.api_client import PiholeApiClient
+from app.services.pihole.api_client import BLOCKED_STATUSES, PiholeApiClient
 from app.services.trackerdb.enricher import TrackerEnricher
 
 logger = logging.getLogger(__name__)
@@ -59,10 +59,11 @@ async def get_tracker_stats(
     # Enrich all domains concurrently
     tracker_results = await asyncio.gather(*[enricher.enrich(q.domain) for q in all_queries])
 
-    # Aggregate: category → company → domain → count
-    stats: dict[str, dict[str, dict[str, int]]] = defaultdict(
-        lambda: defaultdict(lambda: defaultdict(int))
-    )
+    # Aggregate: category → company → {total, blocked, allowed, domains}
+    def _new_company() -> dict[str, Any]:
+        return {"total": 0, "blocked": 0, "allowed": 0, "domains": defaultdict(int)}
+
+    stats: dict[str, dict[str, dict[str, Any]]] = defaultdict(lambda: defaultdict(_new_company))
     tracker_total = 0
 
     for q, t in zip(all_queries, tracker_results):
@@ -71,31 +72,43 @@ async def get_tracker_stats(
         tracker_total += 1
         category = t.category or "Unknown"
         company = t.company_name or "Unknown"
-        stats[category][company][q.domain] += 1
+        entry = stats[category][company]
+        entry["total"] += 1
+        if q.status in BLOCKED_STATUSES:
+            entry["blocked"] += 1
+        else:
+            entry["allowed"] += 1
+        entry["domains"][q.domain] += 1
 
     # Build response, sorted by query_count descending at every level
-    def category_total(companies: dict[str, dict[str, int]]) -> int:
-        return sum(sum(domains.values()) for domains in companies.values())
+    def category_total(companies: dict[str, dict[str, Any]]) -> int:
+        return sum(e["total"] for e in companies.values())
 
     by_category = []
     for category, companies in sorted(stats.items(), key=lambda x: -category_total(x[1])):
         company_list = []
-        for company, domains in sorted(companies.items(), key=lambda x: -sum(x[1].values())):
+        for company, entry in sorted(companies.items(), key=lambda x: -x[1]["total"]):
             top_domains = sorted(
-                [{"domain": d, "query_count": c} for d, c in domains.items()],
+                [{"domain": d, "query_count": c} for d, c in entry["domains"].items()],
                 key=lambda x: -x["query_count"],
             )[:10]
             company_list.append(
                 {
                     "company_name": company,
-                    "query_count": sum(domains.values()),
+                    "query_count": entry["total"],
+                    "blocked_count": entry["blocked"],
+                    "allowed_count": entry["allowed"],
                     "top_domains": top_domains,
                 }
             )
+        cat_blocked = sum(e["blocked"] for e in companies.values())
+        cat_allowed = sum(e["allowed"] for e in companies.values())
         by_category.append(
             {
                 "category": category,
                 "query_count": category_total(companies),
+                "blocked_count": cat_blocked,
+                "allowed_count": cat_allowed,
                 "companies": company_list,
             }
         )

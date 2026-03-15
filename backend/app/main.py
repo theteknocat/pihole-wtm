@@ -1,13 +1,18 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.models.pihole import EnrichedQuery
-from app.services.pihole.api_client import PiholeApiClient, PiholeAuthError, PiholeConnectionError
+from app.models.pihole import EnrichedQuery, RawQuery
+from app.services.pihole.api_client import (
+    BLOCKED_STATUSES,
+    PiholeApiClient,
+    PiholeAuthError,
+    PiholeConnectionError,
+)
 from app.services.stats import get_tracker_stats
 from app.services.trackerdb.enricher import TrackerEnricher
 from app.services.trackerdb.loader import ensure_trackerdb, trackerdb_exists
@@ -74,19 +79,9 @@ async def pihole_summary() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
-@app.get("/api/queries")
-async def queries(
-    limit: int = Query(default=100, ge=1, le=500),
-    cursor: int | None = Query(default=None),
-) -> dict[str, Any]:
-    try:
-        raw_queries, next_cursor = await pihole.get_queries(limit=limit, cursor=cursor)
-    except (PiholeAuthError, PiholeConnectionError) as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-
-    tracker_results = await asyncio.gather(*[enricher.enrich(q.domain) for q in raw_queries])
-
-    enriched = [
+async def _enrich(raw: list[RawQuery]) -> list[EnrichedQuery]:
+    tracker_results = await asyncio.gather(*[enricher.enrich(q.domain) for q in raw])
+    return [
         EnrichedQuery(
             **q.model_dump(),
             tracker_name=t.tracker_name if t else None,
@@ -94,10 +89,42 @@ async def queries(
             company_name=t.company_name if t else None,
             company_country=t.company_country if t else None,
         )
-        for q, t in zip(raw_queries, tracker_results)
+        for q, t in zip(raw, tracker_results)
     ]
 
-    return {"queries": [q.model_dump() for q in enriched], "cursor": next_cursor}
+
+@app.get("/api/queries")
+async def queries(
+    limit: int = Query(default=100, ge=1, le=500),
+    cursor: int | None = Query(default=None),
+    status_type: Literal["allowed", "blocked"] | None = Query(default=None),
+) -> dict[str, Any]:
+    try:
+        if status_type is None:
+            raw_queries, next_cursor = await pihole.get_queries(limit=limit, cursor=cursor)
+            return {"queries": [q.model_dump() for q in await _enrich(raw_queries)], "cursor": next_cursor}
+
+        # Filter by status: fetch pages until we have enough matching queries
+        filtered: list[RawQuery] = []
+        fetch_cursor = cursor
+        for _ in range(10):
+            batch, fetch_cursor = await pihole.get_queries(limit=100, cursor=fetch_cursor)
+            if not batch:
+                break
+            for q in batch:
+                is_blocked = q.status in BLOCKED_STATUSES
+                if (status_type == "blocked") == is_blocked:
+                    filtered.append(q)
+            if len(filtered) >= limit:
+                break
+            if fetch_cursor is None:
+                break
+
+        filtered = filtered[:limit]
+    except (PiholeAuthError, PiholeConnectionError) as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    return {"queries": [q.model_dump() for q in await _enrich(filtered)], "cursor": None}
 
 
 @app.get("/api/stats/trackers")

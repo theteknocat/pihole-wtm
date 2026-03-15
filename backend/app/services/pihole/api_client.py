@@ -9,6 +9,17 @@ from app.models.pihole import RawQuery, SummaryStats
 
 logger = logging.getLogger(__name__)
 
+# Pi-hole v6 status strings that represent a blocked query
+BLOCKED_STATUSES: frozenset[str] = frozenset({
+    "GRAVITY",
+    "REGEX_PI",
+    "DENYLIST",
+    "GRAVITY_CNAME",
+    "REGEX_CNAME",
+    "DENYLIST_CNAME",
+    "RATE_LIMITED",
+})
+
 # Pi-hole v6 query status strings → human-readable labels
 QUERY_STATUS_LABELS: dict[str, str] = {
     "FORWARDED": "allowed (forwarded)",
