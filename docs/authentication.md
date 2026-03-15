@@ -1,6 +1,8 @@
 # Authentication
 
 > **Status: Planned enhancement** — Not yet implemented. Authentication will be added as part of the pre-release hardening phase. See [roadmap.md](roadmap.md) for phasing.
+>
+> **Architecture note:** The design below was written when every API request called Pi-hole directly. With the sync service architecture, the Pi-hole connection is owned by the background sync process rather than individual requests. The session management and Pi-hole credential handling sections will need to be revisited during implementation to reflect this.
 
 ## Overview
 

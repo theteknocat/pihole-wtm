@@ -34,20 +34,34 @@ Pi-hole web interface password. Used to obtain a session token from the Pi-hole 
 
 This value is treated as a secret and will never appear in logs.
 
+> **Note:** Pi-hole v6 is required. Pi-hole v5 is not supported.
+
 ---
 
-### `PIHOLE_API_VERSION`
+## Local Database
 
-Force a specific Pi-hole API version.
+### `DB_PATH`
 
-| Value  | Description                                        |
-| ------ | -------------------------------------------------- |
-| `v6`   | Pi-hole 6.x — REST API with session authentication |
-| `auto` | Auto-detect (currently always uses v6 behaviour)   |
+Path where the local sync database (`pihole-wtm.db`) is stored. Created automatically on first run. The directory must be writable by the backend process.
 
-**Default:** `auto`
+**Default:** `/app/data/pihole-wtm.db`
 
-> **Note:** Pi-hole v5 support is not yet implemented. Only `v6` is functional. `v5` is accepted by the setting but will not work correctly.
+In Docker deployments, mount a named volume to persist the database across restarts:
+
+```yaml
+volumes:
+  - pihole_wtm_data:/app/data
+```
+
+---
+
+### `SYNC_INTERVAL_SECONDS`
+
+How often the sync service polls Pi-hole for new queries.
+
+**Default:** `60`
+
+Lower values mean more up-to-date data but more frequent Pi-hole API calls. Values below 10 are not recommended.
 
 ---
 
@@ -59,7 +73,7 @@ Path where the Ghostery TrackerDB SQLite file is stored. Downloaded automaticall
 
 **Default:** `/app/data/trackerdb.db`
 
-In Docker deployments, mount a named volume to persist the database across restarts:
+In Docker deployments this shares the same named volume as `DB_PATH`:
 
 ```yaml
 volumes:
@@ -130,9 +144,9 @@ Logging verbosity for both uvicorn and the Python logging module.
 
 ### `CORS_ORIGINS`
 
-List of allowed CORS origins for the browser frontend. Can be a comma-separated string or a JSON array.
+Allowed CORS origins for the browser frontend. Provide as a comma-separated string.
 
-**Default:** `["http://localhost:5173", "http://localhost:5174"]`
+**Default:** `http://localhost:5173,http://localhost:5174`
 
 In production, set this to the origin your frontend is actually served from:
 
@@ -143,13 +157,7 @@ CORS_ORIGINS=https://pihole-wtm.yourdomain.local
 Multiple origins, comma-separated:
 
 ```text
-CORS_ORIGINS=https://pihole-wtm.ddev.site:5174,http://localhost:5173
-```
-
-A JSON array is also accepted if you prefer:
-
-```text
-CORS_ORIGINS=["https://pihole-wtm.yourdomain.local"]
+CORS_ORIGINS=https://pihole-wtm.yourdomain.local,http://localhost:5173
 ```
 
 ---
@@ -186,7 +194,7 @@ PIHOLE_API_URL=http://pihole
 PIHOLE_API_PASSWORD=your-pihole-password
 PIHOLE_NETWORK=pihole_default
 DASHBOARD_PORT=8080
-CORS_ORIGINS=["http://your-host:8080"]
+CORS_ORIGINS=http://your-host:8080
 ```
 
 ### Bare-metal
@@ -194,11 +202,12 @@ CORS_ORIGINS=["http://your-host:8080"]
 ```bash
 PIHOLE_API_URL=http://192.168.1.1
 PIHOLE_API_PASSWORD=your-pihole-password
+DB_PATH=/var/lib/pihole-wtm/pihole-wtm.db
 TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
 APP_HOST=127.0.0.1
 APP_PORT=8000
 LOG_LEVEL=info
-CORS_ORIGINS=["http://localhost:8080"]
+CORS_ORIGINS=http://localhost:8080
 ```
 
 ---

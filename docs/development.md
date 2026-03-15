@@ -37,29 +37,21 @@ This will:
 
 For local development you have two options:
 
-**Option A — Use the fixture SQLite database (no Pi-hole required)**
+#### Option A — Use the fixture database (no Pi-hole required)
 
-The test fixture database at `backend/tests/fixtures/sample_ftl.db` contains a small set of synthetic queries and is used by default in the ddev environment. No configuration needed.
+A pre-populated `pihole-wtm.db` fixture at `backend/tests/fixtures/sample_pihole_wtm.db` contains a small set of synthetic enriched queries and is used by default in the ddev environment. No configuration needed.
 
-**Option B — Point to a real Pi-hole**
+#### Option B — Point to a real Pi-hole
 
-Copy `.env.example` to `.env` in the project root and edit the relevant variables:
+Copy `.env.example` to `.env` in the project root and edit:
 
 ```bash
 cp .env.example .env
 ```
 
-Then set either:
-
 ```bash
-# For a Pi-hole accessible via HTTP API:
-PIHOLE_MODE=api
 PIHOLE_API_URL=http://192.168.1.1   # your Pi-hole's address
 PIHOLE_API_PASSWORD=your_password
-
-# For a locally mounted SQLite DB:
-PIHOLE_MODE=sqlite
-PIHOLE_SQLITE_PATH=/path/to/pihole-FTL.db
 ```
 
 Then restart ddev:

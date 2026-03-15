@@ -8,7 +8,7 @@ A standalone dashboard that brings tracker intelligence to your Pi-hole.
 
 Pi-hole tells you *that* a domain was blocked. pihole-wtm tells you *why it matters* — by enriching your DNS query history with tracker intelligence from the [Ghostery TrackerDB](https://github.com/ghostery/trackerdb). You can see at a glance that the domain blocked was an advertising tracker operated by a major ad network, or a fingerprinting script embedded on thousands of sites.
 
-The dashboard sits alongside your existing Pi-hole installation without modifying it. It reads Pi-hole data either directly from the SQLite database (when running on the same host) or via the Pi-hole HTTP API (when running remotely or in a separate container).
+The dashboard sits alongside your existing Pi-hole installation without modifying it. It syncs query data from the Pi-hole v6 API into a local database, enriches it with tracker intelligence, and serves the results from its own store — so the dashboard is fast and Pi-hole is never under load when you're browsing.
 
 ## What It Hopes to Become
 
@@ -27,7 +27,7 @@ The dashboard sits alongside your existing Pi-hole installation without modifyin
 | Backend         | Python 3.12 + FastAPI (async)                                                   |
 | Frontend        | Vue 3 + Vite (TypeScript)                                                       |
 | Tracker data    | [Ghostery TrackerDB](https://github.com/ghostery/trackerdb) (SQLite, CC-BY-4.0) |
-| Pi-hole data    | Direct SQLite DB access or Pi-hole HTTP API (v5/v6)                             |
+| Pi-hole data    | Pi-hole v6 HTTP API                                                             |
 | Dev environment | [ddev](https://ddev.com/)                                                       |
 | Production      | Docker Compose                                                                  |
 
@@ -43,6 +43,7 @@ See the [`docs/`](docs/) directory for detailed planning documents:
 - [Deployment Guide](docs/deployment.md)
 - [Roadmap](docs/roadmap.md)
 - [Tracker Categories](docs/tracker-categories.md)
+- [Authentication](docs/authentication.md)
 
 ## License
 

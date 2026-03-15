@@ -1,6 +1,6 @@
 # Tracker Categories
 
-pihole-wtm classifies domains using [Ghostery's TrackerDB](https://github.com/ghostery/trackerdb), which defines 11 tracker categories. This document describes each category, its privacy implications, and example trackers you might recognise.
+pihole-wtm classifies domains primarily using [Ghostery's TrackerDB](https://github.com/ghostery/trackerdb), which defines 11 tracker categories. Additional enrichment sources (Disconnect.me, RDAP) may supplement coverage for domains not in TrackerDB. This document describes each category, its privacy implications, and example trackers you might recognise.
 
 These categories appear throughout the dashboard as colour-coded badges and are the primary dimension for filtering and charting your query history.
 

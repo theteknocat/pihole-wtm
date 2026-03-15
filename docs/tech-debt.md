@@ -20,9 +20,13 @@ Low risk in practice (the test endpoint is rarely called), but should be fixed w
 
 The `category_total()` helper is called once in the sort key and once when building the response dict, doing the same sum twice. Could precompute into a dict before sorting. Not a performance concern at current scale.
 
+> This will be superseded when `/api/stats/trackers` is migrated to read from the local sync database.
+
 ### `main.py` — `EnrichedQuery` model round-trip in `/api/queries`
 
 `EnrichedQuery(**q.model_dump(), ...)` constructs a Pydantic model only to immediately call `model_dump()` on it. Could be replaced with a plain dict construction to skip the unnecessary validation round-trip.
+
+> This will be superseded when `/api/queries` is migrated to read from the local sync database.
 
 ---
 
@@ -39,14 +43,6 @@ The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual d
 ### `OverviewView` — non-2xx response from `/api/pihole/test` shows no error detail
 
 If the backend returns a 503, `res.json()` parses `{"detail": "..."}` as the pihole object. `pihole.connected` is `undefined` so the UI correctly shows "disconnected", but the backend error message is never displayed. Add a `res.ok` check and surface the `detail` field.
-
----
-
-## Performance
-
-### `stats.py` — `/api/stats/trackers` has no caching
-
-Every request paginates through the full query window and enriches all domains. For a 24h window this can take several seconds. A short TTL cache (e.g. 5 minutes) on the aggregated result would make the endpoint suitable for dashboard use. Consider `cachetools.TTLCache` keyed on `hours`.
 
 ---
 

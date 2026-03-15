@@ -6,74 +6,71 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 ## Phase 1: MVP — Functional Core
 
-**Goal:** A working dashboard that proves the concept end-to-end. Query data from Pi-hole, enrich it with TrackerDB, display the results in a basic but functional UI.
+**Goal:** A working dashboard that proves the concept end-to-end. Sync query data from Pi-hole into a local database, enrich with TrackerDB, display results in a functional UI.
 
-### Backend
+### Phase 1 — Backend
 
-- [ ] Project scaffolding: `pyproject.toml`, FastAPI app factory, pydantic-settings config, `.gitignore`, `Makefile`
-- [ ] `PiholeClient` abstract interface with `RawQuery` and `SummaryStats` Pydantic models
-- [ ] `SqliteClient` — reads from `pihole-FTL.db` via `aiosqlite`
-- [ ] `ApiClient` — Pi-hole v6 HTTP API with session authentication (httpx)
-- [ ] `TrackerdbLoader` — downloads `trackerdb.db` from Ghostery GitHub releases on startup
-- [ ] `TrackerRepository` — domain lookup SQL against `trackerdb.db`
-- [ ] `TrackerEnricher` — subdomain fallback logic (exact → eTLD+1 → parent domains)
-- [ ] LRU cache wrapping the enricher (50k entries)
-- [ ] `EnrichmentService` — orchestrates PiholeClient + TrackerEnricher
-- [ ] API endpoints: `/api/health`, `/api/stats/summary`, `/api/queries`, `/api/trackers/categories`
+- [x] Project scaffolding: `pyproject.toml`, FastAPI app factory, pydantic-settings config
+- [x] `PiholeApiClient` — Pi-hole v6 HTTP API with session authentication (httpx)
+- [x] `TrackerdbLoader` — downloads `trackerdb.db` from Ghostery GitHub releases on startup
+- [x] `TrackerRepository` — domain lookup SQL against `trackerdb.db`
+- [x] `TrackerEnricher` — subdomain fallback logic (exact → eTLD+1 → parent domains), LRU cached
+- [x] Stats endpoint: `/api/stats/trackers` (category + company breakdown by time window)
+- [x] Queries endpoint: `/api/queries` (with status and tracker-only filtering)
+- [x] Debug endpoints: `/api/debug/raw-query`, `/api/debug/pihole`
+- [ ] Local SQLite sync database (`pihole-wtm.db`) with `queries`, `domains`, `sync_state` tables
+- [ ] `SyncService` — background coroutine, cursor-based pagination, filtered storage
+- [ ] Migrate stats and queries endpoints to read from local database
 - [ ] Background task for periodic TrackerDB refresh
-- [ ] Basic test suite with fixture databases
 
-### Frontend
+### Phase 1 — Frontend
 
-- [ ] Vue 3 + Vite + TypeScript scaffold, Tailwind CSS, Pinia, Vue Router
-- [ ] `AppSidebar` and `AppHeader` layout components
-- [ ] `SettingsView` — connection mode selector + test button
-- [ ] `OverviewView` — four `KpiCard` tiles (total queries, blocked %, tracker types seen, top company)
-- [ ] `CategoryPieChart` — doughnut chart of tracker categories
-- [ ] `QueryLogView` — basic `QueryTable` with tracker category and company columns
-- [ ] `CategoryBadge` and `StatusBadge` UI components
+- [x] Vue 3 + Vite + TypeScript scaffold, Tailwind CSS, PrimeVue (Aura), Vue Router
+- [x] `AppHeader` with dark mode toggle and Pi-hole status indicator
+- [x] `OverviewView` — health check, Pi-hole connection status
+- [x] `DashboardView` — tracker category chart, top companies chart, top companies tables, recent query tables
+- [x] `CategoryBarChart`, `CompanyBarChart` — horizontal stacked bar charts (blocked/allowed)
+- [x] `TopCompaniesTable`, `RecentQueriesTable` — sortable, enriched
+- [x] 24h / 7d time window toggle, tracker-only filter toggle
+- [x] Dark mode (system default, persisted to localStorage)
+- [ ] `QueryLogView` — full paginated, filterable query log (separate page)
+- [ ] Loading skeleton states for all data tables and charts
+- [ ] Empty states for zero-data scenarios
 
-### Infrastructure
+### Phase 1 — Infrastructure
 
-- [ ] `.ddev/config.yaml` with `web_extra_daemons` for uvicorn and Vite
+- [x] `.ddev/config.yaml` with `web_extra_daemons` for uvicorn and Vite dev server
 - [ ] `docker-compose.yml` for production deployment
 - [ ] `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`
 - [ ] `nginx.conf` — SPA routing + `/api` proxy
 - [ ] `.env.example`
-- [ ] End-to-end test: `ddev start` → load dashboard → see enriched query data
 
-**Phase 1 outcome:** A deployable dashboard at `localhost:8080` showing query stats, a browsable enriched query log, and a category breakdown chart.
+**Phase 1 outcome:** A deployable dashboard showing tracker stats, a browsable enriched query log, and category/company breakdown charts — all served from a local pre-enriched database.
 
 ---
 
-## Phase 2: Enrichment and Analysis Features
+## Phase 2: Enrichment Depth and Analysis Features
 
-**Goal:** Make the data actionable. Historical trends, drill-down by company and domain, robust filtering, Pi-hole v5 support.
+**Goal:** Richer tracker coverage, more actionable data, and deeper filtering.
 
-### Backend
+### Phase 2 — Backend
 
+- [ ] Disconnect.me tracking protection lists as secondary enrichment source
+- [ ] RDAP company name lookup for domains not covered by TrackerDB or Disconnect.me (async, cached)
+- [ ] `needs_reenrichment` background re-processing when new enrichment sources are added
 - [ ] `GET /api/stats/timeline` — bucketed query/block counts over time (24h, 7d, 30d)
-- [ ] `GET /api/trackers/companies` — top companies by blocked query count, filterable by category
-- [ ] `GET /api/trackers/domains` — top domains by query count, filterable by company
-- [ ] Pi-hole v5 API support in `ApiClient` (legacy `api.php` endpoints)
-- [ ] Auto-detection of Pi-hole API version
-- [ ] Pagination and filtering on `/api/queries` (status, category, company, client IP, date range, domain search)
-- [ ] Graceful handling of domains not in TrackerDB (labelled "Unknown")
-- [ ] Auto-reconnect on Pi-hole v6 session expiry
+- [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search
+- [ ] Graceful handling of enrichment gaps — unlabelled domains show category "Unknown"
 
-### Frontend
+### Phase 2 — Frontend
 
 - [ ] `QueryTimeline` — line + area chart, period selector (24h / 7d / 30d)
-- [ ] `TrackersView` — category filter tabs, `TrackerTable`, `TopCompaniesBar` chart
-- [ ] Click-through from chart segments to filtered query log
 - [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
 - [ ] URL query param sync for all filters (shareable/bookmarkable URLs)
-- [ ] Loading skeleton states for all data tables and charts
-- [ ] Connection error display in `AppHeader` when Pi-hole is unreachable
-- [ ] Auto-refresh for Overview stats (configurable interval, default 30s)
-- [ ] Dark mode toggle (via `@vueuse/core` `useDark`)
+- [ ] Auto-refresh for Overview stats (configurable interval)
+- [ ] Connection error display when Pi-hole is unreachable
 
-**Phase 2 outcome:** Full drill-down capability from tracker category → company → domain → individual queries. Historical timeline. Robust error handling. Production-grade behaviour.
+**Phase 2 outcome:** Full drill-down from tracker category → company → domain → individual queries. Richer company data from multiple enrichment sources. Historical timeline.
 
 ---
 
@@ -81,21 +78,22 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 **Goal:** Make the project maintainable, well-documented, and welcoming to contributors. Cut a v1.0 release.
 
-### Testing
+### Phase 3 — Testing
 
-- [ ] Backend: 80%+ test coverage — all API endpoints, both Pi-hole clients, enricher edge cases
+- [ ] Backend: 80%+ test coverage — all API endpoints, sync service, enricher edge cases
 - [ ] Frontend: Vitest + `@vue/test-utils` for Pinia store logic and key components
 - [ ] GitHub Actions CI: lint + type-check + test on every push and pull request
 
-### Deployment
+### Phase 3 — Deployment
 
 - [ ] Multi-arch Docker image builds (`linux/amd64` and `linux/arm64` for Raspberry Pi)
 - [ ] GitHub Actions release workflow: tag → build → push to GitHub Container Registry (GHCR)
 - [ ] Unraid Community App template
 - [ ] Rate limiting on API endpoints (`slowapi`)
 - [ ] Content Security Policy headers in nginx config
+- [ ] `pihole-wtm setup` CLI command — interactive first-run configuration wizard, validates Pi-hole connection and writes `.env` file (see `docs/configuration.md`)
 
-### Documentation
+### Phase 3 — Documentation
 
 - [ ] All `docs/` pages complete and reviewed
 - [ ] Screenshots in README
@@ -103,22 +101,22 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [ ] `CONTRIBUTING.md` with code style guide, PR process, and development workflow
 - [ ] `CHANGELOG.md` initialised
 
-### UX Polish
+### Phase 3 — UX Polish
 
 - [ ] Responsive layout (tablet and mobile friendly)
 - [ ] Empty states for zero-data scenarios (no Pi-hole connected, no queries in range)
-- [ ] Onboarding flow in `SettingsView` when no connection is configured
+- [ ] Onboarding flow in `OverviewView` when no Pi-hole connection is configured
 - [ ] Country flag display for tracker companies
 - [ ] Tooltip explanations for each tracker category on hover
 
-### Security
+### Phase 3 — Security
 
-- [ ] Audit: Pi-hole password never logged, masked in SettingsView UI
-- [ ] Confirm read-only SQLite access (no write operations possible)
+- [ ] Audit: Pi-hole password never logged, masked in settings UI
+- [ ] Confirm local database is never exposed directly (backend process only)
 - [ ] Input validation on all API endpoints
-- [ ] Dependency vulnerability scanning in CI (e.g., `pip-audit`, `npm audit`)
+- [ ] Dependency vulnerability scanning in CI (`pip-audit`, `npm audit`)
 
-**Phase 3 outcome:** A polished v1.0.0 release with multi-arch Docker images, automated CI/CD, comprehensive tests, and a complete documentation site.
+**Phase 3 outcome:** A polished v1.0.0 release with multi-arch Docker images, automated CI/CD, comprehensive tests, and complete documentation.
 
 ---
 
@@ -126,9 +124,10 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 These are not committed to any phase but are worth tracking as potential future directions:
 
-- **Notifications** — alert when a new type of tracker is first seen, or when blocked query rate spikes
+- **Notifications** — alert when a new tracker category is first seen, or when blocked query rate spikes
 - **Allowlist/blocklist suggestions** — surface domains that are pure trackers but not yet on the Pi-hole blocklist
 - **Multiple Pi-hole instances** — support monitoring multiple Pi-hole installations from one dashboard
 - **Per-client breakdown** — show which devices on the network generate the most tracker queries
 - **Export** — CSV/JSON export of enriched query data
+- **Authentication** — optional login to protect the dashboard on networks where it shouldn't be publicly accessible (see `docs/authentication.md`)
 - **Grafana data source plugin** — for users who already have Grafana dashboards
