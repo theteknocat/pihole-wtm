@@ -16,17 +16,9 @@ Low risk in practice (the test endpoint is rarely called), but should be fixed w
 
 `self._sid` is typed as `str | None` but is used as `str` immediately after the auth lock block. Mypy strict mode may flag this since it can't infer that `_authenticate()` guarantees a non-None value. Fix with an assertion or local variable after the lock.
 
-### `stats.py` — `category_total()` computed twice per category
+### `types/api.ts` — missing new fields on `EnrichedQuery`
 
-The `category_total()` helper is called once in the sort key and once when building the response dict, doing the same sum twice. Could precompute into a dict before sorting. Not a performance concern at current scale.
-
-> This will be superseded when `/api/stats/trackers` is migrated to read from the local sync database.
-
-### `main.py` — `EnrichedQuery` model round-trip in `/api/queries`
-
-`EnrichedQuery(**q.model_dump(), ...)` constructs a Pydantic model only to immediately call `model_dump()` on it. Could be replaced with a plain dict construction to skip the unnecessary validation round-trip.
-
-> This will be superseded when `/api/queries` is migrated to read from the local sync database.
+The frontend `EnrichedQuery` interface is missing `client_name`, `upstream`, and `list_id` fields added in the sync database refactor. These are returned by the API but not typed on the frontend.
 
 ---
 
