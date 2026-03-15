@@ -3,6 +3,19 @@ import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
+import { definePreset } from '@primevue/themes'
+
+const Theme = definePreset(Aura, {
+  semantic: {
+    colorScheme: {
+      dark: {
+        content: {
+          background: '{stone.800}', // stone-800 (#292524) — lifts cards off the stone-900 page
+        },
+      },
+    },
+  },
+})
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,7 +44,7 @@ app.use(pinia)
 app.use(router)
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: Theme,
     options: {
       darkModeSelector: '.dark',
       cssLayer: {
