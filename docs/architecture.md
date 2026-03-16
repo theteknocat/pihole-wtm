@@ -67,17 +67,22 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Enrichment Pipeline** processes each newly discovered domain after it is first stored. It runs through sources in priority order, writing the best available result to the `domains` table. Enrichment runs in the background and never blocks API responses. A `needs_reenrichment` flag on the `domains` table allows background re-processing when new sources are added.
 
-**TrackerEnricher** takes a domain string and returns tracker metadata by querying Ghostery's TrackerDB. Lookups walk from the most-specific hostname to the registered domain (eTLD+1), enabling a match even for subdomains not explicitly listed. Results are cached in an LRU cache (50k entries).
+**TrackerEnricher** takes a domain string and returns tracker metadata by querying Ghostery's TrackerDB. It exposes two lookup strategies:
 
-**TrackerRepository** wraps `aiosqlite` reads against `trackerdb.db`. It exposes methods for domain lookup, category listing, and company aggregation.
+- `enrich_exact(domain)` — exact match only, no fallback. Used for storage gating to avoid matching legitimate subdomains (e.g. `mail.google.com`) via their parent company's ad-network entry (`google.com`).
+- `enrich(domain)` — walks from the most-specific hostname up to the registered domain (eTLD+1), enabling a match for tracker subdomains not explicitly listed. Used for display enrichment of already-stored blocked queries.
+
+Results from `enrich()` are cached in an LRU cache (50k entries). `enrich_exact()` bypasses the cache since the cache stores fallback results that would be incorrect for exact-match use.
+
+**TrackerRepository** wraps `aiosqlite` reads against `trackerdb.db`. It exposes a domain lookup method and a categories listing used by the API.
 
 **Background tasks** handle TrackerDB updates: on startup, the latest `trackerdb.db` is downloaded from Ghostery's GitHub releases if missing or stale. A periodic background coroutine refreshes it according to `TRACKERDB_UPDATE_INTERVAL_HOURS`.
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Overview (status/health), Dashboard (summary charts and tables), and Query Log (enriched paginated log).
+**Vue Router** manages views: Overview (Pi-hole connection status and health), Dashboard (tracker charts and summary tables), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows).
 
-**Pinia stores** hold application state: stats, query list with pagination, and tracker data. Stores handle API calls and cache results in memory.
+**Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d) and a `refreshKey` counter used to signal cross-component data refreshes — for example, causing all visible reports to reload after a data reset from the settings sidebar.
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
@@ -108,17 +113,20 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 3. For each new query:
    a. If status is BLOCKED → always store
-   b. If status is ALLOWED → check enrichment sources (in-memory, instant):
-      - Domain in TrackerDB or Disconnect.me? → store (known tracker allowed through)
+   b. If status is ALLOWED → exact-match gate (no subdomain fallback):
+      - Domain exactly matches TrackerDB or Disconnect.me? → store (known tracker allowed through)
       - Otherwise → discard (legitimate traffic, not relevant to this dashboard)
+      Exact-match is intentional: subdomain fallback would incorrectly flag legitimate services
+      (mail.google.com, calendar.google.com) because their parent company (google.com) appears
+      in tracker databases as an advertising entity.
 
 4. Upsert domain into domains table if not already present
 
-5. Run enrichment pipeline for new/unfilled domains:
-   a. TrackerDB lookup (in-memory LRU cached)
-   b. Disconnect.me lookup (in-memory, if TrackerDB missed)
+5. Run enrichment pipeline to populate display metadata (category, company, tracker name):
+   a. Blocked queries: TrackerDB lookup with subdomain fallback + LRU cache, then Disconnect.me
+   b. Allowed queries: reuse the exact-match gating result directly (no second lookup)
    c. eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
-      (if both databases missed)
+      (if TrackerDB and Disconnect.me both missed)
    Write category, company_name, tracker_name, enrichment_source to domains table
 
    A separate periodic background pass (every ~10 sync cycles) upgrades heuristic-enriched
@@ -196,6 +204,14 @@ CREATE TABLE sync_state (
     last_synced_at  REAL
 );
 
+-- User configuration (planned — not yet implemented).
+-- Will store tracker source settings: active categories, excluded domains, etc.
+-- Kept in the same database so config survives container restarts alongside data.
+CREATE TABLE user_config (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
+
 CREATE INDEX idx_queries_timestamp ON queries(timestamp);
 CREATE INDEX idx_queries_status    ON queries(status);
 CREATE INDEX idx_queries_domain    ON queries(domain);
@@ -219,7 +235,7 @@ pihole-wtm targets **Pi-hole v6** exclusively. Pi-hole v6 uses a REST API with s
 ## Security Considerations
 
 - The Pi-hole API password is stored only in the environment/config; it is never logged and never returned by the pihole-wtm API.
-- `TRACKERDB_PATH` and `DB_PATH` are validated to prevent path traversal.
+- `TRACKERDB_PATH` and `LOCAL_DB_PATH` are validated to prevent path traversal.
 - TrackerDB downloads are verified against the GitHub release asset (not arbitrary URLs).
 - nginx sets appropriate Content Security Policy headers.
 - The local SQLite database is read-write only by the backend process; it is never exposed directly.

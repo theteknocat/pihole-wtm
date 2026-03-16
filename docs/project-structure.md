@@ -35,9 +35,9 @@ pihole-wtm/
 │           ├── trackerdb/
 │           │   ├── loader.py          # Download/cache trackerdb.db from Ghostery releases
 │           │   ├── repository.py      # aiosqlite queries against trackerdb.db
-│           │   └── enricher.py        # Domain → TrackerInfo with subdomain fallback + LRU cache
+│           │   └── enricher.py        # enrich() with subdomain fallback + LRU cache; enrich_exact() for gating
 │           └── disconnect/
-│               └── loader.py          # Disconnect.me services.json loader and domain lookup
+│               └── loader.py          # Disconnect.me services.json loader and exact-match domain lookup
 │
 ├── frontend/                          # Vue 3 + Vite TypeScript SPA
 │   ├── index.html                     # Vite entry point
@@ -51,27 +51,28 @@ pihole-wtm/
 │       ├── App.vue                    # Root: AppHeader + RouterView
 │       ├── style.css                  # CSS layer ordering, dark mode base styles
 │       │
-│       ├── router/
-│       │   └── index.ts               # Route definitions
-│       │
 │       ├── stores/                    # Pinia stores
-│       │   └── trackerStats.ts        # Tracker stats data and time window state
-│       │
-│       ├── api/                       # API client functions (fetch wrappers)
-│       │   └── client.ts              # Base fetch wrapper, error handling
+│       │   └── window.ts              # Shared time window (hours) and refreshKey counter
 │       │
 │       ├── views/                     # Top-level route components
 │       │   ├── OverviewView.vue       # Pi-hole connection status and health
-│       │   └── DashboardView.vue      # Main tracker dashboard (charts + tables)
+│       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
+│       │   └── DomainReportView.vue   # Per-domain drill-down; navigated to from dashboard
+│       │
+│       ├── composables/
+│       │   └── useAuth.ts             # Authentication state composable
 │       │
 │       ├── components/
 │       │   ├── layout/
-│       │   │   └── AppHeader.vue      # Top bar with dark mode toggle + Pi-hole status
+│       │   │   └── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
 │       │   └── dashboard/
-│       │       ├── CategoryBarChart.vue    # Horizontal stacked bar: tracker categories
-│       │       ├── CompanyBarChart.vue     # Horizontal stacked bar: top companies
-│       │       ├── TopCompaniesTable.vue   # Sortable top companies table
-│       │       └── RecentQueriesTable.vue  # Recent blocked/allowed queries table
+│       │       ├── CategoryBarChart.vue    # Horizontal stacked bar: tracker categories (clickable)
+│       │       ├── CompanyBarChart.vue     # Horizontal stacked bar: top companies (clickable)
+│       │       ├── TopCompaniesTable.vue   # Top companies by blocked/allowed count (clickable)
+│       │       └── RecentQueriesTable.vue  # Recent blocked/allowed queries
+│       │
+│       ├── utils/
+│       │   └── chart.ts               # Shared chart helpers: niceMax(), PADDING_LABEL
 │       │
 │       └── types/
 │           └── api.ts                 # TypeScript interfaces mirroring backend response shapes
@@ -102,9 +103,8 @@ pihole-wtm/
 
 ### Frontend
 
-- All API calls go through `src/api/` functions — never `fetch()` directly in components or stores.
-- Components do not own data — they read from Pinia stores and dispatch store actions.
+- View components own their data fetching — `fetch()` calls are made directly in `onMounted` and `watch` handlers within each view. This keeps data concerns local and avoids premature abstraction.
+- Pinia stores hold only truly shared session state (time window, refresh signals). They do not hold fetched data.
 - Type definitions in `src/types/` are kept in sync with backend Pydantic response shapes.
-- Environment-specific configuration (API base URL) comes from `.env.*` files, not hardcoded strings.
 - Dark mode uses `useDark()` from `@vueuse/core`, which reads the system preference and persists the user's choice to localStorage.
 - No pie charts. Bar charts only.

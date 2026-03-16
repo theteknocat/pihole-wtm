@@ -14,25 +14,32 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `PiholeApiClient` — Pi-hole v6 HTTP API with session authentication (httpx)
 - [x] `TrackerdbLoader` — downloads `trackerdb.db` from Ghostery GitHub releases on startup
 - [x] `TrackerRepository` — domain lookup SQL against `trackerdb.db`
-- [x] `TrackerEnricher` — subdomain fallback logic (exact → eTLD+1 → parent domains), LRU cached
+- [x] `TrackerEnricher` — `enrich()` with subdomain fallback + LRU cache; `enrich_exact()` for gating
 - [x] Stats endpoint: `/api/stats/trackers` (category + company breakdown by time window)
 - [x] Queries endpoint: `/api/queries` (with status and tracker-only filtering)
 - [x] Debug endpoints: `/api/debug/raw-query`, `/api/debug/pihole`
 - [x] Local SQLite sync database (`pihole-wtm.db`) with `queries`, `domains`, `sync_state` tables
 - [x] `SyncService` — background coroutine, cursor-based pagination, filtered storage
 - [x] Migrate stats and queries endpoints to read from local database
-- [ ] Background task for periodic TrackerDB refresh
+- [x] `/api/stats/domains` — per-domain query breakdown with category/company filter
+- [x] `/api/admin/reset` — clears all stored queries and domains, resets sync cursor
+- [x] Exact-match-only gating for allowed queries (TrackerDB + Disconnect.me); subdomain fallback retained for display enrichment of blocked queries
+- [ ] Background task for periodic TrackerDB refresh (currently only refreshed on startup)
 
 ### Phase 1 — Frontend
 
 - [x] Vue 3 + Vite + TypeScript scaffold, Tailwind CSS, PrimeVue (Aura), Vue Router
-- [x] `AppHeader` with dark mode toggle and Pi-hole status indicator
+- [x] App header with dark mode toggle, settings sidebar trigger
 - [x] `OverviewView` — health check, Pi-hole connection status
 - [x] `DashboardView` — tracker category chart, top companies chart, top companies tables, recent query tables
-- [x] `CategoryBarChart`, `CompanyBarChart` — horizontal stacked bar charts (blocked/allowed)
-- [x] `TopCompaniesTable`, `RecentQueriesTable` — sortable, enriched
-- [x] 24h / 7d time window toggle, tracker-only filter toggle
+- [x] `CategoryBarChart`, `CompanyBarChart` — horizontal stacked bar charts (blocked/allowed), clickable to drill down
+- [x] `TopCompaniesTable` — clickable rows navigate to domain drill-down
+- [x] `RecentQueriesTable` — enriched, tracker-only filter toggle
+- [x] 24h / 7d time window selection, persisted across views via Pinia store
 - [x] Dark mode (system default, persisted to localStorage)
+- [x] `DomainReportView` — per-domain breakdown, filterable by category or company, navigated from dashboard
+- [x] `SettingsSidebar` — slide-in panel with data reset (inline confirm/cancel) and manual refresh
+- [x] Auto-refresh of all visible reports after data reset; manual refresh button on each view
 - [ ] `QueryLogView` — full paginated, filterable query log (separate page)
 - [ ] Loading skeleton states for all data tables and charts
 - [ ] Empty states for zero-data scenarios
@@ -60,11 +67,14 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] RDAP company name lookup for heuristic-enriched domains (background upgrade pass, cached)
 - [x] `needs_reenrichment` background re-processing when new enrichment sources are added
 - [x] Graceful handling of enrichment gaps — unlabelled domains show category "Uncategorized"
+- [ ] Tracker source architecture refactor — `TrackerSource` protocol, merge repository into enricher, rename `DisconnectDB` → `DisconnectSource`; groundwork for config UI
+- [ ] Tracker source configuration — `user_config` table in SQLite; user-selectable active categories (unified across TrackerDB and Disconnect.me) and explicit domain exclusion list; changes applied retroactively via surgical DELETE or forward-only
 - [ ] `GET /api/stats/timeline` — bucketed query/block counts over time (24h, 7d, 30d)
 - [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search
 
 ### Phase 2 — Frontend
 
+- [ ] Tracker source configuration modal — category toggles (with source badges), domain exclusion list, retroactive/forward-only apply option; accessible from settings sidebar
 - [ ] `QueryTimeline` — line + area chart, period selector (24h / 7d / 30d)
 - [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
 - [ ] URL query param sync for all filters (shareable/bookmarkable URLs)
