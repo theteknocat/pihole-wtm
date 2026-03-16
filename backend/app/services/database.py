@@ -366,6 +366,70 @@ class LocalDatabase:
             "by_category": by_category,
         }
 
+    async def fetch_domain_stats(
+        self,
+        hours: int = 24,
+        category: str | None = None,
+        company: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return per-domain query counts for the given time window, optionally
+        filtered to a single tracker category or company.
+        """
+        from_ts = time.time() - hours * 3600
+        conditions = ["q.timestamp >= ?"]
+        params: list[Any] = [from_ts]
+
+        if category is not None:
+            conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
+            params.append(category)
+        if company is not None:
+            conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
+            params.append(company)
+
+        where = "WHERE " + " AND ".join(conditions)
+
+        sql = f"""
+            SELECT
+                q.domain,
+                COALESCE(d.category, 'Uncategorized')   AS category,
+                COALESCE(d.company_name, 'Unknown')     AS company_name,
+                d.tracker_name,
+                COUNT(*)                                AS query_count,
+                SUM(CASE WHEN q.status IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS blocked_count,
+                SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed_count
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            {where}
+            GROUP BY q.domain
+            ORDER BY query_count DESC
+        """
+
+        async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+
+        return {
+            "window_hours": hours,
+            "filter_category": category,
+            "filter_company": company,
+            "domains": [
+                {
+                    "domain": row["domain"],
+                    "category": row["category"],
+                    "company_name": row["company_name"],
+                    "tracker_name": row["tracker_name"],
+                    "query_count": row["query_count"],
+                    "blocked_count": row["blocked_count"],
+                    "allowed_count": row["allowed_count"],
+                    "block_rate": round(row["blocked_count"] / row["query_count"] * 100, 1)
+                    if row["query_count"] else 0.0,
+                }
+                for row in rows
+            ],
+        }
+
     async def get_sync_status(self) -> dict[str, Any]:
         async with self._conn() as db:
             async with db.execute(

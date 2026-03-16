@@ -122,6 +122,15 @@ async def stats_trackers(
     return await db.fetch_tracker_stats(hours=hours)
 
 
+@app.get("/api/stats/domains")
+async def stats_domains(
+    hours: int = Query(default=24, ge=1, le=168),
+    category: str | None = Query(default=None),
+    company: str | None = Query(default=None),
+) -> dict[str, Any]:
+    return await db.fetch_domain_stats(hours=hours, category=category, company=company)
+
+
 @app.get("/api/trackerdb/status")
 async def trackerdb_status() -> dict[str, Any]:
     return {
