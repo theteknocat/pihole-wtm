@@ -1,4 +1,11 @@
 /**
+ * Label used for the transparent padding dataset that fills each bar to the
+ * axis maximum, making the full row width hoverable/clickable.
+ * Must match exactly in dataset definition, legend filter, and tooltip callback.
+ */
+export const PADDING_LABEL = '_padding'
+
+/**
  * Replicates Chart.js's nice-max algorithm so a padding dataset can be sized
  * to fill exactly to the axis end rather than stopping at the data maximum.
  */

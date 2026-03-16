@@ -51,6 +51,7 @@ export interface EnrichedQuery {
   timestamp: number
   domain: string
   client: string
+  client_name: string | null
   status: string
   status_label: string
   query_type: string

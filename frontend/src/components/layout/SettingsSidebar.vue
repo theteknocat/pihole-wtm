@@ -20,16 +20,21 @@ function close() {
 
 const resetState = ref<'idle' | 'confirm'>('idle')
 const resetting = ref(false)
+const resetError = ref<string | null>(null)
 
 async function doReset() {
   resetting.value = true
+  resetError.value = null
   try {
-    await fetch('/api/admin/reset', { method: 'POST' })
+    const res = await fetch('/api/admin/reset', { method: 'POST' })
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
     windowStore.triggerRefresh()
     close()
+  } catch {
+    resetError.value = 'Reset failed. Please try again.'
+    resetState.value = 'idle'
   } finally {
     resetting.value = false
-    resetState.value = 'idle'
   }
 }
 </script>
@@ -67,7 +72,8 @@ async function doReset() {
               Clears all stored queries and domains. Data will resync on the next cycle.
             </p>
           </div>
-          <div class="flex flex-col items-end gap-1 shrink-0">
+          <div class="flex flex-col items-end gap-1 shrink-0 min-w-0">
+            <p v-if="resetError" class="text-xs text-red-500 text-right w-full">{{ resetError }}</p>
             <template v-if="resetState === 'idle'">
               <Button
                 label="Reset"

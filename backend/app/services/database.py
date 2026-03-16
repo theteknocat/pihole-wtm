@@ -322,8 +322,8 @@ class LocalDatabase:
             entry["allowed"] += row["allowed_count"]
             entry["domains"][row["domain"]] = qc
 
-        # Only count categories with actual TrackerDB data — 'Unknown' means
-        # no TrackerDB match (blocked domain not in the database).
+        # Only count categories with actual enrichment data — 'Uncategorized'
+        # means the domain had no category from any enrichment source.
         tracker_total = sum(
             entry["total"]
             for cat, companies in category_data.items()

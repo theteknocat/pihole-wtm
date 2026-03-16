@@ -100,6 +100,9 @@ watch([category, company], fetchData)
       </div>
     </div>
 
+    <!-- Refresh error (shown over existing data) -->
+    <div v-if="error && data" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
+
     <!-- Loading -->
     <div v-if="loading && !data" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
       <ProgressSpinner />

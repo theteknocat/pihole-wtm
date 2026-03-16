@@ -31,7 +31,6 @@ class DisconnectDB:
     In-memory lookup database built from Disconnect.me's services.json.
 
     Lookup is synchronous and O(1) — data is a plain dict keyed by domain.
-    Subdomain fallback strips one level at a time (same strategy as TrackerDB).
     """
 
     def __init__(self) -> None:

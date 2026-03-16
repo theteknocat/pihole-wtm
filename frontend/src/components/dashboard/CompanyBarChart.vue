@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 import { useDark } from '@vueuse/core'
 import Chart from 'primevue/chart'
+import type { LegendItem } from 'chart.js'
 import type { CompanyStat } from '@/types/api'
-import { niceMax } from '@/utils/chart'
+import { niceMax, PADDING_LABEL } from '@/utils/chart'
 
 const props = defineProps<{
   data: CompanyStat[]
@@ -40,7 +41,7 @@ const chartData = computed(() => ({
       backgroundColor: 'rgba(34, 197, 94, 0.85)',
     },
     {
-      label: '_padding',
+      label: PADDING_LABEL,
       data: top.value.map(c => axisMax.value - c.query_count),
       backgroundColor: isDark.value ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     },
@@ -64,12 +65,13 @@ const chartOptions = computed(() => {
     plugins: {
       legend: {
         position: 'bottom' as const,
-        labels: { color: textColor, filter: (item: any) => item.text !== '_padding' },
+        labels: { color: textColor, filter: (item: LegendItem) => item.text !== PADDING_LABEL },
       },
       tooltip: {
         callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           label: (ctx: any) => {
-            if (ctx.dataset.label === '_padding') {
+            if (ctx.dataset.label === PADDING_LABEL) {
               const total = top.value[ctx.dataIndex].query_count
               return ` Total: ${total.toLocaleString()} queries`
             }
