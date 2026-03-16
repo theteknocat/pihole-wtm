@@ -34,6 +34,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: () => import('./views/OverviewView.vue') },
     { path: '/dashboard', component: () => import('./views/DashboardView.vue') },
+    { path: '/report', component: () => import('./views/DomainReportView.vue') },
   ],
 })
 

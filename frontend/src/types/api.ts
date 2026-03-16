@@ -28,6 +28,24 @@ export interface TrackerStats {
   by_category: CategoryStat[]
 }
 
+export interface DomainStat {
+  domain: string
+  category: string
+  company_name: string
+  tracker_name: string | null
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+  block_rate: number
+}
+
+export interface DomainStats {
+  window_hours: number
+  filter_category: string | null
+  filter_company: string | null
+  domains: DomainStat[]
+}
+
 export interface EnrichedQuery {
   id: number
   timestamp: number
