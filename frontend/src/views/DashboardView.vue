@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
 import SelectButton from 'primevue/selectbutton'
@@ -8,13 +9,20 @@ import CategoryBarChart from '@/components/dashboard/CategoryBarChart.vue'
 import CompanyBarChart from '@/components/dashboard/CompanyBarChart.vue'
 import TopCompaniesTable from '@/components/dashboard/TopCompaniesTable.vue'
 import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
+import { useWindowStore } from '@/stores/window'
 import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
+
+const router = useRouter()
+const windowStore = useWindowStore()
 
 const windowOptions = [
   { label: '24h', value: 24 },
   { label: '7d', value: 168 },
 ]
-const selectedWindow = ref(windowOptions[0])
+const selectedWindow = computed({
+  get: () => windowOptions.find(o => o.value === windowStore.hours) ?? windowOptions[0],
+  set: (v) => { windowStore.hours = v.value },
+})
 const trackerOnly = ref(true)
 
 const stats = ref<TrackerStats | null>(null)
@@ -64,12 +72,12 @@ async function fetchRecentQueries() {
   }
 }
 
-async function fetchStats(hours: number) {
+async function fetchStats() {
   loading.value = true
   error.value = null
   try {
     const [statsRes, blockedRes, allowedRes] = await Promise.all([
-      fetch(`/api/stats/trackers?hours=${hours}`).then(r => r.json()),
+      fetch(`/api/stats/trackers?hours=${windowStore.hours}`).then(r => r.json()),
       fetch(recentQueryUrl('blocked')).then(r => r.json()),
       fetch(recentQueryUrl('allowed')).then(r => r.json()),
     ])
@@ -83,9 +91,17 @@ async function fetchStats(hours: number) {
   }
 }
 
-onMounted(() => fetchStats(selectedWindow.value.value))
-watch(selectedWindow, w => fetchStats(w.value))
-watch(trackerOnly, () => fetchRecentQueries())
+function drillCategory(category: string) {
+  router.push({ path: '/report', query: { category } })
+}
+
+function drillCompany(company: string) {
+  router.push({ path: '/report', query: { company } })
+}
+
+onMounted(fetchStats)
+watch(() => windowStore.hours, fetchStats)
+watch(trackerOnly, fetchRecentQueries)
 </script>
 
 <template>
@@ -128,6 +144,7 @@ watch(trackerOnly, () => fetchRecentQueries())
           <CategoryBarChart
             :data="stats!.by_category"
             :total-tracker-queries="stats!.tracker_queries"
+            @select-category="drillCategory"
           />
         </template>
       </Card>
@@ -139,6 +156,7 @@ watch(trackerOnly, () => fetchRecentQueries())
           <CompanyBarChart
             :data="allCompanies"
             :total-tracker-queries="stats!.tracker_queries"
+            @select-company="drillCompany"
           />
         </template>
       </Card>
@@ -147,7 +165,7 @@ watch(trackerOnly, () => fetchRecentQueries())
         <template #title>Top Blocked Companies</template>
         <template #subtitle>{{ selectedWindow.label }}</template>
         <template #content>
-          <TopCompaniesTable :data="allCompanies" type="blocked" />
+          <TopCompaniesTable :data="allCompanies" type="blocked" @select-company="drillCompany" />
         </template>
       </Card>
 
@@ -155,7 +173,7 @@ watch(trackerOnly, () => fetchRecentQueries())
         <template #title>Top Allowed Companies</template>
         <template #subtitle>{{ selectedWindow.label }}</template>
         <template #content>
-          <TopCompaniesTable :data="allCompanies" type="allowed" />
+          <TopCompaniesTable :data="allCompanies" type="allowed" @select-company="drillCompany" />
         </template>
       </Card>
 

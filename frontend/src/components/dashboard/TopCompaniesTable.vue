@@ -7,6 +7,8 @@ const props = defineProps<{
   type: 'allowed' | 'blocked'
 }>()
 
+const emit = defineEmits<{ (e: 'select-company', company: string): void }>()
+
 const rows = computed(() =>
   [...props.data]
     .sort((a, b) =>
@@ -33,7 +35,8 @@ const countKey = computed(() => (props.type === 'blocked' ? 'blocked_count' : 'a
       <tr
         v-for="(company, i) in rows"
         :key="company.company_name"
-        class="border-b border-gray-100 dark:border-gray-800 last:border-0"
+        class="border-b border-gray-100 dark:border-gray-800 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+        @click="emit('select-company', company.company_name)"
       >
         <td class="py-2 pr-4 text-gray-400 dark:text-gray-500">{{ i + 1 }}</td>
         <td class="py-2 pr-4 truncate max-w-0 w-full">{{ company.company_name }}</td>
