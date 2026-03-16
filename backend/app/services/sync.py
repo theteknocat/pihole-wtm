@@ -81,15 +81,34 @@ async def _sync_once(
     if not new_queries:
         return 0
 
-    # Filter: keep blocked queries always; allowed queries only if a known tracker
-    to_store = []
+    # Filter: always store blocked queries; store allowed queries only when the
+    # domain is an exact match in TrackerDB or Disconnect.me. No subdomain
+    # fallback here — fallback would cause legitimate subdomains (mail.google.com,
+    # calendar.google.com) to match their parent company's tracker entry and be
+    # incorrectly stored as ad-network traffic.
+    #
+    # A per-cycle cache avoids repeated DB hits for the same domain within one batch.
+    # The gating result is reused directly for allowed-query enrichment, eliminating
+    # the redundant second lookup that the previous implementation required.
+    to_store: list[RawQuery] = []
+    allowed_enrichment: dict[int, tuple[TrackerInfo, str]] = {}  # query id → (result, source)
+    _exact_cache: dict[str, tuple[TrackerInfo | None, str | None]] = {}
+
     for q in new_queries:
         if q.status in BLOCKED_STATUSES:
             to_store.append(q)
         else:
-            tb_result = await enricher.enrich(q.domain)
-            if tb_result is not None:
+            if q.domain not in _exact_cache:
+                tb_exact = await enricher.enrich_exact(q.domain)
+                if tb_exact is not None:
+                    _exact_cache[q.domain] = (tb_exact, "trackerdb")
+                else:
+                    disc = disconnect_db.lookup(q.domain)
+                    _exact_cache[q.domain] = (disc, "disconnect") if disc else (None, None)
+            result, source = _exact_cache[q.domain]
+            if result is not None:
                 to_store.append(q)
+                allowed_enrichment[q.id] = (result, source)
 
     if not to_store:
         await db.update_sync_state(max(q.id for q in new_queries))
@@ -99,13 +118,28 @@ async def _sync_once(
     unique_domains = list({q.domain for q in to_store})
     await db.upsert_domains(unique_domains)
 
-    # Enrich all domains concurrently via TrackerDB, then fall back to Disconnect.me
-    trackerdb_results = await asyncio.gather(*[enricher.enrich(q.domain) for q in to_store])
+    # Enrich blocked queries with full subdomain-fallback lookup so display
+    # metadata (category, company) is populated even for tracker subdomains not
+    # explicitly listed. Allowed queries reuse the exact gating result directly.
+    blocked = [q for q in to_store if q.id not in allowed_enrichment]
+    blocked_tb = await asyncio.gather(*[enricher.enrich(q.domain) for q in blocked])
 
     enrichment_updates = []
-    for q, tb_result in zip(to_store, trackerdb_results):
+    for q, tb_result in zip(blocked, blocked_tb):
         result, source = _enrich_domain(q.domain, tb_result, disconnect_db)
         if result is not None:
+            enrichment_updates.append({
+                "domain": q.domain,
+                "tracker_name": result.tracker_name,
+                "category": result.category,
+                "company_name": result.company_name,
+                "company_country": result.company_country,
+                "source": source,
+            })
+
+    for q in to_store:
+        if q.id in allowed_enrichment:
+            result, source = allowed_enrichment[q.id]
             enrichment_updates.append({
                 "domain": q.domain,
                 "tracker_name": result.tracker_name,

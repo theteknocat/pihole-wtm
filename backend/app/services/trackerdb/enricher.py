@@ -35,6 +35,16 @@ class TrackerEnricher:
         self._cache[domain] = result
         return result
 
+    async def enrich_exact(self, domain: str) -> TrackerInfo | None:
+        """
+        Exact-match lookup only — no subdomain fallback.
+
+        Used for storage gating to avoid pulling in legitimate service domains
+        (e.g. mail.google.com) via a parent company's tracker entry (google.com).
+        Does not use or populate the LRU cache, which stores fallback results.
+        """
+        return await self._repo.lookup_domain(domain)
+
     async def _lookup_with_fallback(self, domain: str) -> TrackerInfo | None:
         # Try the full domain first
         result = await self._repo.lookup_domain(domain)
