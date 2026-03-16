@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
+import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import ToggleButton from 'primevue/togglebutton'
 import CategoryBarChart from '@/components/dashboard/CategoryBarChart.vue'
@@ -101,6 +102,7 @@ function drillCompany(company: string) {
 
 onMounted(fetchStats)
 watch(() => windowStore.hours, fetchStats)
+watch(() => windowStore.refreshKey, fetchStats)
 watch(trackerOnly, fetchRecentQueries)
 </script>
 
@@ -115,27 +117,38 @@ watch(trackerOnly, fetchRecentQueries)
           Tracker intelligence for the last {{ selectedWindow.label }}
         </p>
       </div>
-      <SelectButton
+      <div class="flex items-center gap-2">
+        <SelectButton
         v-model="selectedWindow"
         :options="windowOptions"
         option-label="label"
         :allow-empty="false"
-      />
+        />
+        <Button
+          icon="pi pi-refresh"
+          severity="secondary"
+          text
+          rounded
+          :loading="loading"
+          aria-label="Refresh"
+          @click="fetchStats()"
+        />
+      </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
+    <div v-if="loading && !stats" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
       <ProgressSpinner />
       <p>Loading{{ selectedWindow.value === 168 ? ' — 7 day window may take a moment' : '…' }}</p>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex items-center justify-center py-24">
+    <div v-else-if="error && !stats" class="flex items-center justify-center py-24">
       <p class="text-red-500">{{ error }}</p>
     </div>
 
     <!-- Dashboard grid -->
-    <div v-else class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <div v-if="stats" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
       <Card>
         <template #title>Tracker Categories</template>

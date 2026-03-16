@@ -430,6 +430,17 @@ class LocalDatabase:
             ],
         }
 
+    async def reset(self) -> None:
+        """Delete all synced queries and domains, and reset the sync cursor to zero."""
+        async with self._conn() as db:
+            await db.execute("DELETE FROM queries")
+            await db.execute("DELETE FROM domains")
+            await db.execute(
+                "UPDATE sync_state SET last_query_id = 0, last_synced_at = NULL WHERE id = 1"
+            )
+            await db.commit()
+        logger.info("Database reset: all queries and domains deleted, sync cursor zeroed")
+
     async def get_sync_status(self) -> dict[str, Any]:
         async with self._conn() as db:
             async with db.execute(

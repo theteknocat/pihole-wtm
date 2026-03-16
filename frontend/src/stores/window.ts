@@ -3,5 +3,9 @@ import { defineStore } from 'pinia'
 
 export const useWindowStore = defineStore('window', () => {
   const hours = ref(24)
-  return { hours }
+  const refreshKey = ref(0)
+
+  function triggerRefresh() { refreshKey.value++ }
+
+  return { hours, refreshKey, triggerRefresh }
 })

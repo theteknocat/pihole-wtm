@@ -48,6 +48,7 @@ async function fetchData() {
 
 onMounted(fetchData)
 watch(() => windowStore.hours, fetchData)
+watch(() => windowStore.refreshKey, fetchData)
 watch([category, company], fetchData)
 </script>
 
@@ -80,27 +81,38 @@ watch([category, company], fetchData)
           </p>
         </div>
       </div>
-      <SelectButton
+      <div class="flex items-center gap-2">
+        <SelectButton
         v-model="selectedWindow"
         :options="windowOptions"
         option-label="label"
         :allow-empty="false"
-      />
+        />
+        <Button
+          icon="pi pi-refresh"
+          severity="secondary"
+          text
+          rounded
+          :loading="loading"
+          aria-label="Refresh"
+          @click="fetchData()"
+        />
+      </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
+    <div v-if="loading && !data" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
       <ProgressSpinner />
       <p>Loading…</p>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex items-center justify-center py-24">
+    <div v-else-if="error && !data" class="flex items-center justify-center py-24">
       <p class="text-red-500">{{ error }}</p>
     </div>
 
     <!-- Table -->
-    <Card v-else>
+    <Card v-if="data">
       <template #content>
         <DataTable
           :value="data!.domains"

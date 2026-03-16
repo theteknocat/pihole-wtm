@@ -131,6 +131,12 @@ async def stats_domains(
     return await db.fetch_domain_stats(hours=hours, category=category, company=company)
 
 
+@app.post("/api/admin/reset")
+async def admin_reset() -> dict[str, str]:
+    await db.reset()
+    return {"status": "ok"}
+
+
 @app.get("/api/trackerdb/status")
 async def trackerdb_status() -> dict[str, Any]:
     return {
