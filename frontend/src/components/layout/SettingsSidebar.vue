@@ -67,10 +67,11 @@ async function doReset() {
               Clears all stored queries and domains. Data will resync on the next cycle.
             </p>
           </div>
-          <div class="flex items-center gap-1 shrink-0">
+          <div class="flex flex-col items-end gap-1 shrink-0">
             <template v-if="resetState === 'idle'">
               <Button
                 label="Reset"
+                icon="pi pi-trash"
                 severity="danger"
                 size="small"
                 text
@@ -80,6 +81,7 @@ async function doReset() {
             <template v-else>
               <Button
                 label="Cancel"
+                icon="pi pi-times"
                 severity="secondary"
                 size="small"
                 text
@@ -87,7 +89,8 @@ async function doReset() {
                 @click="resetState = 'idle'"
               />
               <Button
-                label="Confirm"
+                label="Reset"
+                icon="pi pi-trash"
                 severity="danger"
                 size="small"
                 :loading="resetting"
