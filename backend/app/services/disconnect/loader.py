@@ -91,21 +91,15 @@ class DisconnectDB:
 
     def lookup(self, domain: str) -> TrackerInfo | None:
         """
-        Look up a domain, falling back to parent domains if not found directly.
+        Look up a domain by exact match only.
         Returns None if the domain is not known to Disconnect.me.
+
+        Unlike TrackerDB, Disconnect.me lists root domains of companies that
+        *operate* ad/tracker networks — not necessarily that the root domain
+        itself is a tracking endpoint. Subdomain fallback would incorrectly
+        flag legitimate services (mail.google.com, www.apple.com, etc.) as
+        trackers simply because their parent company runs an ad network.
         """
         if not self.is_loaded:
             return None
-
-        if domain in self._lookup:
-            return self._lookup[domain]
-
-        # Strip subdomains one level at a time
-        parts = domain.split(".")
-        for i in range(1, len(parts) - 1):
-            parent = ".".join(parts[i:])
-            if parent in self._lookup:
-                logger.debug("Domain %s matched via parent %s in Disconnect.me", domain, parent)
-                return self._lookup[parent]
-
-        return None
+        return self._lookup.get(domain)
