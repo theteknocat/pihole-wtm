@@ -83,10 +83,10 @@ watch([category, company], fetchData)
       </div>
       <div class="flex items-center gap-2">
         <SelectButton
-        v-model="selectedWindow"
-        :options="windowOptions"
-        option-label="label"
-        :allow-empty="false"
+          v-model="selectedWindow"
+          :options="windowOptions"
+          option-label="label"
+          :allow-empty="false"
         />
         <Button
           icon="pi pi-refresh"
