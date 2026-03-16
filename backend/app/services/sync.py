@@ -88,8 +88,7 @@ async def _sync_once(
             to_store.append(q)
         else:
             tb_result = await enricher.enrich(q.domain)
-            _, source = _enrich_domain(q.domain, tb_result, disconnect_db)
-            if source is not None:
+            if tb_result is not None:
                 to_store.append(q)
 
     if not to_store:
