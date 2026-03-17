@@ -26,6 +26,7 @@ pihole-wtm/
 │       │   └── tracker.py             # Pydantic: TrackerInfo
 │       │
 │       └── services/
+│           ├── sources.py             # TrackerSource protocol + get_tracker_sources() registry
 │           ├── database.py            # Local SQLite: schema, sync state, query/domain helpers
 │           ├── sync.py                # Background sync coroutine + enrichment orchestration
 │           ├── heuristic.py           # eTLD+1 company name + subdomain keyword category
@@ -33,11 +34,9 @@ pihole-wtm/
 │           ├── pihole/
 │           │   └── api_client.py      # httpx client for Pi-hole v6 HTTP API
 │           ├── trackerdb/
-│           │   ├── loader.py          # Download/cache trackerdb.db from Ghostery releases
-│           │   ├── repository.py      # aiosqlite queries against trackerdb.db
-│           │   └── enricher.py        # enrich() with subdomain fallback + LRU cache; enrich_exact() for gating
-│           └── disconnect/
-│               └── loader.py          # Disconnect.me services.json loader and exact-match domain lookup
+│           │   └── source.py          # TrackerDBSource: download, lookup, enrich, debug routes
+│           └── disconnectme/
+│               └── source.py          # DisconnectSource: services.json loader, lookup, debug routes
 │
 ├── frontend/                          # Vue 3 + Vite TypeScript SPA
 │   ├── index.html                     # Vite entry point
@@ -55,7 +54,7 @@ pihole-wtm/
 │       │   └── window.ts              # Shared time window (hours) and refreshKey counter
 │       │
 │       ├── views/                     # Top-level route components
-│       │   ├── OverviewView.vue       # Pi-hole connection status and health
+│       │   ├── OverviewView.vue       # System health: backend, Pi-hole, and per-source status
 │       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
 │       │   └── DomainReportView.vue   # Per-domain drill-down; navigated to from dashboard
 │       │

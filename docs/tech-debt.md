@@ -6,20 +6,6 @@ Minor items identified during code review that are worth addressing before relea
 
 ## Backend
 
-### Tracker source architecture — inconsistent structure and no common interface
-
-TrackerDB is split across three layers (loader, repository, enricher) while Disconnect.me conflates loading, storage and lookup into one class. The repository layer adds indirection with no benefit since there is only one implementation.
-
-Planned refactor:
-
-- Merge `trackerdb/repository.py` into `trackerdb/enricher.py`; enricher takes the DB path directly
-- Define a `TrackerSource` protocol with `lookup_exact(domain)` and `lookup(domain)` methods
-- Both `TrackerEnricher` and `DisconnectDB` implement the protocol
-- Rename `DisconnectDB` to `DisconnectSource` for consistency
-- Sync gating loop iterates over configured sources rather than calling each explicitly
-
-This also lays the groundwork for the planned tracker source configuration UI (user-selectable sources and categories).
-
 ### `api_client.py` — `test_connection` bypasses the auth lock
 
 `test_connection()` calls `_authenticate()` directly instead of going through `_get()`, so it doesn't acquire `_auth_lock`. This means a concurrent call to `test_connection()` and a regular request could both trigger authentication simultaneously.

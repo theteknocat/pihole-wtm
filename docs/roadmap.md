@@ -12,9 +12,9 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 - [x] Project scaffolding: `pyproject.toml`, FastAPI app factory, pydantic-settings config
 - [x] `PiholeApiClient` — Pi-hole v6 HTTP API with session authentication (httpx)
-- [x] `TrackerdbLoader` — downloads `trackerdb.db` from Ghostery GitHub releases on startup
-- [x] `TrackerRepository` — domain lookup SQL against `trackerdb.db`
-- [x] `TrackerEnricher` — `enrich()` with subdomain fallback + LRU cache; `enrich_exact()` for gating
+- [x] `TrackerSource` protocol — pluggable source interface with `lookup_exact()`, `enrich()`, `initialize()`, `refresh_if_stale()`, `api_router()`, plus `get_tracker_sources()` registry
+- [x] `TrackerDBSource` — downloads trackerdb.db, subdomain fallback enrichment + LRU cache, exact-match gating, debug routes
+- [x] `DisconnectSource` — services.json in-memory loader, exact-match lookup, debug routes
 - [x] Stats endpoint: `/api/stats/trackers` (category + company breakdown by time window)
 - [x] Queries endpoint: `/api/queries` (with status and tracker-only filtering)
 - [x] Debug endpoints: `/api/debug/raw-query`, `/api/debug/pihole`
@@ -24,13 +24,14 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `/api/stats/domains` — per-domain query breakdown with category/company filter
 - [x] `/api/admin/reset` — clears all stored queries and domains, resets sync cursor
 - [x] Exact-match-only gating for allowed queries (TrackerDB + Disconnect.me); subdomain fallback retained for display enrichment of blocked queries
-- [ ] Background task for periodic TrackerDB refresh (currently only refreshed on startup)
+- [x] Periodic source refresh via `refresh_if_stale()` — TrackerDB re-downloads when file is stale, Disconnect.me re-fetches when data age exceeds configured interval
+- [x] Per-source health check and status on `/api/health` endpoint; OverviewView displays source statuses with icons
 
 ### Phase 1 — Frontend
 
 - [x] Vue 3 + Vite + TypeScript scaffold, Tailwind CSS, PrimeVue (Aura), Vue Router
 - [x] App header with dark mode toggle, settings sidebar trigger
-- [x] `OverviewView` — health check, Pi-hole connection status
+- [x] `OverviewView` — system health: backend status, Pi-hole connection, per-source loaded/unavailable indicators with tooltips
 - [x] `DashboardView` — tracker category chart, top companies chart, top companies tables, recent query tables
 - [x] `CategoryBarChart`, `CompanyBarChart` — horizontal stacked bar charts (blocked/allowed), clickable to drill down
 - [x] `TopCompaniesTable` — clickable rows navigate to domain drill-down
@@ -67,7 +68,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] RDAP company name lookup for heuristic-enriched domains (background upgrade pass, cached)
 - [x] `needs_reenrichment` background re-processing when new enrichment sources are added
 - [x] Graceful handling of enrichment gaps — unlabelled domains show category "Uncategorized"
-- [ ] Tracker source architecture refactor — `TrackerSource` protocol, merge repository into enricher, rename `DisconnectDB` → `DisconnectSource`; groundwork for config UI
+- [x] Tracker source architecture refactor — `TrackerSource` protocol, pluggable source plugins with self-registration, per-source API routes, health checks, and lifecycle management; `main.py` fully source-agnostic
 - [ ] Tracker source configuration — `user_config` table in SQLite; user-selectable active categories (unified across TrackerDB and Disconnect.me) and explicit domain exclusion list; changes applied retroactively via surgical DELETE or forward-only
 - [ ] `GET /api/stats/timeline` — bucketed query/block counts over time (24h, 7d, 30d)
 - [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search

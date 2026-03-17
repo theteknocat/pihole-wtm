@@ -65,22 +65,17 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 - `domains` — one row per unique domain, holding all enrichment results across sources
 - `sync_state` — single-row cursor tracking the last synced Pi-hole query ID
 
-**Enrichment Pipeline** processes each newly discovered domain after it is first stored. It runs through sources in priority order, writing the best available result to the `domains` table. Enrichment runs in the background and never blocks API responses. A `needs_reenrichment` flag on the `domains` table allows background re-processing when new sources are added.
+**Enrichment Pipeline** processes each newly discovered domain after it is first stored. It iterates over configured tracker sources in priority order, writing the best available result to the `domains` table. Enrichment runs in the background and never blocks API responses. A `needs_reenrichment` flag on the `domains` table allows background re-processing when new sources are added.
 
-**TrackerEnricher** takes a domain string and returns tracker metadata by querying Ghostery's TrackerDB. It exposes two lookup strategies:
+**TrackerSource protocol** defines the common interface for all tracker data sources. Each source implements `lookup_exact()` (for storage gating), `enrich()` (for display enrichment with optional fallback strategies), `initialize()`, `refresh_if_stale()`, and `api_router()` (for optional debug endpoints). Sources self-describe their capabilities via `gates` (whether they participate in allowed-query gating), `priority` (lower = tried first), and `label` (human-friendly display name). A `get_tracker_sources()` registration function instantiates all configured sources.
 
-- `enrich_exact(domain)` — exact match only, no fallback. Used for storage gating to avoid matching legitimate subdomains (e.g. `mail.google.com`) via their parent company's ad-network entry (`google.com`).
-- `enrich(domain)` — walks from the most-specific hostname up to the registered domain (eTLD+1), enabling a match for tracker subdomains not explicitly listed. Used for display enrichment of already-stored blocked queries.
+**TrackerDBSource** (Ghostery's `trackerdb.db`) is the primary source. It manages its own lifecycle: downloading the SQLite file from GitHub Releases on startup, validating the schema, and refreshing when stale. It exposes two lookup strategies — `lookup_exact()` (direct DB hit, no fallback) and `enrich()` (subdomain fallback + 50k-entry LRU cache). It also registers debug API routes at `/api/sources/trackerdb/`.
 
-Results from `enrich()` are cached in an LRU cache (50k entries). `enrich_exact()` bypasses the cache since the cache stores fallback results that would be incorrect for exact-match use.
-
-**TrackerRepository** wraps `aiosqlite` reads against `trackerdb.db`. It exposes a domain lookup method and a categories listing used by the API.
-
-**Background tasks** handle TrackerDB updates: on startup, the latest `trackerdb.db` is downloaded from Ghostery's GitHub releases if missing or stale. A periodic background coroutine refreshes it according to `TRACKERDB_UPDATE_INTERVAL_HOURS`.
+**DisconnectSource** (Disconnect.me `services.json`) is the secondary source. Data is downloaded and parsed into an in-memory dict on startup. All lookups are exact-match only — Disconnect.me lists root domains of companies that operate ad networks, so subdomain fallback would incorrectly flag legitimate services. Debug routes registered at `/api/sources/disconnect/`.
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Overview (Pi-hole connection status and health), Dashboard (tracker charts and summary tables), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows).
+**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows).
 
 **Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d) and a `refreshKey` counter used to signal cross-component data refreshes — for example, causing all visible reports to reload after a data reset from the settings sidebar.
 
@@ -92,9 +87,9 @@ Results from `enrich()` are cached in an LRU cache (50k entries). `enrich_exact(
 
 ### Data Sources
 
-**`trackerdb.db`** is Ghostery's TrackerDB compiled to SQLite. It contains tables for trackers, organisations, categories, and domain patterns. Released periodically on GitHub at [ghostery/trackerdb](https://github.com/ghostery/trackerdb/releases).
+**`trackerdb.db`** is Ghostery's TrackerDB compiled to SQLite. It contains tables for trackers, organisations, categories, and domain patterns. Released periodically on GitHub at [ghostery/trackerdb](https://github.com/ghostery/trackerdb/releases). Managed by `TrackerDBSource`.
 
-**Disconnect.me tracking protection lists** — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Loaded into memory on startup and refreshed every `DISCONNECT_UPDATE_INTERVAL_HOURS`. Used as a secondary enrichment source for domains not in TrackerDB.
+**Disconnect.me tracking protection lists** — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Loaded into memory on startup and refreshed when stale (configurable via `DISCONNECT_UPDATE_INTERVAL_HOURS`). Managed by `DisconnectSource`. Used as a secondary enrichment source for domains not in TrackerDB.
 
 **eTLD+1 heuristic** — a lightweight fallback for domains not matched by TrackerDB or Disconnect.me. Extracts a company name from the registered domain label and infers a tracker category from well-known subdomain keywords (e.g. `telemetry.*` → "telemetry", `analytics.*` → "analytics"). Less reliable than a curated database but meaningfully better than showing nothing.
 
@@ -123,10 +118,11 @@ Results from `enrich()` are cached in an LRU cache (50k entries). `enrich_exact(
 4. Upsert domain into domains table if not already present
 
 5. Run enrichment pipeline to populate display metadata (category, company, tracker name):
-   a. Blocked queries: TrackerDB lookup with subdomain fallback + LRU cache, then Disconnect.me
+   a. Blocked queries: iterate sources in priority order using enrich() (includes subdomain
+      fallback for TrackerDB, exact-match for Disconnect.me)
    b. Allowed queries: reuse the exact-match gating result directly (no second lookup)
    c. eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
-      (if TrackerDB and Disconnect.me both missed)
+      (if all configured sources missed)
    Write category, company_name, tracker_name, enrichment_source to domains table
 
    A separate periodic background pass (every ~10 sync cycles) upgrades heuristic-enriched
@@ -151,18 +147,23 @@ Results from `enrich()` are cached in an LRU cache (50k entries). `enrich_exact(
 3. Returns pre-enriched aggregated result — no Pi-hole API call, no inline enrichment
 ```
 
-### TrackerDB Update
+### Source Lifecycle
 
 ```text
 1. FastAPI lifespan startup:
-   └─ Check if trackerdb.db exists and is < TRACKERDB_UPDATE_INTERVAL_HOURS old
-   └─ If stale/missing: fetch latest release from GitHub API
-      └─ GET https://api.github.com/repos/ghostery/trackerdb/releases/latest
-      └─ Download trackerdb.db asset
-      └─ Write to temp file, rename atomically (prevents corrupt reads)
-      └─ Invalidate LRU cache
+   └─ get_tracker_sources() instantiates all sources, sorted by priority
+   └─ For each source: await source.initialize()
+      ├─ TrackerDBSource: check if trackerdb.db exists and is fresh
+      │  └─ If stale/missing: GET GitHub Releases API → download → validate schema → atomic rename
+      └─ DisconnectSource: download and parse services.json into memory
 
-2. Background coroutine sleeps for TRACKERDB_UPDATE_INTERVAL_HOURS, then repeats
+2. Each sync cycle: await source.refresh_if_stale() for each source
+   ├─ TrackerDBSource: re-downloads if file mtime exceeds TRACKERDB_UPDATE_INTERVAL_HOURS;
+   │  clears LRU cache only if the file actually changed
+   └─ DisconnectSource: re-downloads if loaded_at exceeds DISCONNECT_UPDATE_INTERVAL_HOURS
+
+3. Each source optionally registers debug routes via api_router():
+   └─ /api/sources/{source_name}/status, /api/sources/{source_name}/lookup
 ```
 
 ## Database Schema
