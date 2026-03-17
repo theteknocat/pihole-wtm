@@ -19,48 +19,104 @@ from app.services.pihole.api_client import BLOCKED_STATUSES, QUERY_STATUS_LABELS
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA = """
-PRAGMA journal_mode=WAL;
-PRAGMA foreign_keys=ON;
+# ---------------------------------------------------------------------------
+# Schema migrations — forward-only, version-stamped
+#
+# Each entry is (version, description, sql). On startup, init() checks the
+# current schema_version and applies any migrations with a higher version
+# number in order. Migration 1 is the initial schema — there is no separate
+# "bootstrap" path.
+#
+# Rules for adding migrations:
+#   - Append a new tuple; never modify existing entries.
+#   - Use IF NOT EXISTS / IF EXISTS so migrations are idempotent.
+#   - For data transforms that can't be expressed as SQL, use an async
+#     callable instead of a string (see _apply_migrations).
+# ---------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS domains (
-    domain              TEXT PRIMARY KEY,
-    tracker_name        TEXT,
-    category            TEXT,
-    company_name        TEXT,
-    company_country     TEXT,
-    enrichment_source   TEXT,
-    enriched_at         REAL,
-    needs_reenrichment  INTEGER DEFAULT 0
-);
+_MIGRATIONS: list[tuple[int, str, str]] = [
+    (
+        1,
+        "initial schema",
+        """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            id      INTEGER PRIMARY KEY DEFAULT 1,
+            version INTEGER NOT NULL
+        );
 
-CREATE TABLE IF NOT EXISTS queries (
-    id          INTEGER PRIMARY KEY,
-    timestamp   REAL NOT NULL,
-    domain      TEXT NOT NULL REFERENCES domains(domain),
-    client_ip   TEXT,
-    client_name TEXT,
-    status      TEXT NOT NULL,
-    query_type  TEXT,
-    reply_type  TEXT,
-    reply_time  REAL,
-    upstream    TEXT,
-    list_id     INTEGER
-);
+        CREATE TABLE IF NOT EXISTS domains (
+            domain              TEXT PRIMARY KEY,
+            tracker_name        TEXT,
+            category            TEXT,
+            company_name        TEXT,
+            company_country     TEXT,
+            enrichment_source   TEXT,
+            enriched_at         REAL,
+            needs_reenrichment  INTEGER DEFAULT 0
+        );
 
-CREATE TABLE IF NOT EXISTS sync_state (
-    id              INTEGER PRIMARY KEY DEFAULT 1,
-    last_query_id   INTEGER NOT NULL DEFAULT 0,
-    last_synced_at  REAL
-);
+        CREATE TABLE IF NOT EXISTS queries (
+            id          INTEGER PRIMARY KEY,
+            timestamp   REAL NOT NULL,
+            domain      TEXT NOT NULL REFERENCES domains(domain),
+            client_ip   TEXT,
+            client_name TEXT,
+            status      TEXT NOT NULL,
+            query_type  TEXT,
+            reply_type  TEXT,
+            reply_time  REAL,
+            upstream    TEXT,
+            list_id     INTEGER
+        );
 
-CREATE INDEX IF NOT EXISTS idx_queries_timestamp ON queries(timestamp);
-CREATE INDEX IF NOT EXISTS idx_queries_status    ON queries(status);
-CREATE INDEX IF NOT EXISTS idx_queries_domain    ON queries(domain);
-CREATE INDEX IF NOT EXISTS idx_queries_client    ON queries(client_ip);
-CREATE INDEX IF NOT EXISTS idx_domains_category  ON domains(category);
-CREATE INDEX IF NOT EXISTS idx_domains_company   ON domains(company_name);
-"""
+        CREATE TABLE IF NOT EXISTS sync_state (
+            id              INTEGER PRIMARY KEY DEFAULT 1,
+            last_query_id   INTEGER NOT NULL DEFAULT 0,
+            last_synced_at  REAL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_queries_timestamp ON queries(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_queries_status    ON queries(status);
+        CREATE INDEX IF NOT EXISTS idx_queries_domain    ON queries(domain);
+        CREATE INDEX IF NOT EXISTS idx_queries_client    ON queries(client_ip);
+        CREATE INDEX IF NOT EXISTS idx_domains_category  ON domains(category);
+        CREATE INDEX IF NOT EXISTS idx_domains_company   ON domains(company_name);
+        """,
+    ),
+    # Future migrations go here, e.g.:
+    # (2, "add user_config table", "CREATE TABLE IF NOT EXISTS user_config (...)"),
+]
+
+
+async def _get_schema_version(db: aiosqlite.Connection) -> int:
+    """Return current schema version, or 0 if the version table doesn't exist."""
+    async with db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+    ) as cur:
+        if not await cur.fetchone():
+            return 0
+    async with db.execute("SELECT version FROM schema_version WHERE id = 1") as cur:
+        row = await cur.fetchone()
+        return row[0] if row else 0
+
+
+async def _apply_migrations(db: aiosqlite.Connection) -> None:
+    """Run any pending migrations and update the stored schema version."""
+    current = await _get_schema_version(db)
+
+    for version, description, sql in _MIGRATIONS:
+        if version <= current:
+            continue
+        logger.info("Applying migration %d: %s", version, description)
+        await db.executescript(sql)
+        await db.execute(
+            "INSERT OR REPLACE INTO schema_version (id, version) VALUES (1, ?)",
+            (version,),
+        )
+        await db.commit()
+
+    final = await _get_schema_version(db)
+    logger.info("Database schema at version %d", final)
 
 # Blocked status placeholders for SQL IN clauses
 _BLOCKED_IN = ",".join(f"'{s}'" for s in BLOCKED_STATUSES)
@@ -78,9 +134,10 @@ class LocalDatabase:
             yield db
 
     async def init(self) -> None:
-        """Create schema and seed sync_state if this is a fresh database."""
+        """Apply pending migrations and seed sync_state if this is a fresh database."""
         async with self._conn() as db:
-            await db.executescript(_SCHEMA)
+            await db.execute("PRAGMA journal_mode=WAL")
+            await _apply_migrations(db)
             # Seed sync_state row if missing (fresh DB)
             await db.execute(
                 "INSERT OR IGNORE INTO sync_state (id, last_query_id) VALUES (1, 0)"
