@@ -168,7 +168,28 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 ## Database Schema
 
+### Migrations
+
+Schema changes are managed by a lightweight version-stamped migration system in `database.py`. There is no external migration tool — the backend handles it on startup.
+
+- A `schema_version` table tracks the current version (single row, integer).
+- Migrations are defined as an ordered list of `(version, description, sql)` tuples in `_MIGRATIONS`.
+- On startup, `LocalDatabase.init()` checks the current version and applies any pending migrations in order, committing after each one.
+- Migrations are forward-only (no down migrations). If an upgrade fails, the user resets the database.
+- All DDL uses `IF NOT EXISTS` / `IF EXISTS` so migrations are idempotent.
+- Migration 1 is the initial schema — there is no separate bootstrap path. A fresh database starts at version 0 and applies all migrations from the beginning.
+
+To add a new migration: append a tuple to `_MIGRATIONS` with the next version number. Never modify existing entries.
+
+### Tables
+
 ```sql
+-- Schema version tracking (single row).
+CREATE TABLE schema_version (
+    id      INTEGER PRIMARY KEY DEFAULT 1,
+    version INTEGER NOT NULL
+);
+
 -- One row per unique domain encountered.
 -- All enrichment data lives here, not on query rows.
 CREATE TABLE domains (
