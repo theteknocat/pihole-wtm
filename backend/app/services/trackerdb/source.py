@@ -80,6 +80,7 @@ class TrackerDBSource:
     """
 
     source_name = "trackerdb"
+    label = "TrackerDB (Ghostery)"
     gates = True
     priority = 10
 
@@ -140,6 +141,18 @@ class TrackerDBSource:
         result = await self._lookup_with_fallback(domain)
         self._cache[domain] = result
         return result
+
+    # -- Health ---------------------------------------------------------------
+
+    async def health_check(self) -> dict:
+        loaded = self._path.exists()
+        categories = await self.get_categories() if loaded else []
+        domain_count = sum(c["domain_count"] for c in categories)
+        return {
+            "loaded": loaded,
+            "domain_count": domain_count,
+            "category_count": len(categories),
+        }
 
     # -- API routes -----------------------------------------------------------
 

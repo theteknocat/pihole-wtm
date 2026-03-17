@@ -28,6 +28,11 @@ class TrackerSource(Protocol):
         ...
 
     @property
+    def label(self) -> str:
+        """Human-friendly display name (e.g. 'TrackerDB (Ghostery)', 'Disconnect.me')."""
+        ...
+
+    @property
     def gates(self) -> bool:
         """Whether this source participates in allowed-query storage gating."""
         ...
@@ -62,6 +67,10 @@ class TrackerSource(Protocol):
 
     async def refresh_if_stale(self) -> None:
         """Re-download/reload source data if stale. No-op if fresh."""
+        ...
+
+    async def health_check(self) -> dict:
+        """Return source status for the health endpoint."""
         ...
 
     def api_router(self) -> APIRouter | None:

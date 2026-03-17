@@ -39,6 +39,7 @@ class DisconnectSource:
     """
 
     source_name = "disconnect"
+    label = "Disconnect.me"
     gates = True
     priority = 20
 
@@ -81,6 +82,14 @@ class DisconnectSource:
     async def enrich(self, domain: str) -> TrackerInfo | None:
         """Same as lookup_exact — Disconnect.me has no fallback strategy."""
         return await self.lookup_exact(domain)
+
+    # -- Health ---------------------------------------------------------------
+
+    async def health_check(self) -> dict:
+        return {
+            "loaded": self.is_loaded,
+            "domain_count": len(self._lookup),
+        }
 
     # -- API routes -----------------------------------------------------------
 

@@ -72,10 +72,19 @@ app.add_middleware(
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     sync_status = await db.get_sync_status()
+    source_statuses = [
+        {
+            "name": source.source_name,
+            "label": source.label,
+            **(await source.health_check()),
+        }
+        for source in sources
+    ]
     return {
         "status": "ok",
         "pihole_api_url": settings.pihole_api_url,
         "version": "0.1.0",
+        "sources": source_statuses,
         **sync_status,
     }
 
