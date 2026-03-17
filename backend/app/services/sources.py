@@ -75,7 +75,7 @@ def get_tracker_sources() -> list[TrackerSource]:
 
     This is the single registration point — add new sources here.
     """
-    from app.services.disconnect.source import DisconnectSource
+    from app.services.disconnectme.source import DisconnectSource
     from app.services.trackerdb.source import TrackerDBSource
 
     sources: list[TrackerSource] = [
