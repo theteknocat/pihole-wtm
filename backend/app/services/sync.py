@@ -1,7 +1,7 @@
 """
 Background sync service: periodically fetches new queries from Pi-hole,
 filters to only relevant ones, and stores them in the local database
-with enrichment data from TrackerDB and Disconnect.me.
+with enrichment data from configured tracker sources.
 
 Pi-hole query history is append-only — we only ever need to fetch queries
 with an ID greater than the highest one we've already stored.
@@ -14,36 +14,49 @@ from app.config import settings
 from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
 from app.services.database import LocalDatabase
-from app.services.disconnect.loader import DisconnectDB
 from app.services.heuristic import extract_category, extract_company_name
 from app.services.pihole.api_client import BLOCKED_STATUSES, PiholeApiClient
 from app.services.rdap import lookup_company as rdap_lookup
-from app.services.trackerdb.enricher import TrackerEnricher
+from app.services.sources import TrackerSource
 
 logger = logging.getLogger(__name__)
 
 
-def _enrich_domain(
+async def _enrich_from_sources(
     domain: str,
-    trackerdb_result: TrackerInfo | None,
-    disconnect_db: DisconnectDB,
+    sources: list[TrackerSource],
 ) -> tuple[TrackerInfo | None, str | None]:
     """
-    Return (TrackerInfo, source) using TrackerDB first, then Disconnect.me.
-    source is "trackerdb" or "disconnect", or None if neither matched.
+    Try each source in priority order, return the first match.
+    Returns (TrackerInfo, source_name) or (None, None).
     """
-    if trackerdb_result is not None:
-        return trackerdb_result, "trackerdb"
-    result = disconnect_db.lookup(domain)
-    if result is not None:
-        return result, "disconnect"
+    for source in sources:
+        result = await source.enrich(domain)
+        if result is not None:
+            return result, source.source_name
+    return None, None
+
+
+async def _gate_from_sources(
+    domain: str,
+    sources: list[TrackerSource],
+) -> tuple[TrackerInfo | None, str | None]:
+    """
+    Exact-match gating: try each gating-enabled source in priority order.
+    Returns (TrackerInfo, source_name) or (None, None).
+    """
+    for source in sources:
+        if not source.gates:
+            continue
+        result = await source.lookup_exact(domain)
+        if result is not None:
+            return result, source.source_name
     return None, None
 
 
 async def _sync_once(
     pihole: PiholeApiClient,
-    enricher: TrackerEnricher,
-    disconnect_db: DisconnectDB,
+    sources: list[TrackerSource],
     db: LocalDatabase,
 ) -> int:
     """
@@ -82,14 +95,14 @@ async def _sync_once(
         return 0
 
     # Filter: always store blocked queries; store allowed queries only when the
-    # domain is an exact match in TrackerDB or Disconnect.me. No subdomain
-    # fallback here — fallback would cause legitimate subdomains (mail.google.com,
+    # domain is an exact match in any configured source. No subdomain fallback
+    # here — fallback would cause legitimate subdomains (mail.google.com,
     # calendar.google.com) to match their parent company's tracker entry and be
     # incorrectly stored as ad-network traffic.
     #
-    # A per-cycle cache avoids repeated DB hits for the same domain within one batch.
-    # The gating result is reused directly for allowed-query enrichment, eliminating
-    # the redundant second lookup that the previous implementation required.
+    # A per-cycle cache avoids repeated lookups for the same domain within one
+    # batch. The gating result is reused directly for allowed-query enrichment,
+    # eliminating a redundant second lookup.
     to_store: list[RawQuery] = []
     allowed_enrichment: dict[int, tuple[TrackerInfo, str]] = {}  # query id → (result, source)
     _exact_cache: dict[str, tuple[TrackerInfo | None, str | None]] = {}
@@ -99,16 +112,11 @@ async def _sync_once(
             to_store.append(q)
         else:
             if q.domain not in _exact_cache:
-                tb_exact = await enricher.enrich_exact(q.domain)
-                if tb_exact is not None:
-                    _exact_cache[q.domain] = (tb_exact, "trackerdb")
-                else:
-                    disc = disconnect_db.lookup(q.domain)
-                    _exact_cache[q.domain] = (disc, "disconnect") if disc else (None, None)
-            result, source = _exact_cache[q.domain]
+                _exact_cache[q.domain] = await _gate_from_sources(q.domain, sources)
+            result, source_name = _exact_cache[q.domain]
             if result is not None:
                 to_store.append(q)
-                allowed_enrichment[q.id] = (result, source)
+                allowed_enrichment[q.id] = (result, source_name)
 
     if not to_store:
         await db.update_sync_state(max(q.id for q in new_queries))
@@ -118,37 +126,41 @@ async def _sync_once(
     unique_domains = list({q.domain for q in to_store})
     await db.upsert_domains(unique_domains)
 
-    # Enrich blocked queries with full subdomain-fallback lookup so display
-    # metadata (category, company) is populated even for tracker subdomains not
+    # Enrich blocked queries with full fallback lookup so display metadata
+    # (category, company) is populated even for tracker subdomains not
     # explicitly listed. Allowed queries reuse the exact gating result directly.
     blocked = [q for q in to_store if q.id not in allowed_enrichment]
-    blocked_tb = await asyncio.gather(*[enricher.enrich(q.domain) for q in blocked])
+    blocked_results = await asyncio.gather(
+        *[_enrich_from_sources(q.domain, sources) for q in blocked]
+    )
 
-    enrichment_updates = []
-    for q, tb_result in zip(blocked, blocked_tb):
-        result, source = _enrich_domain(q.domain, tb_result, disconnect_db)
+    # Deduplicate by domain — a domain may appear in both blocked and allowed
+    # queries within the same batch. Use a dict so last write wins.
+    enrichment_by_domain: dict[str, dict] = {}
+    for q, (result, source_name) in zip(blocked, blocked_results):
         if result is not None:
-            enrichment_updates.append({
+            enrichment_by_domain[q.domain] = {
                 "domain": q.domain,
                 "tracker_name": result.tracker_name,
                 "category": result.category,
                 "company_name": result.company_name,
                 "company_country": result.company_country,
-                "source": source,
-            })
+                "source": source_name,
+            }
 
     for q in to_store:
         if q.id in allowed_enrichment:
-            result, source = allowed_enrichment[q.id]
-            enrichment_updates.append({
+            result, source_name = allowed_enrichment[q.id]
+            enrichment_by_domain[q.domain] = {
                 "domain": q.domain,
                 "tracker_name": result.tracker_name,
                 "category": result.category,
                 "company_name": result.company_name,
                 "company_country": result.company_country,
-                "source": source,
-            })
+                "source": source_name,
+            }
 
+    enrichment_updates = list(enrichment_by_domain.values())
     if enrichment_updates:
         await db.batch_update_domain_enrichment(enrichment_updates)
 
@@ -183,15 +195,14 @@ async def _sync_once(
     )
 
     # Re-enrich any previously stored domains that had no enrichment yet.
-    # This catches domains stored before Disconnect.me was available.
-    await _reenrich_missing(enricher, disconnect_db, db)
+    # This catches domains stored before a new source was available.
+    await _reenrich_missing(sources, db)
 
     return len(to_store)
 
 
 async def _reenrich_missing(
-    enricher: TrackerEnricher,
-    disconnect_db: DisconnectDB,
+    sources: list[TrackerSource],
     db: LocalDatabase,
 ) -> None:
     """Enrich domains that are stored but still have no enrichment data."""
@@ -200,11 +211,12 @@ async def _reenrich_missing(
         return
 
     logger.debug("Re-enriching %d unenriched domains", len(unenriched))
-    trackerdb_results = await asyncio.gather(*[enricher.enrich(d) for d in unenriched])
+    results = await asyncio.gather(
+        *[_enrich_from_sources(d, sources) for d in unenriched]
+    )
 
     updates = []
-    for domain, tb_result in zip(unenriched, trackerdb_results):
-        result, source = _enrich_domain(domain, tb_result, disconnect_db)
+    for domain, (result, source_name) in zip(unenriched, results):
         if result is not None:
             updates.append({
                 "domain": domain,
@@ -212,10 +224,10 @@ async def _reenrich_missing(
                 "category": result.category,
                 "company_name": result.company_name,
                 "company_country": result.company_country,
-                "source": source,
+                "source": source_name,
             })
         else:
-            # eTLD+1 heuristic — company name + subdomain keyword category
+            # eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
             company_name = extract_company_name(domain)
             category = extract_category(domain)
             if company_name or category:
@@ -265,26 +277,25 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
 
 async def run_sync_loop(
     pihole: PiholeApiClient,
-    enricher: TrackerEnricher,
-    disconnect_db: DisconnectDB,
+    sources: list[TrackerSource],
     db: LocalDatabase,
 ) -> None:
     """
     Long-running background task. Syncs once immediately on startup,
-    then repeats every sync_interval_seconds. Also refreshes Disconnect.me
-    data when it becomes stale, and runs RDAP upgrade passes periodically.
+    then repeats every sync_interval_seconds. Also refreshes stale sources
+    and runs RDAP upgrade passes periodically.
     """
     logger.info("Sync service started (interval: %ds)", settings.sync_interval_seconds)
     _rdap_cycle = 0
     _RDAP_EVERY_N_CYCLES = 10  # run RDAP pass every 10 sync cycles (~10 minutes)
 
     while True:
-        # Refresh Disconnect.me if stale
-        if disconnect_db.is_stale:
-            await disconnect_db.load()
+        # Refresh any sources whose data has become stale
+        for source in sources:
+            await source.refresh_if_stale()
 
         try:
-            stored = await _sync_once(pihole, enricher, disconnect_db, db)
+            stored = await _sync_once(pihole, sources, db)
             if stored:
                 logger.debug("Sync cycle complete: %d queries stored", stored)
         except Exception:

@@ -7,40 +7,41 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.services.database import LocalDatabase
-from app.services.disconnect.loader import DisconnectDB
 from app.services.pihole.api_client import (
     PiholeApiClient,
     PiholeAuthError,
     PiholeConnectionError,
 )
+from app.services.sources import TrackerSource, get_tracker_sources
 from app.services.sync import run_sync_loop
-from app.services.trackerdb.enricher import TrackerEnricher
-from app.services.trackerdb.loader import ensure_trackerdb, trackerdb_exists
-from app.services.trackerdb.repository import TrackerRepository
 
 pihole: PiholeApiClient
-tracker_repo: TrackerRepository
-enricher: TrackerEnricher
-disconnect_db: DisconnectDB
+sources: list[TrackerSource]
 db: LocalDatabase
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pihole, tracker_repo, enricher, disconnect_db, db
+    global pihole, sources, db
 
     pihole = PiholeApiClient()
-    tracker_repo = TrackerRepository()
-    enricher = TrackerEnricher(tracker_repo)
-    disconnect_db = DisconnectDB()
+    sources = get_tracker_sources()
     db = LocalDatabase()
 
-    await ensure_trackerdb()
-    await disconnect_db.load()
+    # Initialize all tracker sources (download data, open connections, etc.)
+    for source in sources:
+        await source.initialize()
+
+    # Register source-specific API routes (debug/diagnostic endpoints)
+    for source in sources:
+        router = source.api_router()
+        if router is not None:
+            app.include_router(router)
+
     await db.init()
     await db.flag_heuristic_uncategorized_for_reenrichment()
 
-    sync_task = asyncio.create_task(run_sync_loop(pihole, enricher, disconnect_db, db))
+    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db))
 
     yield
 
@@ -74,7 +75,6 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "pihole_api_url": settings.pihole_api_url,
-        "trackerdb_loaded": trackerdb_exists(),
         "version": "0.1.0",
         **sync_status,
     }
@@ -135,23 +135,6 @@ async def stats_domains(
 async def admin_reset() -> dict[str, str]:
     await db.reset()
     return {"status": "ok"}
-
-
-@app.get("/api/trackerdb/status")
-async def trackerdb_status() -> dict[str, Any]:
-    return {
-        "loaded": trackerdb_exists(),
-        "cache": enricher.cache_info,
-        "categories": await tracker_repo.get_categories(),
-    }
-
-
-@app.get("/api/trackerdb/lookup")
-async def trackerdb_lookup(domain: str) -> dict[str, Any]:
-    result = await enricher.enrich(domain)
-    if result is None:
-        return {"domain": domain, "found": False}
-    return {"domain": domain, "found": True, **result.model_dump()}
 
 
 @app.get("/api/debug/raw-query")

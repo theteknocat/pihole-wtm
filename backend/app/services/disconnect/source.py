@@ -1,19 +1,20 @@
 """
-Disconnect.me tracking protection database.
+Disconnect.me tracking protection source plugin.
 
 Downloads and parses Disconnect.me's services.json, which maps domains to
 tracker categories (Advertising, Analytics, Social, Content, Cryptomining,
 Fingerprinting) and company names. Used as a secondary enrichment source
 after TrackerDB.
 
-Data is held in memory — no file cache. Refreshed periodically via the
-background sync loop.
+Data is held in memory — no file cache. Refreshed periodically when stale.
 """
 
 import logging
 import time
+from typing import Any
 
 import httpx
+from fastapi import APIRouter, Query
 
 from app.config import settings
 from app.models.tracker import TrackerInfo
@@ -26,12 +27,20 @@ _SERVICES_URL = (
 )
 
 
-class DisconnectDB:
+class DisconnectSource:
     """
     In-memory lookup database built from Disconnect.me's services.json.
 
+    Implements the TrackerSource protocol. All lookups are exact-match only —
+    Disconnect.me lists root domains of companies that *operate* ad/tracker
+    networks, so subdomain fallback would incorrectly flag legitimate services.
+
     Lookup is synchronous and O(1) — data is a plain dict keyed by domain.
     """
+
+    source_name = "disconnect"
+    gates = True
+    priority = 20
 
     def __init__(self) -> None:
         self._lookup: dict[str, TrackerInfo] = {}
@@ -50,7 +59,58 @@ class DisconnectDB:
         age_hours = (time.time() - self._loaded_at) / 3600
         return age_hours >= settings.disconnect_update_interval_hours
 
-    async def load(self) -> None:
+    # -- Lifecycle ------------------------------------------------------------
+
+    async def initialize(self) -> None:
+        """Download and parse services.json into memory."""
+        await self._load()
+
+    async def refresh_if_stale(self) -> None:
+        """Re-download services.json if the data has become stale."""
+        if self.is_stale:
+            await self._load()
+
+    # -- Protocol: lookup / enrich --------------------------------------------
+
+    async def lookup_exact(self, domain: str) -> TrackerInfo | None:
+        """Exact domain match. Returns None if not loaded or not found."""
+        if not self.is_loaded:
+            return None
+        return self._lookup.get(domain)
+
+    async def enrich(self, domain: str) -> TrackerInfo | None:
+        """Same as lookup_exact — Disconnect.me has no fallback strategy."""
+        return await self.lookup_exact(domain)
+
+    # -- API routes -----------------------------------------------------------
+
+    def api_router(self) -> APIRouter:
+        """Debug/diagnostic endpoints for Disconnect.me."""
+        router = APIRouter(
+            prefix=f"/api/sources/{self.source_name}",
+            tags=[self.source_name],
+        )
+
+        @router.get("/status")
+        async def status() -> dict[str, Any]:
+            return {
+                "loaded": self.is_loaded,
+                "domain_count": len(self._lookup),
+                "loaded_at": self._loaded_at,
+            }
+
+        @router.get("/lookup")
+        async def lookup(domain: str = Query(...)) -> dict[str, Any]:
+            result = await self.lookup_exact(domain)
+            if result is None:
+                return {"domain": domain, "found": False}
+            return {"domain": domain, "found": True, **result.model_dump()}
+
+        return router
+
+    # -- Internal helpers -----------------------------------------------------
+
+    async def _load(self) -> None:
         """Download and parse services.json into memory."""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -87,18 +147,3 @@ class DisconnectDB:
             len(lookup),
             len(categories),
         )
-
-    def lookup(self, domain: str) -> TrackerInfo | None:
-        """
-        Look up a domain by exact match only.
-        Returns None if the domain is not known to Disconnect.me.
-
-        Unlike TrackerDB, Disconnect.me lists root domains of companies that
-        *operate* ad/tracker networks — not necessarily that the root domain
-        itself is a tracking endpoint. Subdomain fallback would incorrectly
-        flag legitimate services (mail.google.com, www.apple.com, etc.) as
-        trackers simply because their parent company runs an ad network.
-        """
-        if not self.is_loaded:
-            return None
-        return self._lookup.get(domain)
