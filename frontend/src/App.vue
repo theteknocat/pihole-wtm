@@ -24,18 +24,25 @@ const settingsOpen = ref(false)
         <nav class="flex items-center gap-1">
           <RouterLink
             to="/dashboard"
-            class="px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/dashboard' || route.path === '/report'
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
+            :class="route.path === '/dashboard'
               ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          >Dashboard</RouterLink>
+          ><i class="pi pi-objects-column text-xs" />Dashboard</RouterLink>
           <RouterLink
             to="/timeline"
-            class="px-3 py-1.5 rounded text-sm no-underline transition-colors"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
             :class="route.path === '/timeline'
               ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          >Timeline</RouterLink>
+          ><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
+          <RouterLink
+            to="/report"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
+            :class="route.path === '/report'
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
+          ><i class="pi pi-list text-xs" />Report</RouterLink>
         </nav>
       </div>
       <div class="flex items-center gap-1">
