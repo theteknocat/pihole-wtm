@@ -20,7 +20,6 @@ const sorted = computed(() =>
 
 const chartHeight = computed(() => Math.max(288, sorted.value.length * 40))
 
-
 const pct = (n: number) =>
   props.totalTrackerQueries > 0 ? (n / props.totalTrackerQueries) * 100 : 0
 
