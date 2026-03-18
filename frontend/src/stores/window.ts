@@ -8,7 +8,7 @@ export const useWindowStore = defineStore('window', () => {
   const refreshKey = ref(0)
   let intervalId: ReturnType<typeof setInterval> | null = null
 
-  function triggerRefresh() { refreshKey.value++ }
+  function triggerRefresh() { refreshKey.value = 1 - refreshKey.value }
 
   function startAutoRefresh() {
     if (intervalId) return
