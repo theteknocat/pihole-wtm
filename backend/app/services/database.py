@@ -534,6 +534,103 @@ class LocalDatabase:
             ],
         }
 
+    async def fetch_timeline_stats(
+        self,
+        hours: int = 24,
+        excluded_categories: list[str] | None = None,
+        excluded_companies: list[str] | None = None,
+        excluded_domains: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return query counts bucketed over time for the given window.
+        Bucket size adapts to the window: 1 hour for 24h, 6 hours for 7d.
+        """
+        now = time.time()
+        from_ts = now - hours * 3600
+
+        # Choose bucket size in seconds
+        if hours <= 24:
+            bucket_seconds = 3600       # 1 hour
+        else:
+            bucket_seconds = 6 * 3600   # 6 hours
+
+        conditions = ["q.timestamp >= ?"]
+        params: list[Any] = [from_ts]
+
+        if excluded_categories:
+            placeholders = ",".join("?" for _ in excluded_categories)
+            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
+            params.extend(excluded_categories)
+        if excluded_companies:
+            placeholders = ",".join("?" for _ in excluded_companies)
+            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
+            params.extend(excluded_companies)
+        if excluded_domains:
+            placeholders = ",".join("?" for _ in excluded_domains)
+            conditions.append(f"q.domain NOT IN ({placeholders})")
+            params.extend(excluded_domains)
+
+        where = "WHERE " + " AND ".join(conditions)
+
+        sql = f"""
+            SELECT
+                CAST((q.timestamp - ?) / ? AS INTEGER) AS bucket,
+                COUNT(*)                                AS total,
+                SUM(CASE WHEN q.status IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS blocked,
+                SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            {where}
+            GROUP BY bucket
+            ORDER BY bucket
+        """
+        params = [from_ts, bucket_seconds] + params
+
+        async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+
+        # Build a complete series including empty buckets
+        num_buckets = hours * 3600 // bucket_seconds
+        bucket_map = {row["bucket"]: row for row in rows}
+        buckets = []
+        for i in range(num_buckets):
+            row = bucket_map.get(i)
+            buckets.append({
+                "timestamp": from_ts + i * bucket_seconds,
+                "total": row["total"] if row else 0,
+                "blocked": row["blocked"] if row else 0,
+                "allowed": row["allowed"] if row else 0,
+            })
+
+        return {
+            "window_hours": hours,
+            "bucket_seconds": bucket_seconds,
+            "buckets": buckets,
+        }
+
+    async def purge_old_data(self, retention_days: int) -> tuple[int, int]:
+        """
+        Delete queries older than retention_days and remove orphaned domains.
+        Returns (queries_deleted, domains_deleted).
+        """
+        cutoff = time.time() - retention_days * 86400
+        async with self._conn() as db:
+            cursor = await db.execute(
+                "DELETE FROM queries WHERE timestamp < ?", (cutoff,)
+            )
+            queries_deleted = cursor.rowcount
+
+            cursor = await db.execute(
+                """DELETE FROM domains
+                   WHERE domain NOT IN (SELECT DISTINCT domain FROM queries)"""
+            )
+            domains_deleted = cursor.rowcount
+
+            await db.commit()
+        return queries_deleted, domains_deleted
+
     async def reset(self) -> None:
         """Delete all synced queries and domains, and reset the sync cursor to zero."""
         async with self._conn() as db:

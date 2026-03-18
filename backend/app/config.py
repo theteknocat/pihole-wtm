@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Local database
     local_db_path: str = "/app/data/pihole_wtm.db"
     sync_interval_seconds: int = 60
+    data_retention_days: int = 7
 
     # Application server
     app_host: str = "0.0.0.0"

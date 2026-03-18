@@ -301,6 +301,14 @@ async def run_sync_loop(
         except Exception:
             logger.exception("Sync cycle failed — will retry next interval")
 
+        # Purge data older than the configured retention period
+        try:
+            q_del, d_del = await db.purge_old_data(settings.data_retention_days)
+            if q_del or d_del:
+                logger.info("Retention: purged %d queries, %d orphaned domains", q_del, d_del)
+        except Exception:
+            logger.exception("Data retention purge failed — will retry next cycle")
+
         # Periodically upgrade heuristic domains with RDAP data
         _rdap_cycle += 1
         if _rdap_cycle >= _RDAP_EVERY_N_CYCLES:
