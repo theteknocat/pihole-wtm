@@ -591,8 +591,10 @@ class LocalDatabase:
             async with db.execute(sql, params) as cur:
                 rows = await cur.fetchall()
 
-        # Build a complete series including empty buckets
-        num_buckets = hours * 3600 // bucket_seconds
+        # Build a complete series including empty buckets.
+        # +1 to include the current partial bucket (e.g. 25 hourly buckets
+        # for a 24h window, so the chart extends to the current hour).
+        num_buckets = hours * 3600 // bucket_seconds + 1
         bucket_map = {row["bucket"]: row for row in rows}
         buckets = []
         for i in range(num_buckets):
