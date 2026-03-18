@@ -1,5 +1,6 @@
-import { computed, type Ref } from 'vue'
+import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 import { useDark } from '@vueuse/core'
+import type Chart from 'primevue/chart'
 
 interface BarStat {
   query_count: number
@@ -39,7 +40,12 @@ export function useTrackerBarChart<T extends BarStat>(config: TrackerBarChartCon
   const pct = (n: number) =>
     totalTrackerQueries.value > 0 ? (n / totalTrackerQueries.value) * 100 : 0
 
-  const chartData = computed(() => ({
+  // Template ref — components bind this to the PrimeVue Chart via ref="chartRef"
+  const chartRef = ref<InstanceType<typeof Chart> | null>(null)
+
+  // shallowRef so PrimeVue's deep watcher doesn't see internal mutations.
+  // Set once for initial render; subsequent updates go through Chart.js directly.
+  const chartData = shallowRef({
     labels: items.value.map(label),
     datasets: [
       {
@@ -53,7 +59,29 @@ export function useTrackerBarChart<T extends BarStat>(config: TrackerBarChartCon
         backgroundColor: 'rgba(34, 197, 94, 0.85)',
       },
     ],
-  }))
+  })
+
+  // On data refresh, mutate the Chart.js instance directly for smooth transitions.
+  // Falls back to replacing the shallowRef if the instance isn't ready yet
+  // (e.g. during initial render before the canvas is mounted).
+  watch(items, (newItems) => {
+    const instance = chartRef.value?.getChart()
+    if (instance) {
+      instance.data.labels = newItems.map(label)
+      instance.data.datasets[0].data = newItems.map(c => c.blocked_count)
+      instance.data.datasets[1].data = newItems.map(c => c.allowed_count)
+      instance.update()
+    } else {
+      // No chart instance yet — update the shallowRef for initial render
+      chartData.value = {
+        labels: newItems.map(label),
+        datasets: [
+          { ...chartData.value.datasets[0], data: newItems.map(c => c.blocked_count) },
+          { ...chartData.value.datasets[1], data: newItems.map(c => c.allowed_count) },
+        ],
+      }
+    }
+  })
 
   const chartOptions = computed(() => {
     const textColor = isDark.value ? '#e5e7eb' : '#374151'
@@ -100,5 +128,5 @@ export function useTrackerBarChart<T extends BarStat>(config: TrackerBarChartCon
     }
   })
 
-  return { isDark, chartHeight, chartData, chartOptions }
+  return { isDark, chartRef, chartHeight, chartData, chartOptions }
 }

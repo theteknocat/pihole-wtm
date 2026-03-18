@@ -16,7 +16,7 @@ const sorted = computed(() =>
   [...props.data].sort((a, b) => b.query_count - a.query_count)
 )
 
-const { isDark, chartHeight, chartData, chartOptions: baseOptions } = useTrackerBarChart({
+const { isDark, chartRef, chartHeight, chartData, chartOptions: baseOptions } = useTrackerBarChart({
   items: sorted,
   totalTrackerQueries: toRef(props, 'totalTrackerQueries'),
   label: c => formatCategory(c.category),
@@ -38,6 +38,7 @@ const chartOptions = computed(() => ({
 
 <template>
   <Chart
+    ref="chartRef"
     type="bar"
     :data="chartData"
     :options="chartOptions"
