@@ -82,7 +82,7 @@ async function doReset() {
           Choose which categories, companies, and domains to display.
         </p>
 
-        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-3">Sync Data</p>
+        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-3">Query Data</p>
 
         <div class="flex gap-1">
           <template v-if="resetState === 'idle'">
