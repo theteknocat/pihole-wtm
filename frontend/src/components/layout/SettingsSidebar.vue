@@ -20,6 +20,28 @@ function close() {
   setTimeout(() => emit('close'), 200)
 }
 
+const reenriching = ref(false)
+const reenrichMessage = ref<string | null>(null)
+
+async function doReenrich() {
+  reenriching.value = true
+  reenrichMessage.value = null
+  try {
+    const res = await fetch('/api/admin/reenrich', { method: 'POST' })
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
+    const data = await res.json()
+    reenrichMessage.value = data.flagged > 0
+      ? `${data.flagged} domains queued — will refresh over the next few sync cycles.`
+      : 'No domains need re-enrichment.'
+    if (data.flagged > 0) windowStore.triggerRefresh()
+    setTimeout(() => { reenrichMessage.value = null }, 12000)
+  } catch {
+    reenrichMessage.value = 'Re-enrichment failed. Please try again.'
+  } finally {
+    reenriching.value = false
+  }
+}
+
 const resetState = ref<'idle' | 'confirm'>('idle')
 const resetting = ref(false)
 const resetError = ref<string | null>(null)
@@ -80,6 +102,27 @@ async function doReset() {
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
           Choose which categories, companies, and domains to display.
+        </p>
+
+        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-3">Enrichment</p>
+
+        <div>
+          <Button
+            class="w-full"
+            label="Re-enrich Domains"
+            icon="pi pi-sync"
+            severity="secondary"
+            size="small"
+            outlined
+            :loading="reenriching"
+            @click="doReenrich"
+          />
+        </div>
+        <p v-if="reenrichMessage" class="text-xs mt-2" :class="reenrichMessage.includes('failed') ? 'text-red-500' : 'text-green-600 dark:text-green-400'">
+          {{ reenrichMessage }}
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          Re-processes domains that used heuristic guesses or failed RDAP lookups. Existing query data is kept.
         </p>
 
         <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-3">Query Data</p>

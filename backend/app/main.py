@@ -195,6 +195,13 @@ async def config_options() -> dict[str, Any]:
     return {"categories": categories, "companies": companies}
 
 
+@app.post("/api/admin/reenrich")
+async def admin_reenrich() -> dict[str, Any]:
+    """Flag heuristic and rdap_failed domains for re-enrichment."""
+    count = await db.flag_for_reenrichment()
+    return {"status": "ok", "flagged": count}
+
+
 @app.post("/api/admin/reset")
 async def admin_reset() -> dict[str, str]:
     await db.reset()

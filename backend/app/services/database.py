@@ -236,6 +236,20 @@ class LocalDatabase:
             await db.commit()
             return cursor.rowcount
 
+    async def flag_for_reenrichment(self) -> int:
+        """
+        Mark all heuristic-enriched and rdap_failed domains for re-enrichment.
+        The sync service will re-process them on the next cycle.
+        Returns the number of domains flagged.
+        """
+        async with self._conn() as db:
+            cursor = await db.execute(
+                """UPDATE domains SET needs_reenrichment = 1
+                   WHERE enrichment_source IN ('heuristic', 'rdap_failed')"""
+            )
+            await db.commit()
+            return cursor.rowcount
+
     async def get_heuristic_domains(self) -> list[dict[str, Any]]:
         """Return domains enriched only via the eTLD+1 heuristic — candidates for RDAP upgrade."""
         async with self._conn() as db:
