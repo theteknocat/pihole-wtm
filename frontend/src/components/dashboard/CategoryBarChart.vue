@@ -2,9 +2,7 @@
 import { computed } from 'vue'
 import { useDark } from '@vueuse/core'
 import Chart from 'primevue/chart'
-import type { LegendItem } from 'chart.js'
 import type { CategoryStat } from '@/types/api'
-import { niceMax, PADDING_LABEL } from '@/utils/chart'
 import { formatCategory } from '@/utils/format'
 
 const props = defineProps<{
@@ -23,8 +21,6 @@ const sorted = computed(() =>
 const chartHeight = computed(() => Math.max(288, sorted.value.length * 40))
 
 
-const axisMax = computed(() => niceMax(Math.max(...sorted.value.map(c => c.query_count), 1)))
-
 const pct = (n: number) =>
   props.totalTrackerQueries > 0 ? (n / props.totalTrackerQueries) * 100 : 0
 
@@ -40,11 +36,6 @@ const chartData = computed(() => ({
       label: 'Allowed',
       data: sorted.value.map(c => c.allowed_count),
       backgroundColor: 'rgba(34, 197, 94, 0.85)',
-    },
-    {
-      label: PADDING_LABEL,
-      data: sorted.value.map(c => axisMax.value - c.query_count),
-      backgroundColor: isDark.value ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     },
   ],
 }))
@@ -63,22 +54,30 @@ const chartOptions = computed(() => {
       if (event.native?.target)
         (event.native.target as HTMLElement).style.cursor = elements.length ? 'pointer' : 'default'
     },
+    interaction: {
+      mode: 'index' as const,
+      axis: 'y' as const,
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: 'bottom' as const,
-        labels: { color: textColor, filter: (item: LegendItem) => item.text !== PADDING_LABEL },
+        labels: { color: textColor },
       },
       tooltip: {
         callbacks: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          title: (items: any[]) => {
+            if (!items.length) return ''
+            const stat = sorted.value[items[0].dataIndex]
+            return `${formatCategory(stat.category)} — ${stat.query_count.toLocaleString()} queries`
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           label: (ctx: any) => {
-            if (ctx.dataset.label === PADDING_LABEL) {
-              const total = sorted.value[ctx.dataIndex].query_count
-              return ` Total: ${total.toLocaleString()} queries`
-            }
             const count = ctx.parsed.x
+            if (count === 0) return null
             const p = pct(count).toFixed(1)
-            return ` ${ctx.dataset.label}: ${count.toLocaleString()} (${p}% of tracker queries)`
+            return ` ${ctx.dataset.label}: ${count.toLocaleString()} (${p}%)`
           },
         },
       },
@@ -86,7 +85,6 @@ const chartOptions = computed(() => {
     scales: {
       x: {
         stacked: true,
-        max: axisMax.value,
         ticks: { color: textColor },
         grid: { color: gridColor },
       },
