@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 # Cache: registered_domain → company name (or None if not found / privacy-protected)
 _cache: LRUCache = LRUCache(maxsize=5000)
 
+# RDAP entity roles that are never the domain owner.
+_SKIP_ROLES = {"registrar", "technical", "abuse", "noc", "billing"}
+
 # Substrings that indicate a WHOIS privacy/proxy service rather than the actual registrant.
 _PRIVACY_INDICATORS = [
     "privacy",
@@ -83,10 +86,8 @@ def _extract_org(data: dict) -> str | None:
     """
     all_entities = _flatten_entities(data.get("entities", []))
 
-    # Skip registrar/technical/abuse entities — their names are never the
-    # domain owner.  Only consider registrant, or entities with no role
+    # Skip non-owner entities; keep registrant and entities with no role
     # (some servers omit roles on the registrant).
-    _SKIP_ROLES = {"registrar", "technical", "abuse", "noc", "billing"}
     candidates = [
         e for e in all_entities
         if not _SKIP_ROLES.intersection(e.get("roles", []))

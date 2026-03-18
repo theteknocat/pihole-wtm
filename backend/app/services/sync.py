@@ -273,6 +273,16 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
                 "source": "rdap",
             }])
             upgraded += 1
+        else:
+            # Mark as failed so we don't retry on every cycle
+            await db.batch_update_domain_enrichment([{
+                "domain": row["domain"],
+                "tracker_name": row["tracker_name"],
+                "category": row["category"],
+                "company_name": row.get("company_name"),
+                "company_country": None,
+                "source": "rdap_failed",
+            }])
         await asyncio.sleep(0.5)  # be polite to RDAP services
 
     logger.info("RDAP: upgraded %d / %d domains", upgraded, len(rows))

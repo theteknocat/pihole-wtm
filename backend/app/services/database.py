@@ -241,10 +241,10 @@ class LocalDatabase:
         async with self._conn() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT domain, tracker_name, category FROM domains WHERE enrichment_source = 'heuristic'"
+                "SELECT domain, tracker_name, category, company_name FROM domains WHERE enrichment_source = 'heuristic'"
             ) as cur:
                 rows = await cur.fetchall()
-                return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"]} for r in rows]
+                return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"], "company_name": r["company_name"]} for r in rows]
 
     # -------------------------------------------------------------------------
     # Query insertion
