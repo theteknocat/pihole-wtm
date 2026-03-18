@@ -22,19 +22,23 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
+  Filler,
   Tooltip,
   Legend,
 } from 'chart.js'
 import App from './App.vue'
 import './style.css'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, Tooltip, Legend)
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: () => import('./views/OverviewView.vue') },
     { path: '/dashboard', component: () => import('./views/DashboardView.vue') },
+    { path: '/timeline', component: () => import('./views/TimelineView.vue') },
     { path: '/report', component: () => import('./views/DomainReportView.vue') },
   ],
 })

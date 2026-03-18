@@ -46,6 +46,19 @@ export interface DomainStats {
   domains: DomainStat[]
 }
 
+export interface TimelineBucket {
+  timestamp: number
+  total: number
+  blocked: number
+  allowed: number
+}
+
+export interface TimelineStats {
+  window_hours: number
+  bucket_seconds: number
+  buckets: TimelineBucket[]
+}
+
 export interface EnrichedQuery {
   id: number
   timestamp: number
