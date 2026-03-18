@@ -23,11 +23,8 @@ const chartRef = ref<InstanceType<typeof Chart> | null>(null)
 
 function formatTime(ts: number): string {
   const d = new Date(ts * 1000)
-  if (props.bucketSeconds >= 6 * 3600) {
-    return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' +
-      d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-  }
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + time
 }
 
 function buildDatasets(buckets: TimelineBucket[]) {
