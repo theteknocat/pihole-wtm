@@ -5,6 +5,7 @@ import Chart from 'primevue/chart'
 import type { LegendItem } from 'chart.js'
 import type { CategoryStat } from '@/types/api'
 import { niceMax, PADDING_LABEL } from '@/utils/chart'
+import { formatCategory } from '@/utils/format'
 
 const props = defineProps<{
   data: CategoryStat[]
@@ -14,10 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'select-category', category: string): void }>()
 
 const isDark = useDark()
-
-function formatCategory(cat: string): string {
-  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
 
 const sorted = computed(() =>
   [...props.data].sort((a, b) => b.query_count - a.query_count)

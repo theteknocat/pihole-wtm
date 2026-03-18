@@ -83,8 +83,16 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_domains_company   ON domains(company_name);
         """,
     ),
-    # Future migrations go here, e.g.:
-    # (2, "add user_config table", "CREATE TABLE IF NOT EXISTS user_config (...)"),
+    (
+        2,
+        "add user_config table",
+        """
+        CREATE TABLE IF NOT EXISTS user_config (
+            key     TEXT PRIMARY KEY,
+            value   TEXT NOT NULL
+        );
+        """,
+    ),
 ]
 
 
@@ -333,12 +341,35 @@ class LocalDatabase:
 
         return results, next_cursor
 
-    async def fetch_tracker_stats(self, hours: int = 24) -> dict[str, Any]:
+    async def fetch_tracker_stats(
+        self,
+        hours: int = 24,
+        excluded_categories: list[str] | None = None,
+        excluded_companies: list[str] | None = None,
+        excluded_domains: list[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Aggregate tracker stats over the given time window.
         Returns the same shape as the old get_tracker_stats() response.
         """
         from_ts = time.time() - hours * 3600
+        conditions = ["q.timestamp >= ?"]
+        params: list[Any] = [from_ts]
+
+        if excluded_categories:
+            placeholders = ",".join("?" for _ in excluded_categories)
+            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
+            params.extend(excluded_categories)
+        if excluded_companies:
+            placeholders = ",".join("?" for _ in excluded_companies)
+            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
+            params.extend(excluded_companies)
+        if excluded_domains:
+            placeholders = ",".join("?" for _ in excluded_domains)
+            conditions.append(f"q.domain NOT IN ({placeholders})")
+            params.extend(excluded_domains)
+
+        where = "WHERE " + " AND ".join(conditions)
 
         sql = f"""
             SELECT
@@ -351,14 +382,14 @@ class LocalDatabase:
                 SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed_count
             FROM queries q
             JOIN domains d ON q.domain = d.domain
-            WHERE q.timestamp >= ?
+            {where}
             GROUP BY d.category, d.company_name, q.domain
             ORDER BY query_count DESC
         """
 
         async with self._conn() as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute(sql, (from_ts,)) as cur:
+            async with db.execute(sql, params) as cur:
                 rows = await cur.fetchall()
 
         # Aggregate into the nested category → company → domains structure
@@ -428,6 +459,9 @@ class LocalDatabase:
         hours: int = 24,
         category: str | None = None,
         company: str | None = None,
+        excluded_categories: list[str] | None = None,
+        excluded_companies: list[str] | None = None,
+        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-domain query counts for the given time window, optionally
@@ -443,6 +477,18 @@ class LocalDatabase:
         if company is not None:
             conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
             params.append(company)
+        if excluded_categories:
+            placeholders = ",".join("?" for _ in excluded_categories)
+            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
+            params.extend(excluded_categories)
+        if excluded_companies:
+            placeholders = ",".join("?" for _ in excluded_companies)
+            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
+            params.extend(excluded_companies)
+        if excluded_domains:
+            placeholders = ",".join("?" for _ in excluded_domains)
+            conditions.append(f"q.domain NOT IN ({placeholders})")
+            params.extend(excluded_domains)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -497,6 +543,70 @@ class LocalDatabase:
             )
             await db.commit()
         logger.info("Database reset: all queries and domains deleted, sync cursor zeroed")
+
+    # -------------------------------------------------------------------------
+    # User configuration
+    # -------------------------------------------------------------------------
+
+    async def get_config(self, key: str) -> str | None:
+        """Get a single config value by key."""
+        async with self._conn() as db:
+            async with db.execute(
+                "SELECT value FROM user_config WHERE key = ?", (key,)
+            ) as cur:
+                row = await cur.fetchone()
+                return row[0] if row else None
+
+    async def get_all_config(self) -> dict[str, str]:
+        """Return all config key-value pairs."""
+        async with self._conn() as db:
+            async with db.execute("SELECT key, value FROM user_config") as cur:
+                rows = await cur.fetchall()
+                return {r[0]: r[1] for r in rows}
+
+    async def set_config(self, key: str, value: str) -> None:
+        """Set a config value (upsert)."""
+        async with self._conn() as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
+                (key, value),
+            )
+            await db.commit()
+
+    async def set_config_bulk(self, items: dict[str, str]) -> None:
+        """Set multiple config values in a single transaction."""
+        async with self._conn() as db:
+            await db.executemany(
+                "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
+                list(items.items()),
+            )
+            await db.commit()
+
+    async def delete_config(self, key: str) -> None:
+        """Remove a config key."""
+        async with self._conn() as db:
+            await db.execute("DELETE FROM user_config WHERE key = ?", (key,))
+            await db.commit()
+
+    async def get_available_categories(self) -> list[str]:
+        """Return distinct category values from enriched domains."""
+        async with self._conn() as db:
+            async with db.execute(
+                "SELECT DISTINCT category FROM domains WHERE category IS NOT NULL ORDER BY category"
+            ) as cur:
+                return [r[0] for r in await cur.fetchall()]
+
+    async def get_available_companies(self) -> list[str]:
+        """Return distinct company names from enriched domains."""
+        async with self._conn() as db:
+            async with db.execute(
+                "SELECT DISTINCT company_name FROM domains WHERE company_name IS NOT NULL ORDER BY company_name"
+            ) as cur:
+                return [r[0] for r in await cur.fetchall()]
+
+    # -------------------------------------------------------------------------
+    # Sync status
+    # -------------------------------------------------------------------------
 
     async def get_sync_status(self) -> dict[str, Any]:
         async with self._conn() as db:

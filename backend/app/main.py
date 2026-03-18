@@ -1,8 +1,9 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -124,11 +125,22 @@ async def queries(
     return {"queries": results, "cursor": next_cursor}
 
 
+async def _get_exclusions() -> dict[str, list[str]]:
+    """Read user exclusion config from the database."""
+    raw = await db.get_all_config()
+    return {
+        "excluded_categories": json.loads(raw.get("excluded_categories", "[]")),
+        "excluded_companies": json.loads(raw.get("excluded_companies", "[]")),
+        "excluded_domains": json.loads(raw.get("excluded_domains", "[]")),
+    }
+
+
 @app.get("/api/stats/trackers")
 async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict[str, Any]:
-    return await db.fetch_tracker_stats(hours=hours)
+    excl = await _get_exclusions()
+    return await db.fetch_tracker_stats(hours=hours, **excl)
 
 
 @app.get("/api/stats/domains")
@@ -137,7 +149,42 @@ async def stats_domains(
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_domain_stats(hours=hours, category=category, company=company)
+    excl = await _get_exclusions()
+    return await db.fetch_domain_stats(hours=hours, category=category, company=company, **excl)
+
+
+@app.get("/api/config")
+async def get_config() -> dict[str, Any]:
+    """Return all user configuration as a structured object."""
+    raw = await db.get_all_config()
+    return {
+        "excluded_categories": json.loads(raw.get("excluded_categories", "[]")),
+        "excluded_companies": json.loads(raw.get("excluded_companies", "[]")),
+        "excluded_domains": json.loads(raw.get("excluded_domains", "[]")),
+    }
+
+
+@app.put("/api/config")
+async def put_config(request: Request) -> dict[str, str]:
+    """Update user configuration. Accepts partial updates."""
+    body = await request.json()
+    items: dict[str, str] = {}
+    for key in ("excluded_categories", "excluded_companies", "excluded_domains"):
+        if key in body:
+            if not isinstance(body[key], list):
+                raise HTTPException(status_code=422, detail=f"{key} must be an array")
+            items[key] = json.dumps(body[key])
+    if items:
+        await db.set_config_bulk(items)
+    return {"status": "ok"}
+
+
+@app.get("/api/config/options")
+async def config_options() -> dict[str, Any]:
+    """Return the available categories and companies from stored data."""
+    categories = await db.get_available_categories()
+    companies = await db.get_available_companies()
+    return {"categories": categories, "companies": companies}
 
 
 @app.post("/api/admin/reset")

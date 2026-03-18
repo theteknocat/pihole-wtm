@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
+import ConfigDialog from './ConfigDialog.vue'
 import { useWindowStore } from '@/stores/window'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
+const configOpen = ref(false)
 const windowStore = useWindowStore()
 
 // Drive enter/exit animations from a single boolean.
@@ -63,6 +65,25 @@ async function doReset() {
       <!-- Content -->
       <div class="flex-1 overflow-auto p-4">
 
+        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Tracker Sources</p>
+
+        <div class="flex items-start justify-between gap-3 mb-6">
+          <div>
+            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Configure sources</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Choose which categories, companies, and domains to display.
+            </p>
+          </div>
+          <Button
+            label="Open"
+            icon="pi pi-sliders-h"
+            severity="secondary"
+            size="small"
+            text
+            @click="configOpen = true"
+          />
+        </div>
+
         <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Data</p>
 
         <div class="flex items-start justify-between gap-3">
@@ -109,5 +130,6 @@ async function doReset() {
       </div>
     </aside>
 
+    <ConfigDialog v-if="configOpen" @close="configOpen = false" />
   </div>
 </template>
