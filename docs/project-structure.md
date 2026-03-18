@@ -59,11 +59,13 @@ pihole-wtm/
 │       │   └── DomainReportView.vue   # Per-domain drill-down; navigated to from dashboard
 │       │
 │       ├── composables/
-│       │   └── useAuth.ts             # Authentication state composable
+│       │   ├── useAuth.ts             # Authentication state composable
+│       │   └── useTrackerBarChart.ts  # Shared bar chart config (datasets, tooltips, scales)
 │       │
 │       ├── components/
 │       │   ├── layout/
-│       │   │   └── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
+│       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
+│       │   │   └── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
 │       │   └── dashboard/
 │       │       ├── CategoryBarChart.vue    # Horizontal stacked bar: tracker categories (clickable)
 │       │       ├── CompanyBarChart.vue     # Horizontal stacked bar: top companies (clickable)
@@ -71,7 +73,7 @@ pihole-wtm/
 │       │       └── RecentQueriesTable.vue  # Recent blocked/allowed queries
 │       │
 │       ├── utils/
-│       │   └── chart.ts               # Shared chart helpers: niceMax(), PADDING_LABEL
+│       │   └── format.ts              # Display formatting helpers (e.g. formatCategory)
 │       │
 │       └── types/
 │           └── api.ts                 # TypeScript interfaces mirroring backend response shapes

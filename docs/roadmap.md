@@ -69,13 +69,13 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `needs_reenrichment` background re-processing when new enrichment sources are added
 - [x] Graceful handling of enrichment gaps — unlabelled domains show category "Uncategorized"
 - [x] Tracker source architecture refactor — `TrackerSource` protocol, pluggable source plugins with self-registration, per-source API routes, health checks, and lifecycle management; `main.py` fully source-agnostic
-- [ ] Tracker source configuration — `user_config` table in SQLite; user-selectable active categories (unified across TrackerDB and Disconnect.me) and explicit domain exclusion list; changes applied retroactively via surgical DELETE or forward-only
+- [x] Tracker source configuration — `user_config` table in SQLite; excluded categories, companies, and domains stored as JSON arrays; exclusions applied at query time (display-only, data still collected)
 - [ ] `GET /api/stats/timeline` — bucketed query/block counts over time (24h, 7d, 30d)
 - [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search
 
 ### Phase 2 — Frontend
 
-- [ ] Tracker source configuration modal — category toggles (with source badges), domain exclusion list, retroactive/forward-only apply option; accessible from settings sidebar
+- [x] Tracker source configuration dialog — category checkboxes, company checkboxes with search, domain exclusion list; accessible from settings sidebar
 - [ ] `QueryTimeline` — line + area chart, period selector (24h / 7d / 30d)
 - [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
 - [ ] URL query param sync for all filters (shareable/bookmarkable URLs)

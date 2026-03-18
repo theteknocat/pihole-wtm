@@ -24,10 +24,6 @@ Low risk in practice (the test endpoint is rarely called), but should be fixed w
 
 ## Frontend
 
-### Chart options duplicated across `CategoryBarChart` and `CompanyBarChart`
-
-Both components contain identical logic for computing `textColor`, `gridColor`, the tooltip callback, and scale/legend config. Extract to a `useChartOptions(totalTrackerQueries)` composable to keep it in one place.
-
 ### `RecentQueriesTable` — `type` prop unused in template
 
 The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual differentiation. Either colour-code the rows/cells based on type (e.g. a coloured left border or status badge) or remove the prop if it turns out to not be needed.

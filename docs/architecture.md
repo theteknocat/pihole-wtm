@@ -24,16 +24,17 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 │  ┌─────────────┐                                                 │
 │  │   Routers   │──────────────────────────────┐                  │
 │  │ /stats      │                              │                  │
-│  │ /queries    │                              ▼                  │
+│  │ /queries    │                              │                  │
+│  │ /config     │                              ▼                  │
 │  │ /debug      │         ┌────────────────────────────────────┐  │
 │  └─────────────┘         │     Local SQLite (pihole-wtm.db)   │  │
 │                          │                                    │  │
 │  ┌─────────────┐         │  ┌──────────┐  ┌──────────────┐    │  │
 │  │Sync Service │────────►│  │ queries  │  │   domains    │    │  │
 │  │(background) │         │  └──────────┘  └──────────────┘    │  │
-│  └──────┬──────┘         │  ┌──────────┐                      │  │
-│         │                │  │sync_state│                      │  │
-│         │ enrich         │  └──────────┘                      │  │
+│  └──────┬──────┘         │  ┌──────────┐  ┌─────────────┐     │  │
+│         │                │  │sync_state│  │ user_config │     │  │
+│         │ enrich         │  └──────────┘  └─────────────┘     │  │
 │         ▼                └────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────┐                │
 │  │             Enrichment Pipeline              │                │
@@ -59,11 +60,12 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. The Pi-hole API is only used by this service.
 
-**Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds three tables:
+**Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds four tables:
 
 - `queries` — filtered Pi-hole query history with Pi-hole fields captured at sync time
 - `domains` — one row per unique domain, holding all enrichment results across sources
 - `sync_state` — single-row cursor tracking the last synced Pi-hole query ID
+- `user_config` — key-value store for user preferences (excluded categories, companies, domains)
 
 **Enrichment Pipeline** processes each newly discovered domain after it is first stored. It iterates over configured tracker sources in priority order, writing the best available result to the `domains` table. Enrichment runs in the background and never blocks API responses. A `needs_reenrichment` flag on the `domains` table allows background re-processing when new sources are added.
 
@@ -81,7 +83,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
-**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (companies by query share, categories by query share). No pie or doughnut charts.
+**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (companies by query share, categories by query share). No pie or doughnut charts. Chart configuration is shared via the `useTrackerBarChart` composable, which provides dark-mode-aware datasets, tooltip formatting, and scale options.
 
 **Tailwind CSS** provides utility-class layout and spacing. Tailwind's dark mode uses the `class` strategy, toggled by `@vueuse/core`'s `useDark()` which defaults to the system preference and persists the user's choice to localStorage.
 
@@ -93,7 +95,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **eTLD+1 heuristic** — a lightweight fallback for domains not matched by TrackerDB or Disconnect.me. Extracts a company name from the registered domain label and infers a tracker category from well-known subdomain keywords (e.g. `telemetry.*` → "telemetry", `analytics.*` → "analytics"). Less reliable than a curated database but meaningfully better than showing nothing.
 
-**RDAP** — Registration Data Access Protocol lookups provide registrant organisation names for domains enriched only via the heuristic. Lookups run as a periodic background upgrade pass (every ~10 sync cycles), with a 0.5s delay per domain to stay within rate limits. Results are cached in-memory per registered domain.
+**RDAP** — Registration Data Access Protocol lookups provide registrant organisation names for domains enriched only via the heuristic. Lookups run as a periodic background upgrade pass (every ~10 sync cycles), with a 0.5s delay per domain to stay within rate limits. Results are cached in-memory per registered domain. The parser flattens nested RDAP entities (registrant inside registrar), skips non-owner roles (registrar, technical, abuse, etc.), and filters out WHOIS privacy proxy names. Domains where RDAP returns no usable name are marked `rdap_failed` to prevent repeated retries. Existing heuristic-derived category and company name are preserved when RDAP upgrades a domain.
 
 ## Data Flow
 
@@ -127,6 +129,8 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
    A separate periodic background pass (every ~10 sync cycles) upgrades heuristic-enriched
    domains with registrant names from RDAP, one domain at a time with a 0.5s delay.
+   Domains where RDAP returns no usable name are marked `rdap_failed` so they are not
+   retried on subsequent cycles.
 
 6. Insert filtered queries into queries table
 
@@ -198,7 +202,7 @@ CREATE TABLE domains (
     category            TEXT,
     company_name        TEXT,
     company_country     TEXT,
-    enrichment_source   TEXT,    -- 'trackerdb', 'disconnect', 'rdap', 'heuristic'
+    enrichment_source   TEXT,    -- 'trackerdb', 'disconnect', 'rdap', 'rdap_failed', 'heuristic'
     enriched_at         REAL,
     needs_reenrichment  INTEGER DEFAULT 0
 );
@@ -226,9 +230,10 @@ CREATE TABLE sync_state (
     last_synced_at  REAL
 );
 
--- User configuration (planned — not yet implemented).
--- Will store tracker source settings: active categories, excluded domains, etc.
--- Kept in the same database so config survives container restarts alongside data.
+-- User configuration (key-value store).
+-- Stores tracker source exclusion settings (excluded_categories, excluded_companies,
+-- excluded_domains) as JSON arrays. Kept in the same database so config survives
+-- container restarts alongside data.
 CREATE TABLE user_config (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
