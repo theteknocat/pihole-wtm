@@ -20,6 +20,39 @@ logger = logging.getLogger(__name__)
 # Cache: registered_domain → company name (or None if not found / privacy-protected)
 _cache: LRUCache = LRUCache(maxsize=5000)
 
+# Substrings that indicate a WHOIS privacy/proxy service rather than the actual registrant.
+_PRIVACY_INDICATORS = [
+    "privacy",
+    "proxy",
+    "redacted",
+    "whoisguard",
+    "domains by proxy",
+    "domainsbyproxy",
+    "contactprivacy",
+    "contact privacy",
+    "identity protect",
+    "withheld for privacy",
+    "data protected",
+    "domain protection",
+    "whoisprivacy",
+    "whois privacy",
+    "perfect privacy",
+    "private registration",
+    "domain privacy",
+    "id shield",
+    "privacy protect",
+    "privacyguardian",
+    "anonymize",
+    "not disclosed",
+    "statutory masking",
+]
+
+
+def _is_privacy_proxy(name: str) -> bool:
+    """Return True if the name looks like a WHOIS privacy/proxy service."""
+    lower = name.lower()
+    return any(indicator in lower for indicator in _PRIVACY_INDICATORS)
+
 
 def _registered_domain(domain: str) -> str:
     """
@@ -50,8 +83,17 @@ def _extract_org(data: dict) -> str | None:
     """
     all_entities = _flatten_entities(data.get("entities", []))
 
+    # Skip registrar/technical/abuse entities — their names are never the
+    # domain owner.  Only consider registrant, or entities with no role
+    # (some servers omit roles on the registrant).
+    _SKIP_ROLES = {"registrar", "technical", "abuse", "noc", "billing"}
+    candidates = [
+        e for e in all_entities
+        if not _SKIP_ROLES.intersection(e.get("roles", []))
+    ]
+
     # Prefer registrant role
-    ordered = sorted(all_entities, key=lambda e: ("registrant" not in e.get("roles", [])))
+    ordered = sorted(candidates, key=lambda e: ("registrant" not in e.get("roles", [])))
 
     for entity in ordered:
         vcard = entity.get("vcardArray")
@@ -60,7 +102,7 @@ def _extract_org(data: dict) -> str | None:
         for field in vcard[1]:
             if field[0] in ("fn", "org") and len(field) >= 4:
                 value = field[3]
-                if isinstance(value, str) and len(value) >= 2:
+                if isinstance(value, str) and len(value) >= 2 and not _is_privacy_proxy(value):
                     return value
 
     return None
