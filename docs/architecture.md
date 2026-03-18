@@ -58,7 +58,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Routers** handle HTTP routing and input validation. They read exclusively from the local SQLite database — they never call the Pi-hole API directly.
 
-**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. The Pi-hole API is only used by this service.
+**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configured retention period (default 7 days) and removes orphaned domain records. The Pi-hole API is only used by this service.
 
 **Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds four tables:
 
@@ -77,13 +77,13 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows).
+**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows). The app header includes a navigation bar with Dashboard and Timeline links, with active-state highlighting based on the current route.
 
 **Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d) and a `refreshKey` counter used to signal cross-component data refreshes — for example, causing all visible reports to reload after a data reset from the settings sidebar.
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
-**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (companies by query share, categories by query share). No pie or doughnut charts. Chart configuration is shared via the `useTrackerBarChart` composable, which provides dark-mode-aware datasets, tooltip formatting, and scale options.
+**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (categories and companies by query share) and a line/area chart (query timeline). No pie or doughnut charts. Bar chart configuration is shared via the `useTrackerBarChart` composable, which provides dark-mode-aware datasets, tooltip formatting, and scale options.
 
 **Tailwind CSS** provides utility-class layout and spacing. Tailwind's dark mode uses the `class` strategy, toggled by `@vueuse/core`'s `useDark()` which defaults to the system preference and persists the user's choice to localStorage.
 
@@ -135,6 +135,9 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 6. Insert filtered queries into queries table
 
 7. Update sync_state.last_query_id = highest ID processed
+
+8. Purge queries older than DATA_RETENTION_DAYS (default 7)
+   └─ Delete orphaned domain rows that no longer have any associated queries
 ```
 
 ### API Request (dashboard load)

@@ -18,7 +18,7 @@ The dashboard sits alongside your existing Pi-hole installation without modifyin
 - ~~A breakdown of blocked queries by tracker category (advertising, analytics, fingerprinting, CDN, etc.)~~ ✓
 - ~~A company-level view — which organisations' trackers appear most often in your query log~~ ✓
 - ~~Deep-drill filtering: click a category to see the queries, click a company to see its domains~~ ✓
-- Historical timelines showing how your tracker exposure changes over time
+- ~~Historical timelines showing how your tracker exposure changes over time~~ ✓
 - Multi-arch Docker images for Raspberry Pi and x86 hosts
 - A zero-configuration "just works" experience when run on the same machine as Pi-hole
 

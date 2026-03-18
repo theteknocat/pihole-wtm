@@ -47,7 +47,7 @@ pihole-wtm/
 │   ├── postcss.config.js
 │   └── src/
 │       ├── main.ts                    # createApp, router, pinia, PrimeVue
-│       ├── App.vue                    # Root: AppHeader + RouterView
+│       ├── App.vue                    # Root: header (logo, nav, dark mode, settings) + RouterView
 │       ├── style.css                  # CSS layer ordering, dark mode base styles
 │       │
 │       ├── stores/                    # Pinia stores
@@ -56,6 +56,7 @@ pihole-wtm/
 │       ├── views/                     # Top-level route components
 │       │   ├── OverviewView.vue       # System health: backend, Pi-hole, and per-source status
 │       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
+│       │   ├── TimelineView.vue       # Query volume timeline with summary stats
 │       │   └── DomainReportView.vue   # Per-domain drill-down; navigated to from dashboard
 │       │
 │       ├── composables/
@@ -66,6 +67,8 @@ pihole-wtm/
 │       │   ├── layout/
 │       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
 │       │   │   └── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
+│       │   ├── timeline/
+│       │   │   └── TimelineChart.vue       # Line + area chart: blocked/allowed query volume over time
 │       │   └── dashboard/
 │       │       ├── CategoryBarChart.vue    # Horizontal stacked bar: tracker categories (clickable)
 │       │       ├── CompanyBarChart.vue     # Horizontal stacked bar: top companies (clickable)
@@ -108,4 +111,4 @@ pihole-wtm/
 - Pinia stores hold only truly shared session state (time window, refresh signals). They do not hold fetched data.
 - Type definitions in `src/types/` are kept in sync with backend Pydantic response shapes.
 - Dark mode uses `useDark()` from `@vueuse/core`, which reads the system preference and persists the user's choice to localStorage.
-- No pie charts. Bar charts only.
+- No pie charts. Bar charts for breakdowns, line/area charts for timelines.

@@ -65,6 +65,16 @@ Lower values mean more up-to-date data but more frequent Pi-hole API calls. Valu
 
 ---
 
+### `DATA_RETENTION_DAYS`
+
+How many days of query data to keep in the local database. Queries older than this are automatically deleted each sync cycle, and domain records with no remaining queries are cleaned up.
+
+**Default:** `7`
+
+This matches the maximum time window available in the dashboard (7 days). Setting a higher value retains more historical data but increases database size. The dashboard will never display data beyond 7 days regardless of this setting.
+
+---
+
 ## Disconnect.me
 
 ### `DISCONNECT_UPDATE_INTERVAL_HOURS`
