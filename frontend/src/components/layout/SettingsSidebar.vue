@@ -67,65 +67,63 @@ async function doReset() {
 
         <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Tracker Sources</p>
 
-        <div class="flex items-start justify-between gap-3 mb-6">
-          <div>
-            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Configure sources</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Choose which categories, companies, and domains to display.
-            </p>
-          </div>
+        <div>
           <Button
-            label="Open"
+            class="w-full"
+            label="Configure Sources"
             icon="pi pi-sliders-h"
             severity="secondary"
             size="small"
-            text
+            raised
             @click="configOpen = true"
           />
         </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          Choose which categories, companies, and domains to display.
+        </p>
 
-        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Data</p>
+        <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-3">Sync Data</p>
 
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Reset sync data</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Clears all stored queries and domains. Data will resync on the next cycle.
-            </p>
-          </div>
-          <div class="flex flex-col items-end gap-1 shrink-0 min-w-0">
-            <p v-if="resetError" class="text-xs text-red-500 text-right w-full">{{ resetError }}</p>
-            <template v-if="resetState === 'idle'">
-              <Button
-                label="Reset"
-                icon="pi pi-trash"
-                severity="danger"
-                size="small"
-                text
-                @click="resetState = 'confirm'"
-              />
-            </template>
-            <template v-else>
-              <Button
-                label="Cancel"
-                icon="pi pi-times"
-                severity="secondary"
-                size="small"
-                text
-                :disabled="resetting"
-                @click="resetState = 'idle'"
-              />
-              <Button
-                label="Reset"
-                icon="pi pi-trash"
-                severity="danger"
-                size="small"
-                :loading="resetting"
-                @click="doReset"
-              />
-            </template>
-          </div>
+        <div class="flex gap-1">
+          <template v-if="resetState === 'idle'">
+            <Button
+              class="flex-1"
+              label="Reset Data"
+              icon="pi pi-trash"
+              severity="danger"
+              size="small"
+              raised
+              @click="resetState = 'confirm'"
+            />
+          </template>
+          <template v-else>
+            <Button
+              class="flex-1"
+              label="Cancel"
+              icon="pi pi-times"
+              severity="secondary"
+              size="small"
+              raised
+              :disabled="resetting"
+              @click="resetState = 'idle'"
+            />
+            <Button
+              class="flex-1"
+              label="Reset"
+              icon="pi pi-trash"
+              severity="danger"
+              size="small"
+              raised
+              :loading="resetting"
+              @click="doReset"
+            />
+          </template>
         </div>
+        <p v-if="resetState == 'confirm'" class="text-xs my-2">Are you sure? All data will be removed and it may take some time to rebuild.</p>
+        <p v-if="resetError" class="text-xs text-red-500 my-2">{{ resetError }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          Clears all stored queries and domains. Data will resync on the next cycle.
+        </p>
 
       </div>
     </aside>
