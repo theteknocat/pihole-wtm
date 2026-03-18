@@ -250,21 +250,24 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
     Background upgrade pass: replace heuristic company names with proper
     registered organization names from RDAP, one domain at a time with a
     short delay to stay within rate limits.
+
+    Preserves existing tracker_name and category from the heuristic pass,
+    since RDAP only provides a company name.
     """
-    domains = await db.get_heuristic_domains()
-    if not domains:
+    rows = await db.get_heuristic_domains()
+    if not rows:
         return
 
-    logger.info("RDAP: upgrading %d heuristic-enriched domains", len(domains))
+    logger.info("RDAP: upgrading %d heuristic-enriched domains", len(rows))
     upgraded = 0
 
-    for domain in domains:
-        company = await rdap_lookup(domain)
+    for row in rows:
+        company = await rdap_lookup(row["domain"])
         if company:
             await db.batch_update_domain_enrichment([{
-                "domain": domain,
-                "tracker_name": None,
-                "category": None,
+                "domain": row["domain"],
+                "tracker_name": row["tracker_name"],
+                "category": row["category"],
                 "company_name": company,
                 "company_country": None,
                 "source": "rdap",
@@ -272,7 +275,7 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
             upgraded += 1
         await asyncio.sleep(0.5)  # be polite to RDAP services
 
-    logger.info("RDAP: upgraded %d / %d domains", upgraded, len(domains))
+    logger.info("RDAP: upgraded %d / %d domains", upgraded, len(rows))
 
 
 async def run_sync_loop(

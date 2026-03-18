@@ -31,15 +31,27 @@ def _registered_domain(domain: str) -> str:
     return ".".join(parts[-2:]) if len(parts) >= 2 else domain
 
 
+def _flatten_entities(entities: list[dict]) -> list[dict]:
+    """Recursively collect all entities, including nested ones."""
+    result: list[dict] = []
+    for entity in entities:
+        result.append(entity)
+        nested = entity.get("entities")
+        if nested:
+            result.extend(_flatten_entities(nested))
+    return result
+
+
 def _extract_org(data: dict) -> str | None:
     """
     Parse a registrant organization name from an RDAP response.
     Tries the registrant entity first, then any other entity with vCard data.
+    Flattens nested entities so registrants inside registrar entities are found.
     """
-    entities = data.get("entities", [])
+    all_entities = _flatten_entities(data.get("entities", []))
 
     # Prefer registrant role
-    ordered = sorted(entities, key=lambda e: ("registrant" not in e.get("roles", [])))
+    ordered = sorted(all_entities, key=lambda e: ("registrant" not in e.get("roles", [])))
 
     for entity in ordered:
         vcard = entity.get("vcardArray")

@@ -236,14 +236,15 @@ class LocalDatabase:
             await db.commit()
             return cursor.rowcount
 
-    async def get_heuristic_domains(self) -> list[str]:
+    async def get_heuristic_domains(self) -> list[dict[str, Any]]:
         """Return domains enriched only via the eTLD+1 heuristic — candidates for RDAP upgrade."""
         async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT domain FROM domains WHERE enrichment_source = 'heuristic'"
+                "SELECT domain, tracker_name, category FROM domains WHERE enrichment_source = 'heuristic'"
             ) as cur:
                 rows = await cur.fetchall()
-                return [r[0] for r in rows]
+                return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"]} for r in rows]
 
     # -------------------------------------------------------------------------
     # Query insertion
