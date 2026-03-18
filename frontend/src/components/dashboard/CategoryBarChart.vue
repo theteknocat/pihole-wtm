@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useDark } from '@vueuse/core'
+import { computed, toRef } from 'vue'
 import Chart from 'primevue/chart'
 import type { CategoryStat } from '@/types/api'
 import { formatCategory } from '@/utils/format'
+import { useTrackerBarChart } from '@/composables/useTrackerBarChart'
 
 const props = defineProps<{
   data: CategoryStat[]
@@ -12,85 +12,28 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'select-category', category: string): void }>()
 
-const isDark = useDark()
-
 const sorted = computed(() =>
   [...props.data].sort((a, b) => b.query_count - a.query_count)
 )
 
-const chartHeight = computed(() => Math.max(288, sorted.value.length * 40))
-
-const pct = (n: number) =>
-  props.totalTrackerQueries > 0 ? (n / props.totalTrackerQueries) * 100 : 0
-
-const chartData = computed(() => ({
-  labels: sorted.value.map(c => formatCategory(c.category)),
-  datasets: [
-    {
-      label: 'Blocked',
-      data: sorted.value.map(c => c.blocked_count),
-      backgroundColor: 'rgba(239, 68, 68, 0.85)',
-    },
-    {
-      label: 'Allowed',
-      data: sorted.value.map(c => c.allowed_count),
-      backgroundColor: 'rgba(34, 197, 94, 0.85)',
-    },
-  ],
-}))
-
-const chartOptions = computed(() => {
-  const textColor = isDark.value ? '#e5e7eb' : '#374151'
-  const gridColor = isDark.value ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-  return {
-    indexAxis: 'y' as const,
-    responsive: true,
-    maintainAspectRatio: false,
-    onClick: (_: unknown, elements: { index: number }[]) => {
-      if (elements.length) emit('select-category', sorted.value[elements[0].index].category)
-    },
-    onHover: (event: { native: MouseEvent | null }, elements: unknown[]) => {
-      if (event.native?.target)
-        (event.native.target as HTMLElement).style.cursor = elements.length ? 'pointer' : 'default'
-    },
-    interaction: {
-      mode: 'index' as const,
-      axis: 'y' as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
-        labels: { color: textColor },
-      },
-      tooltip: {
-        callbacks: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          title: (items: any[]) => {
-            if (!items.length) return ''
-            const stat = sorted.value[items[0].dataIndex]
-            return `${formatCategory(stat.category)} — ${stat.query_count.toLocaleString()} queries`
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          label: (ctx: any) => {
-            const count = ctx.parsed.x
-            if (count === 0) return null
-            const p = pct(count).toFixed(1)
-            return ` ${ctx.dataset.label}: ${count.toLocaleString()} (${p}%)`
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        stacked: true,
-        ticks: { color: textColor },
-        grid: { color: gridColor },
-      },
-      y: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor } },
-    },
-  }
+const { isDark, chartHeight, chartData, chartOptions: baseOptions } = useTrackerBarChart({
+  items: sorted,
+  totalTrackerQueries: toRef(props, 'totalTrackerQueries'),
+  label: c => formatCategory(c.category),
+  tooltipTitle: c => `${formatCategory(c.category)} — ${c.query_count.toLocaleString()} queries`,
+  rowHeight: 40,
 })
+
+const chartOptions = computed(() => ({
+  ...baseOptions.value,
+  onClick: (_: unknown, elements: { index: number }[]) => {
+    if (elements.length) emit('select-category', sorted.value[elements[0].index].category)
+  },
+  onHover: (event: { native: MouseEvent | null }, elements: unknown[]) => {
+    if (event.native?.target)
+      (event.native.target as HTMLElement).style.cursor = elements.length ? 'pointer' : 'default'
+  },
+}))
 </script>
 
 <template>
