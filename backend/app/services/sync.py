@@ -22,6 +22,27 @@ from app.services.sources import TrackerSource
 logger = logging.getLogger(__name__)
 
 
+def _enrichment_dict(
+    domain: str,
+    source: str,
+    info: TrackerInfo | None = None,
+    *,
+    tracker_name: str | None = None,
+    category: str | None = None,
+    company_name: str | None = None,
+    company_country: str | None = None,
+) -> dict:
+    """Build an enrichment update dict. Uses TrackerInfo fields if provided, otherwise keyword args."""
+    return {
+        "domain": domain,
+        "tracker_name": info.tracker_name if info else tracker_name,
+        "category": info.category if info else category,
+        "company_name": info.company_name if info else company_name,
+        "company_country": info.company_country if info else company_country,
+        "source": source,
+    }
+
+
 async def _enrich_from_sources(
     domain: str,
     sources: list[TrackerSource],
@@ -139,26 +160,12 @@ async def _sync_once(
     enrichment_by_domain: dict[str, dict] = {}
     for q, (result, source_name) in zip(blocked, blocked_results):
         if result is not None:
-            enrichment_by_domain[q.domain] = {
-                "domain": q.domain,
-                "tracker_name": result.tracker_name,
-                "category": result.category,
-                "company_name": result.company_name,
-                "company_country": result.company_country,
-                "source": source_name,
-            }
+            enrichment_by_domain[q.domain] = _enrichment_dict(q.domain, source_name, result)
 
     for q in to_store:
         if q.id in allowed_enrichment:
             result, source_name = allowed_enrichment[q.id]
-            enrichment_by_domain[q.domain] = {
-                "domain": q.domain,
-                "tracker_name": result.tracker_name,
-                "category": result.category,
-                "company_name": result.company_name,
-                "company_country": result.company_country,
-                "source": source_name,
-            }
+            enrichment_by_domain[q.domain] = _enrichment_dict(q.domain, source_name, result)
 
     enrichment_updates = list(enrichment_by_domain.values())
     if enrichment_updates:
@@ -218,27 +225,15 @@ async def _reenrich_missing(
     updates = []
     for domain, (result, source_name) in zip(unenriched, results):
         if result is not None:
-            updates.append({
-                "domain": domain,
-                "tracker_name": result.tracker_name,
-                "category": result.category,
-                "company_name": result.company_name,
-                "company_country": result.company_country,
-                "source": source_name,
-            })
+            updates.append(_enrichment_dict(domain, source_name, result))
         else:
             # eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
             company_name = extract_company_name(domain)
             category = extract_category(domain)
             if company_name or category:
-                updates.append({
-                    "domain": domain,
-                    "tracker_name": None,
-                    "category": category,
-                    "company_name": company_name,
-                    "company_country": None,
-                    "source": "heuristic",
-                })
+                updates.append(_enrichment_dict(
+                    domain, "heuristic", category=category, company_name=company_name,
+                ))
 
     if updates:
         await db.batch_update_domain_enrichment(updates)
@@ -264,25 +259,17 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
     for row in rows:
         company = await rdap_lookup(row["domain"])
         if company:
-            await db.batch_update_domain_enrichment([{
-                "domain": row["domain"],
-                "tracker_name": row["tracker_name"],
-                "category": row["category"],
-                "company_name": company,
-                "company_country": None,
-                "source": "rdap",
-            }])
+            await db.batch_update_domain_enrichment([_enrichment_dict(
+                row["domain"], "rdap",
+                tracker_name=row["tracker_name"], category=row["category"], company_name=company,
+            )])
             upgraded += 1
         else:
             # Mark as failed so we don't retry on every cycle
-            await db.batch_update_domain_enrichment([{
-                "domain": row["domain"],
-                "tracker_name": row["tracker_name"],
-                "category": row["category"],
-                "company_name": row.get("company_name"),
-                "company_country": None,
-                "source": "rdap_failed",
-            }])
+            await db.batch_update_domain_enrichment([_enrichment_dict(
+                row["domain"], "rdap_failed",
+                tracker_name=row["tracker_name"], category=row["category"], company_name=row["company_name"],
+            )])
         await asyncio.sleep(0.5)  # be polite to RDAP services
 
     logger.info("RDAP: upgraded %d / %d domains", upgraded, len(rows))
