@@ -1,13 +1,22 @@
 <script setup lang="ts">
+/**
+ * DomainReportView — per-domain query breakdown with filterable category/company dropdowns.
+ *
+ * Filters are synced to URL query params so links are bookmarkable and the back button
+ * preserves state. PrimeVue's Select component with `filter` gives a searchable dropdown
+ * (similar to Select2), and `showClear` provides a per-filter clear button.
+ */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 import { useWindowStore } from '@/stores/window'
+import { formatCategory } from '@/utils/format'
 import type { DomainStats } from '@/types/api'
 
 const route = useRoute()
@@ -23,20 +32,46 @@ const selectedWindow = computed({
   set: (v) => { windowStore.hours = v.value },
 })
 
-const category = computed(() => route.query.category as string | undefined)
-const company = computed(() => route.query.company as string | undefined)
+// Filter state — initialised from URL query params
+const selectedCategory = ref<string | null>((route.query.category as string) ?? null)
+const selectedCompany = ref<string | null>((route.query.company as string) ?? null)
+
+// Available options from the backend
+const categoryOptions = ref<string[]>([])
+const companyOptions = ref<string[]>([])
 
 const data = ref<DomainStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+
+const hasFilters = computed(() => selectedCategory.value != null || selectedCompany.value != null)
+
+// Sync filter state to URL query params (replace, don't push — avoids history spam)
+function syncUrlParams() {
+  const query: Record<string, string> = {}
+  if (selectedCategory.value) query.category = selectedCategory.value
+  if (selectedCompany.value) query.company = selectedCompany.value
+  router.replace({ path: '/report', query })
+}
+
+async function fetchOptions() {
+  try {
+    const res = await fetch('/api/config/options')
+    const json = await res.json()
+    categoryOptions.value = json.categories ?? []
+    companyOptions.value = json.companies ?? []
+  } catch (e) {
+    console.warn('Failed to fetch filter options:', e)
+  }
+}
 
 async function fetchData() {
   loading.value = true
   error.value = null
   try {
     const params = new URLSearchParams({ hours: String(windowStore.hours) })
-    if (category.value) params.set('category', category.value)
-    if (company.value) params.set('company', company.value)
+    if (selectedCategory.value) params.set('category', selectedCategory.value)
+    if (selectedCompany.value) params.set('company', selectedCompany.value)
     const res = await fetch(`/api/stats/domains?${params}`)
     data.value = await res.json()
   } catch {
@@ -46,10 +81,25 @@ async function fetchData() {
   }
 }
 
-onMounted(fetchData)
+function resetFilters() {
+  selectedCategory.value = null
+  selectedCompany.value = null
+}
+
+onMounted(async () => {
+  await fetchOptions()
+  await fetchData()
+})
+
 watch(() => windowStore.hours, fetchData)
-watch(() => windowStore.refreshKey, fetchData)
-watch([category, company], fetchData)
+watch(() => windowStore.refreshKey, () => {
+  fetchOptions()
+  fetchData()
+})
+watch([selectedCategory, selectedCompany], () => {
+  syncUrlParams()
+  fetchData()
+})
 </script>
 
 <template>
@@ -57,29 +107,11 @@ watch([category, company], fetchData)
 
     <!-- Header -->
     <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <Button
-          icon="pi pi-arrow-left"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Back"
-          @click="router.back()"
-        />
-        <div>
-          <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Domain Report
-            <span v-if="category" class="font-normal text-gray-500 dark:text-gray-400">
-              — {{ category }}
-            </span>
-            <span v-else-if="company" class="font-normal text-gray-500 dark:text-gray-400">
-              — {{ company }}
-            </span>
-          </h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Domains grouped by query count — {{ selectedWindow.label }}
-          </p>
-        </div>
+      <div>
+        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Domain Report</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Domains grouped by query count — {{ selectedWindow.label }}
+        </p>
       </div>
       <div class="flex items-center gap-2">
         <SelectButton
@@ -98,6 +130,44 @@ watch([category, company], fetchData)
           @click="fetchData()"
         />
       </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex items-center gap-3 flex-wrap">
+      <Select
+        v-model="selectedCategory"
+        :options="categoryOptions"
+        placeholder="All categories"
+        filter
+        showClear
+        class="w-64"
+      >
+        <template #value="{ value }">
+          {{ value ? formatCategory(value) : 'All categories' }}
+        </template>
+        <template #option="{ option }">
+          {{ formatCategory(option) }}
+        </template>
+      </Select>
+
+      <Select
+        v-model="selectedCompany"
+        :options="companyOptions"
+        placeholder="All companies"
+        filter
+        showClear
+        class="w-64"
+      />
+
+      <Button
+        v-if="hasFilters"
+        label="Reset all"
+        icon="pi pi-filter-slash"
+        severity="secondary"
+        text
+        size="small"
+        @click="resetFilters"
+      />
     </div>
 
     <!-- Refresh error (shown over existing data) -->
@@ -132,8 +202,12 @@ watch([category, company], fetchData)
               <span class="font-mono text-xs">{{ row.domain }}</span>
             </template>
           </Column>
-          <Column v-if="!category" field="category" header="Category" sortable />
-          <Column v-if="!company" field="company_name" header="Company" sortable />
+          <Column field="category" header="Category" sortable>
+            <template #body="{ data: row }">
+              {{ formatCategory(row.category) }}
+            </template>
+          </Column>
+          <Column field="company_name" header="Company" sortable />
           <Column field="query_count" header="Total" sortable style="text-align: right" />
           <Column field="blocked_count" header="Blocked" sortable>
             <template #body="{ data: row }">
