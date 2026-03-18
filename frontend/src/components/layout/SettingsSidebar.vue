@@ -74,7 +74,7 @@ async function doReset() {
             icon="pi pi-sliders-h"
             severity="secondary"
             size="small"
-            raised
+            outlined
             @click="configOpen = true"
           />
         </div>
@@ -92,7 +92,7 @@ async function doReset() {
               icon="pi pi-trash"
               severity="danger"
               size="small"
-              raised
+              outlined
               @click="resetState = 'confirm'"
             />
           </template>
@@ -103,7 +103,7 @@ async function doReset() {
               icon="pi pi-times"
               severity="secondary"
               size="small"
-              raised
+              outlined
               :disabled="resetting"
               @click="resetState = 'idle'"
             />
@@ -113,7 +113,7 @@ async function doReset() {
               icon="pi pi-trash"
               severity="danger"
               size="small"
-              raised
+              outlined
               :loading="resetting"
               @click="doReset"
             />
