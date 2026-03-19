@@ -571,17 +571,27 @@ class LocalDatabase:
     async def fetch_client_stats(
         self,
         hours: int = 24,
+        category: str | None = None,
+        company: str | None = None,
         excluded_categories: list[str] | None = None,
         excluded_companies: list[str] | None = None,
         excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
-        Return per-client query counts for the given time window.
+        Return per-client query counts for the given time window,
+        optionally filtered to a single category or company.
         Joins client_names to include user-defined friendly names.
         """
         from_ts = time.time() - hours * 3600
         conditions = ["q.timestamp >= ?"]
         params: list[Any] = [from_ts]
+
+        if category is not None:
+            conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
+            params.append(category)
+        if company is not None:
+            conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
+            params.append(company)
 
         if excluded_categories:
             placeholders = ",".join("?" for _ in excluded_categories)

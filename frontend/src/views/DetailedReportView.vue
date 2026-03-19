@@ -87,6 +87,8 @@ async function fetchData() {
   try {
     if (windowStore.reportGroupBy === 'client') {
       const params = new URLSearchParams({ hours: String(windowStore.hours) })
+      if (selectedCategory.value) params.set('category', selectedCategory.value)
+      if (selectedCompany.value) params.set('company', selectedCompany.value)
       const res = await fetch(`/api/stats/clients?${params}`)
       clientData.value = await res.json()
     } else {
@@ -177,8 +179,8 @@ watch([selectedCategory, selectedCompany], () => {
       </div>
     </div>
 
-    <!-- Filters (domain mode only) -->
-    <div v-if="windowStore.reportGroupBy === 'domain'" class="flex items-center gap-3 flex-wrap">
+    <!-- Filters -->
+    <div class="flex items-center gap-3 flex-wrap">
       <Select
         v-model="selectedCategory"
         :options="categoryOptions"

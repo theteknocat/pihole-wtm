@@ -165,9 +165,11 @@ async def stats_domains(
 @app.get("/api/stats/clients")
 async def stats_clients(
     hours: int = Query(default=24, ge=1, le=168),
+    category: str | None = Query(default=None),
+    company: str | None = Query(default=None),
 ) -> dict[str, Any]:
     excl = await _get_exclusions()
-    return await db.fetch_client_stats(hours=hours, **excl)
+    return await db.fetch_client_stats(hours=hours, category=category, company=company, **excl)
 
 
 @app.get("/api/config")
