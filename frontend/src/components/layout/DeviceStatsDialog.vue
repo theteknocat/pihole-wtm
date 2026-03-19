@@ -2,18 +2,26 @@
 /**
  * DeviceStatsDialog — near-fullscreen modal showing tracker stats for a single device.
  *
- * Reuses the existing CategoryBarChart and CompanyBarChart components with data
- * fetched from /api/stats/trackers filtered by client_ip. A toggle switches
- * between the two chart views.
+ * Uses a single Chart.js instance with useTrackerBarChart. Toggling between
+ * categories and companies swaps the data fed to the composable, which updates
+ * the chart in place for smooth animated transitions.
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import Dialog from 'primevue/dialog'
+import PvChart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
-import CategoryBarChart from '@/components/dashboard/CategoryBarChart.vue'
-import CompanyBarChart from '@/components/dashboard/CompanyBarChart.vue'
 import { useWindowStore } from '@/stores/window'
+import { useTrackerBarChart } from '@/composables/useTrackerBarChart'
+import { formatCategory } from '@/utils/format'
 import type { TrackerStats, CompanyStat } from '@/types/api'
+
+interface ChartItem {
+  name: string
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+}
 
 const props = defineProps<{
   clientIp: string
@@ -29,11 +37,11 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 // Chart toggle
-const chartOptions = [
+const chartModeOptions = [
   { label: 'Categories', value: 'category' as const },
   { label: 'Companies', value: 'company' as const },
 ]
-const selectedChart = ref(chartOptions[0])
+const selectedMode = ref(chartModeOptions[0])
 
 // Aggregate companies across categories — same logic as DashboardView
 const allCompanies = computed<CompanyStat[]>(() => {
@@ -52,6 +60,31 @@ const allCompanies = computed<CompanyStat[]>(() => {
     }
   }
   return [...map.values()]
+})
+
+// Normalize both data shapes into a common ChartItem array.
+// The composable watches this ref and updates the chart in place.
+const chartItems = computed<ChartItem[]>(() => {
+  if (!stats.value) return []
+  if (selectedMode.value.value === 'category') {
+    return [...stats.value.by_category]
+      .sort((a, b) => b.query_count - a.query_count)
+      .map(c => ({ name: formatCategory(c.category), query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
+  }
+  return [...allCompanies.value]
+    .sort((a, b) => b.query_count - a.query_count)
+    .slice(0, 15)
+    .map(c => ({ name: c.company_name, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
+})
+
+const trackerQueries = computed(() => stats.value?.tracker_queries ?? 0)
+
+const { isDark, chartRef, chartHeight, chartData, chartOptions } = useTrackerBarChart({
+  items: chartItems,
+  totalTrackerQueries: trackerQueries,
+  label: c => c.name,
+  tooltipTitle: c => `${c.name} — ${c.query_count.toLocaleString()} queries`,
+  rowHeight: 38,
 })
 
 async function fetchStats() {
@@ -93,8 +126,8 @@ watch(() => windowStore.refreshKey, fetchStats)
       <div class="flex items-center justify-between w-full pr-2">
         <span class="font-semibold text-lg">{{ clientName ?? clientIp }} — Tracker Breakdown</span>
         <SelectButton
-          v-model="selectedChart"
-          :options="chartOptions"
+          v-model="selectedMode"
+          :options="chartModeOptions"
           option-label="label"
           :allow-empty="false"
         />
@@ -118,18 +151,15 @@ watch(() => windowStore.refreshKey, fetchStats)
       <p class="text-red-500">{{ error }}</p>
     </div>
 
-    <!-- Charts -->
-    <template v-if="stats">
-      <CategoryBarChart
-        v-if="selectedChart.value === 'category'"
-        :data="stats.by_category"
-        :total-tracker-queries="stats.tracker_queries"
-      />
-      <CompanyBarChart
-        v-else
-        :data="allCompanies"
-        :total-tracker-queries="stats.tracker_queries"
-      />
-    </template>
+    <!-- Chart -->
+    <PvChart
+      v-if="stats"
+      ref="chartRef"
+      type="bar"
+      :data="chartData"
+      :options="chartOptions"
+      :key="isDark ? 'dark' : 'light'"
+      :style="{ height: `${chartHeight}px` }"
+    />
   </Dialog>
 </template>
