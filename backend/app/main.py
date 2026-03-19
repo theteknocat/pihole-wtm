@@ -138,9 +138,10 @@ async def _get_exclusions() -> dict[str, list[str]]:
 @app.get("/api/stats/trackers")
 async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=168),
+    client_ip: str | None = Query(default=None),
 ) -> dict[str, Any]:
     excl = await _get_exclusions()
-    return await db.fetch_tracker_stats(hours=hours, **excl)
+    return await db.fetch_tracker_stats(hours=hours, client_ip=client_ip, **excl)
 
 
 @app.get("/api/stats/timeline")

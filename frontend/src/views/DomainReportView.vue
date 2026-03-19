@@ -17,6 +17,7 @@ import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
+import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
 import { useWindowStore } from '@/stores/window'
 import { formatCategory } from '@/utils/format'
 import type { DomainStats, ClientStats, ClientStat } from '@/types/api'
@@ -58,8 +59,9 @@ const clientData = ref<ClientStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-// Client name editing
+// Client name editing and device stats inspection
 const editingClient = ref<ClientStat | null>(null)
+const inspectingClient = ref<ClientStat | null>(null)
 
 function syncUrlParams() {
   const query: Record<string, string> = {}
@@ -303,7 +305,9 @@ watch([selectedCategory, selectedCompany], () => {
                   @click="editingClient = row"
                 />
                 <span class="block">
-                  {{ row.client_name ?? row.client_ip }}
+                  <a
+                    @click="inspectingClient = row"
+                  >{{ row.client_name ?? row.client_ip }}</a>
                   <span v-if="row.client_name" class="text-xs block text-gray-400 font-mono">{{ row.client_ip }}</span>
                 </span>
               </div>
@@ -340,6 +344,14 @@ watch([selectedCategory, selectedCompany], () => {
       :current-name="editingClient.client_name"
       @close="editingClient = null"
       @saved="(name) => onClientSaved(editingClient!, name)"
+    />
+
+    <!-- Device stats dialog -->
+    <DeviceStatsDialog
+      v-if="inspectingClient"
+      :client-ip="inspectingClient.client_ip"
+      :client-name="inspectingClient.client_name"
+      @close="inspectingClient = null"
     />
 
   </div>

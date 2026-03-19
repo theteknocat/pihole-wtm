@@ -373,17 +373,23 @@ class LocalDatabase:
     async def fetch_tracker_stats(
         self,
         hours: int = 24,
+        client_ip: str | None = None,
         excluded_categories: list[str] | None = None,
         excluded_companies: list[str] | None = None,
         excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Aggregate tracker stats over the given time window.
+        Optionally filter to a single client device by IP.
         Returns the same shape as the old get_tracker_stats() response.
         """
         from_ts = time.time() - hours * 3600
         conditions = ["q.timestamp >= ?"]
         params: list[Any] = [from_ts]
+
+        if client_ip:
+            conditions.append("q.client_ip = ?")
+            params.append(client_ip)
 
         if excluded_categories:
             placeholders = ",".join("?" for _ in excluded_categories)
