@@ -733,6 +733,47 @@ class LocalDatabase:
                 return [r[0] for r in await cur.fetchall()]
 
     # -------------------------------------------------------------------------
+    # Client names
+    # -------------------------------------------------------------------------
+
+    async def get_client_names(self) -> dict[str, str]:
+        """Return all client IP → name mappings."""
+        async with self._conn() as db:
+            async with db.execute("SELECT client_ip, name FROM client_names ORDER BY name") as cur:
+                return {r[0]: r[1] for r in await cur.fetchall()}
+
+    async def get_clients(self) -> list[dict[str, Any]]:
+        """Return all distinct client IPs with query counts and any assigned names."""
+        async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT q.client_ip, cn.name, COUNT(*) AS query_count
+                FROM queries q
+                LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+                GROUP BY q.client_ip
+                ORDER BY query_count DESC
+            """) as cur:
+                return [
+                    {"client_ip": r["client_ip"], "name": r["name"], "query_count": r["query_count"]}
+                    for r in await cur.fetchall()
+                ]
+
+    async def set_client_name(self, client_ip: str, name: str) -> None:
+        """Set or update a client name for an IP."""
+        async with self._conn() as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO client_names (client_ip, name) VALUES (?, ?)",
+                (client_ip, name),
+            )
+            await db.commit()
+
+    async def delete_client_name(self, client_ip: str) -> None:
+        """Remove a client name mapping."""
+        async with self._conn() as db:
+            await db.execute("DELETE FROM client_names WHERE client_ip = ?", (client_ip,))
+            await db.commit()
+
+    # -------------------------------------------------------------------------
     # Sync status
     # -------------------------------------------------------------------------
 
