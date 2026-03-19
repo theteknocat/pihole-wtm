@@ -93,11 +93,11 @@ async function fetchStats() {
 }
 
 function drillCategory(category: string) {
-  router.push({ path: '/report', query: { category } })
+  router.push({ path: '/detailed-report', query: { category } })
 }
 
 function drillCompany(company: string) {
-  router.push({ path: '/report', query: { company } })
+  router.push({ path: '/detailed-report', query: { company } })
 }
 
 onMounted(fetchStats)

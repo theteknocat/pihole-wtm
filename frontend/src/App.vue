@@ -37,12 +37,12 @@ const settingsOpen = ref(false)
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
           ><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
           <RouterLink
-            to="/report"
+            to="/detailed-report"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/report'
+            :class="route.path === '/detailed-report'
               ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          ><i class="pi pi-list text-xs" />Report</RouterLink>
+          ><i class="pi pi-list text-xs" />Detailed Report</RouterLink>
         </nav>
       </div>
       <div class="flex items-center gap-1">

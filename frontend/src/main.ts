@@ -39,7 +39,7 @@ const router = createRouter({
     { path: '/', component: () => import('./views/OverviewView.vue') },
     { path: '/dashboard', component: () => import('./views/DashboardView.vue') },
     { path: '/timeline', component: () => import('./views/TimelineView.vue') },
-    { path: '/report', component: () => import('./views/DomainReportView.vue') },
+    { path: '/detailed-report', component: () => import('./views/DetailedReportView.vue') },
   ],
 })
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * DomainReportView — query breakdown grouped by domain or by client device.
+ * DetailedReportView — query breakdown grouped by domain or by client device.
  *
  * A toggle switches between domain grouping (with category/company filters)
  * and client grouping (with inline name editing via a pencil button).
@@ -67,7 +67,7 @@ function syncUrlParams() {
   const query: Record<string, string> = {}
   if (selectedCategory.value) query.category = selectedCategory.value
   if (selectedCompany.value) query.company = selectedCompany.value
-  router.replace({ path: '/report', query })
+  router.replace({ path: '/detailed-report', query })
 }
 
 async function fetchOptions() {
