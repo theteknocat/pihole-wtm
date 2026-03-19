@@ -95,9 +95,13 @@ const chartOptions = computed(() => ({
   onClick: (_: unknown, elements: { index: number }[]) => {
     if (!elements.length) return
     const item = chartItems.value[elements[0].index]
-    const query: Record<string, string> = selectedMode.value.value === 'category'
-      ? { category: item.key }
-      : { company: item.key }
+    const query: Record<string, string> = { client_ip: props.clientIp }
+    if (selectedMode.value.value === 'category') {
+      query.category = item.key
+    } else {
+      query.company = item.key
+    }
+    windowStore.reportGroupBy = 'domain'
     visible.value = false
     router.push({ path: '/detailed-report', query })
   },
