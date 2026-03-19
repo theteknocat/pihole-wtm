@@ -46,6 +46,20 @@ export interface DomainStats {
   domains: DomainStat[]
 }
 
+export interface ClientStat {
+  client_ip: string
+  client_name: string | null
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+  block_rate: number
+}
+
+export interface ClientStats {
+  window_hours: number
+  clients: ClientStat[]
+}
+
 export interface TimelineBucket {
   timestamp: number
   total: number
