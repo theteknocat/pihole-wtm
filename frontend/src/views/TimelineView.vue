@@ -5,8 +5,9 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import TimelineChart from '@/components/timeline/TimelineChart.vue'
+import DeviceTimelineChart from '@/components/timeline/DeviceTimelineChart.vue'
 import { useWindowStore } from '@/stores/window'
-import type { TimelineStats } from '@/types/api'
+import type { TimelineStats, ClientTimelineStats } from '@/types/api'
 
 const windowStore = useWindowStore()
 
@@ -20,6 +21,7 @@ const selectedWindow = computed({
 })
 
 const timeline = ref<TimelineStats | null>(null)
+const clientTimeline = ref<ClientTimelineStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -27,8 +29,13 @@ async function fetchTimeline() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetch(`/api/stats/timeline?hours=${windowStore.hours}`)
-    timeline.value = await res.json()
+    const [timelineRes, clientRes] = await Promise.all([
+      fetch(`/api/stats/timeline?hours=${windowStore.hours}`),
+      fetch(`/api/stats/timeline/clients?hours=${windowStore.hours}`),
+    ])
+    if (!timelineRes.ok || !clientRes.ok) throw new Error('Server error')
+    timeline.value = await timelineRes.json()
+    clientTimeline.value = await clientRes.json()
   } catch {
     error.value = 'Failed to load timeline data. Is the backend reachable?'
   } finally {
@@ -141,6 +148,20 @@ watch(() => windowStore.refreshKey, fetchTimeline)
           <TimelineChart
             :buckets="timeline.buckets"
             :bucket-seconds="timeline.bucket_seconds"
+          />
+        </template>
+      </Card>
+
+      <!-- Device activity chart -->
+      <Card v-if="clientTimeline && clientTimeline.clients.length > 0">
+        <template #title>Device Activity</template>
+        <template #subtitle>
+          Query volume by device — {{ selectedWindow.label }}
+        </template>
+        <template #content>
+          <DeviceTimelineChart
+            :clients="clientTimeline.clients"
+            :bucket-seconds="clientTimeline.bucket_seconds"
           />
         </template>
       </Card>

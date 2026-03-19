@@ -152,6 +152,14 @@ async def stats_timeline(
     return await db.fetch_timeline_stats(hours=hours, **excl)
 
 
+@app.get("/api/stats/timeline/clients")
+async def stats_timeline_clients(
+    hours: int = Query(default=24, ge=1, le=168),
+) -> dict[str, Any]:
+    excl = await _get_exclusions()
+    return await db.fetch_client_timeline_stats(hours=hours, **excl)
+
+
 @app.get("/api/stats/domains")
 async def stats_domains(
     hours: int = Query(default=24, ge=1, le=168),

@@ -73,6 +73,24 @@ export interface TimelineStats {
   buckets: TimelineBucket[]
 }
 
+export interface ClientTimelineBucket {
+  timestamp: number
+  count: number
+}
+
+export interface ClientTimelineEntry {
+  client_ip: string
+  client_name: string | null
+  total: number
+  buckets: ClientTimelineBucket[]
+}
+
+export interface ClientTimelineStats {
+  window_hours: number
+  bucket_seconds: number
+  clients: ClientTimelineEntry[]
+}
+
 export interface EnrichedQuery {
   id: number
   timestamp: number

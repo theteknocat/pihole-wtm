@@ -725,6 +725,100 @@ class LocalDatabase:
             "buckets": buckets,
         }
 
+    async def fetch_client_timeline_stats(
+        self,
+        hours: int = 24,
+        excluded_categories: list[str] | None = None,
+        excluded_companies: list[str] | None = None,
+        excluded_domains: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return per-client query counts bucketed over time.
+        Same bucketing as fetch_timeline_stats but grouped by client_ip.
+        """
+        now = time.time()
+        from_ts = now - hours * 3600
+
+        if hours <= 24:
+            bucket_seconds = 3600
+        else:
+            bucket_seconds = 6 * 3600
+
+        conditions = ["q.timestamp >= ?"]
+        params: list[Any] = [from_ts]
+
+        if excluded_categories:
+            placeholders = ",".join("?" for _ in excluded_categories)
+            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
+            params.extend(excluded_categories)
+        if excluded_companies:
+            placeholders = ",".join("?" for _ in excluded_companies)
+            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
+            params.extend(excluded_companies)
+        if excluded_domains:
+            placeholders = ",".join("?" for _ in excluded_domains)
+            conditions.append(f"q.domain NOT IN ({placeholders})")
+            params.extend(excluded_domains)
+
+        where = "WHERE " + " AND ".join(conditions)
+
+        sql = f"""
+            SELECT
+                q.client_ip,
+                cn.name AS client_name,
+                CAST((q.timestamp - ?) / ? AS INTEGER) AS bucket,
+                COUNT(*) AS count
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            {where}
+            GROUP BY q.client_ip, bucket
+            ORDER BY q.client_ip, bucket
+        """
+        params = [from_ts, bucket_seconds] + params
+
+        async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+
+        # Build per-client bucket maps
+        num_buckets = hours * 3600 // bucket_seconds + 1
+        client_data: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            ip = row["client_ip"]
+            if ip not in client_data:
+                client_data[ip] = {
+                    "client_ip": ip,
+                    "client_name": row["client_name"],
+                    "bucket_map": {},
+                    "total": 0,
+                }
+            client_data[ip]["bucket_map"][row["bucket"]] = row["count"]
+            client_data[ip]["total"] += row["count"]
+
+        # Build complete bucket series for each client, sorted by total descending
+        clients = []
+        for info in sorted(client_data.values(), key=lambda c: -c["total"]):
+            buckets = []
+            for i in range(num_buckets):
+                buckets.append({
+                    "timestamp": from_ts + i * bucket_seconds,
+                    "count": info["bucket_map"].get(i, 0),
+                })
+            clients.append({
+                "client_ip": info["client_ip"],
+                "client_name": info["client_name"],
+                "total": info["total"],
+                "buckets": buckets,
+            })
+
+        return {
+            "window_hours": hours,
+            "bucket_seconds": bucket_seconds,
+            "clients": clients,
+        }
+
     async def purge_old_data(self, retention_days: int) -> tuple[int, int]:
         """
         Delete queries older than retention_days and remove orphaned domains.
