@@ -562,6 +562,72 @@ class LocalDatabase:
             ],
         }
 
+    async def fetch_client_stats(
+        self,
+        hours: int = 24,
+        excluded_categories: list[str] | None = None,
+        excluded_companies: list[str] | None = None,
+        excluded_domains: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return per-client query counts for the given time window.
+        Joins client_names to include user-defined friendly names.
+        """
+        from_ts = time.time() - hours * 3600
+        conditions = ["q.timestamp >= ?"]
+        params: list[Any] = [from_ts]
+
+        if excluded_categories:
+            placeholders = ",".join("?" for _ in excluded_categories)
+            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
+            params.extend(excluded_categories)
+        if excluded_companies:
+            placeholders = ",".join("?" for _ in excluded_companies)
+            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
+            params.extend(excluded_companies)
+        if excluded_domains:
+            placeholders = ",".join("?" for _ in excluded_domains)
+            conditions.append(f"q.domain NOT IN ({placeholders})")
+            params.extend(excluded_domains)
+
+        where = "WHERE " + " AND ".join(conditions)
+
+        sql = f"""
+            SELECT
+                q.client_ip,
+                cn.name AS client_name,
+                COUNT(*)                                AS query_count,
+                SUM(CASE WHEN q.status IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS blocked_count,
+                SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed_count
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            {where}
+            GROUP BY q.client_ip
+            ORDER BY query_count DESC
+        """
+
+        async with self._conn() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+
+        return {
+            "window_hours": hours,
+            "clients": [
+                {
+                    "client_ip": row["client_ip"],
+                    "client_name": row["client_name"],
+                    "query_count": row["query_count"],
+                    "blocked_count": row["blocked_count"],
+                    "allowed_count": row["allowed_count"],
+                    "block_rate": round(row["blocked_count"] / row["query_count"] * 100, 1)
+                    if row["query_count"] else 0.0,
+                }
+                for row in rows
+            ],
+        }
+
     async def fetch_timeline_stats(
         self,
         hours: int = 24,

@@ -161,6 +161,14 @@ async def stats_domains(
     return await db.fetch_domain_stats(hours=hours, category=category, company=company, **excl)
 
 
+@app.get("/api/stats/clients")
+async def stats_clients(
+    hours: int = Query(default=24, ge=1, le=168),
+) -> dict[str, Any]:
+    excl = await _get_exclusions()
+    return await db.fetch_client_stats(hours=hours, **excl)
+
+
 @app.get("/api/config")
 async def get_config() -> dict[str, Any]:
     """Return all user configuration as a structured object."""
@@ -193,6 +201,30 @@ async def config_options() -> dict[str, Any]:
     categories = await db.get_available_categories()
     companies = await db.get_available_companies()
     return {"categories": categories, "companies": companies}
+
+
+@app.get("/api/clients")
+async def get_clients() -> dict[str, Any]:
+    """Return all distinct client IPs with query counts and assigned names."""
+    return {"clients": await db.get_clients()}
+
+
+@app.put("/api/clients/{client_ip:path}")
+async def set_client(client_ip: str, request: Request) -> dict[str, str]:
+    """Set or update a friendly name for a client IP."""
+    body = await request.json()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    await db.set_client_name(client_ip, name)
+    return {"status": "ok"}
+
+
+@app.delete("/api/clients/{client_ip:path}")
+async def delete_client(client_ip: str) -> dict[str, str]:
+    """Remove a client name mapping."""
+    await db.delete_client_name(client_ip)
+    return {"status": "ok"}
 
 
 @app.post("/api/admin/reenrich")
