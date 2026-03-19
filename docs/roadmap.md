@@ -38,9 +38,12 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `RecentQueriesTable` — enriched, tracker-only filter toggle
 - [x] 24h / 7d time window selection, persisted across views via Pinia store
 - [x] Dark mode (system default, persisted to localStorage)
-- [x] `DomainReportView` — per-domain breakdown, filterable by category or company, navigated from dashboard
+- [x] `DetailedReportView` — domain/device breakdown with togglable grouping, category/company/device filters, navigated from dashboard
 - [x] `SettingsSidebar` — slide-in panel with data reset (inline confirm/cancel) and manual refresh
 - [x] Auto-refresh of all visible reports after data reset; manual refresh button on each view
+- [x] `ClientNameDialog` — modal for assigning/clearing friendly names for client IP addresses
+- [x] `DeviceStatsDialog` — per-device tracker breakdown chart with category/company toggle and click-through drill-down
+- [x] Per-device query breakdown on Detailed Report (device grouping mode)
 - [ ] `QueryLogView` — full paginated, filterable query log (separate page)
 - [ ] Loading skeleton states for all data tables and charts
 - [ ] Empty states for zero-data scenarios
@@ -72,6 +75,9 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] Tracker source configuration — `user_config` table in SQLite; excluded categories, companies, and domains stored as JSON arrays; exclusions applied at query time (display-only, data still collected)
 - [x] `GET /api/stats/timeline` — bucketed query/block counts over time (hourly for 24h, 6-hourly for 7d)
 - [x] Automatic data retention — configurable via `DATA_RETENTION_DAYS` (default 7); old queries purged each sync cycle, orphaned domains cleaned up
+- [x] `/api/stats/clients` — per-client query aggregation with category/company filters
+- [x] `/api/clients` — client IP listing with names and query counts; `PUT`/`DELETE` for name management
+- [x] `client_names` table — user-managed friendly names for client IPs, joined at query time
 - [ ] Full filtering on `/api/queries`: status, category, company, client IP, date range, domain search
 
 ### Phase 2 — Frontend
@@ -80,7 +86,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `TimelineView` — dedicated page with summary stats and line + area chart, period selector (24h / 7d)
 - [x] Header navigation — Dashboard and Timeline links with active-state highlighting
 - [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
-- [ ] URL query param sync for all filters (shareable/bookmarkable URLs)
+- [x] URL query param sync for Detailed Report filters (category, company, client_ip)
 - [ ] Auto-refresh for Overview stats (configurable interval)
 - [ ] Connection error display when Pi-hole is unreachable
 
@@ -141,7 +147,6 @@ These are not committed to any phase but are worth tracking as potential future 
 - **Notifications** — alert when a new tracker category is first seen, or when blocked query rate spikes
 - **Allowlist/blocklist suggestions** — surface domains that are pure trackers but not yet on the Pi-hole blocklist
 - **Multiple Pi-hole instances** — support monitoring multiple Pi-hole installations from one dashboard
-- **Per-client breakdown** — show which devices on the network generate the most tracker queries
 - **Export** — CSV/JSON export of enriched query data
 - **Authentication** — optional login to protect the dashboard on networks where it shouldn't be publicly accessible (see `docs/authentication.md`)
 - **Grafana data source plugin** — for users who already have Grafana dashboards

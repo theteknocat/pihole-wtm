@@ -26,15 +26,18 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 │  │ /stats      │                              │                  │
 │  │ /queries    │                              │                  │
 │  │ /config     │                              ▼                  │
-│  │ /debug      │         ┌────────────────────────────────────┐  │
-│  └─────────────┘         │     Local SQLite (pihole-wtm.db)   │  │
-│                          │                                    │  │
-│  ┌─────────────┐         │  ┌──────────┐  ┌──────────────┐    │  │
-│  │Sync Service │────────►│  │ queries  │  │   domains    │    │  │
-│  │(background) │         │  └──────────┘  └──────────────┘    │  │
-│  └──────┬──────┘         │  ┌──────────┐  ┌─────────────┐     │  │
-│         │                │  │sync_state│  │ user_config │     │  │
-│         │ enrich         │  └──────────┘  └─────────────┘     │  │
+│  │ /clients    │         ┌────────────────────────────────────┐  │
+│  │ /debug      │         │     Local SQLite (pihole-wtm.db)   │  │
+│  └─────────────┘         │                                    │  │
+│                          │  ┌──────────┐  ┌──────────────┐    │  │
+│  ┌─────────────┐         │  │ queries  │  │   domains    │    │  │
+│  │Sync Service │────────►│  └──────────┘  └──────────────┘    │  │
+│  │(background) │         │  ┌──────────┐  ┌──────────────┐    │  │
+│  └──────┬──────┘         │  │sync_state│  │ user_config  │    │  │
+│         │                │  └──────────┘  └──────────────┘    │  │
+│         │ enrich         │  ┌──────────────┐                  │  │
+│         │                │  │ client_names │                  │  │
+│         │                │  └──────────────┘                  │  │
 │         ▼                └────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────┐                │
 │  │             Enrichment Pipeline              │                │
@@ -60,12 +63,13 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configured retention period (default 7 days) and removes orphaned domain records. The Pi-hole API is only used by this service.
 
-**Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds four tables:
+**Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds five tables:
 
 - `queries` — filtered Pi-hole query history with Pi-hole fields captured at sync time
 - `domains` — one row per unique domain, holding all enrichment results across sources
 - `sync_state` — single-row cursor tracking the last synced Pi-hole query ID
 - `user_config` — key-value store for user preferences (excluded categories, companies, domains)
+- `client_names` — user-defined friendly names for client IP addresses
 
 **Enrichment Pipeline** processes each newly discovered domain after it is first stored. It iterates over configured tracker sources in priority order, writing the best available result to the `domains` table. Enrichment runs in the background and never blocks API responses. A `needs_reenrichment` flag on the `domains` table allows background re-processing when new sources are added.
 
@@ -77,9 +81,9 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Domain Report (per-domain drill-down, navigated to from chart bars and company table rows). The app header includes a navigation bar with Dashboard and Timeline links, with active-state highlighting based on the current route.
+**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Detailed Report (per-domain or per-device breakdown with drill-down from chart bars and company table rows). The app header includes a navigation bar with Dashboard, Timeline, and Detailed Report links, with active-state highlighting and icons based on the current route.
 
-**Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d) and a `refreshKey` counter used to signal cross-component data refreshes — for example, causing all visible reports to reload after a data reset from the settings sidebar.
+**Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d), a `refreshKey` counter used to signal cross-component data refreshes, and a `reportGroupBy` selection (`'domain'` or `'client'`) persisted to localStorage so the Detailed Report remembers whether you were viewing domains or devices.
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
@@ -217,7 +221,6 @@ CREATE TABLE queries (
     timestamp   REAL NOT NULL,
     domain      TEXT NOT NULL REFERENCES domains(domain),
     client_ip   TEXT,
-    client_name TEXT,
     status      TEXT NOT NULL,
     query_type  TEXT,
     reply_type  TEXT,
@@ -240,6 +243,13 @@ CREATE TABLE sync_state (
 CREATE TABLE user_config (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
+);
+
+-- User-defined friendly names for client devices (by IP address).
+-- Managed via the UI; joined into query and stats results at read time.
+CREATE TABLE client_names (
+    client_ip   TEXT PRIMARY KEY,
+    name        TEXT NOT NULL
 );
 
 CREATE INDEX idx_queries_timestamp ON queries(timestamp);

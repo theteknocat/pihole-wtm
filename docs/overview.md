@@ -49,6 +49,9 @@ The dashboard ranks companies by how often their domains appear in your query lo
 **"What happened to my query volume over the past week?"**
 The timeline chart shows queries and blocks over time, helping you spot changes in behaviour (a new device on the network, a website you started visiting, a new Pi-hole blocklist).
 
+**"Which device on my network talks to the most trackers?"**
+The Detailed Report's device grouping ranks clients by query count, with per-device drill-down showing tracker category and company breakdowns. You can assign friendly names to IP addresses so devices are recognisable at a glance.
+
 **"Something is slipping through my blocklist"**
 The dashboard surfaces allowed queries that match known tracker databases — things Pi-hole is permitting that arguably shouldn't be.
 

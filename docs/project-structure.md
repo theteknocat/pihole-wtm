@@ -51,13 +51,13 @@ pihole-wtm/
 │       ├── style.css                  # CSS layer ordering, dark mode base styles
 │       │
 │       ├── stores/                    # Pinia stores
-│       │   └── window.ts              # Shared time window (hours) and refreshKey counter
+│       │   └── window.ts              # Shared time window, refreshKey, reportGroupBy (localStorage-persisted)
 │       │
 │       ├── views/                     # Top-level route components
 │       │   ├── OverviewView.vue       # System health: backend, Pi-hole, and per-source status
 │       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
 │       │   ├── TimelineView.vue       # Query volume timeline with summary stats
-│       │   └── DomainReportView.vue   # Per-domain drill-down; navigated to from dashboard
+│       │   └── DetailedReportView.vue # Domain/device breakdown with filters; togglable grouping
 │       │
 │       ├── composables/
 │       │   ├── useAuth.ts             # Authentication state composable
@@ -66,7 +66,9 @@ pihole-wtm/
 │       ├── components/
 │       │   ├── layout/
 │       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
-│       │   │   └── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
+│       │   │   ├── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
+│       │   │   ├── ClientNameDialog.vue    # Modal for setting/clearing a friendly name for a client IP
+│       │   │   └── DeviceStatsDialog.vue   # Near-fullscreen modal: per-device tracker breakdown chart
 │       │   ├── timeline/
 │       │   │   └── TimelineChart.vue       # Line + area chart: blocked/allowed query volume over time
 │       │   └── dashboard/
@@ -89,6 +91,7 @@ pihole-wtm/
     ├── configuration.md               # Environment variable reference
     ├── deployment.md                  # Production deployment guide
     ├── roadmap.md                     # Phased implementation plan
+    ├── release-prep.md                # One-time tasks before first public release
     ├── tracker-categories.md          # Tracker category reference
     ├── authentication.md              # Planned authentication design
     └── tech-debt.md                   # Deferred fixes and lower-priority improvements
