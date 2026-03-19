@@ -67,16 +67,13 @@ function buildOtherBuckets(clients: ClientTimelineEntry[]): number[] {
 function buildDatasets(clients: ClientTimelineEntry[]) {
   const top = clients.slice(0, MAX_DEVICES)
 
-  // Draw smallest devices first (bottom of stack) so the dominant device
-  // sits on top. This prevents the small devices from visually jumping
-  // up and down with the dominant device's fluctuations.
+  // Smallest devices at the bottom of the stack, dominant on top.
+  // This keeps the small bands stable near the origin — if the dominant
+  // device were at the bottom, its fluctuations would shift everything above.
   const reversed = [...top].reverse()
-
   const datasets = []
 
-  // "Other" goes at the very bottom since it's the least interesting.
-  // The first dataset fills to the origin; all subsequent fill to the
-  // previous dataset ('-1') so each band only covers its own value.
+  // "Other" at the very bottom — least interesting, most stable
   const otherData = buildOtherBuckets(clients)
   if (otherData.length > 0) {
     datasets.push({
@@ -84,15 +81,16 @@ function buildDatasets(clients: ClientTimelineEntry[]) {
       data: otherData,
       borderColor: OTHER_COLOR,
       backgroundColor: OTHER_FILL,
-      fill: datasets.length === 0 ? 'origin' : '-1',
+      fill: 'origin',
       tension: 0.3,
       pointRadius: 0,
       pointHitRadius: 8,
     })
   }
 
+  // The first dataset fills to the origin; all subsequent fill to the
+  // previous dataset ('-1') so each band only covers its own value.
   for (const c of reversed) {
-    // Colour index based on original position (most active = first palette colour)
     const originalIdx = top.indexOf(c)
     datasets.push({
       label: deviceLabel(c),
@@ -156,6 +154,8 @@ const chartOptions = computed(() => {
         labels: { color: textColor },
       },
       tooltip: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        itemSort: (a: any, b: any) => b.raw - a.raw,
         callbacks: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           label: (ctx: any) => {
