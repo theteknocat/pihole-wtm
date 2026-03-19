@@ -6,6 +6,7 @@ const AUTO_REFRESH_SECONDS = 30
 export const useWindowStore = defineStore('window', () => {
   const hours = ref(24)
   const refreshKey = ref(0)
+  const reportGroupBy = ref<'domain' | 'client'>('domain')
   let intervalId: ReturnType<typeof setInterval> | null = null
 
   function triggerRefresh() { refreshKey.value = 1 - refreshKey.value }
@@ -25,5 +26,5 @@ export const useWindowStore = defineStore('window', () => {
   // Start immediately — runs for the lifetime of the app
   startAutoRefresh()
 
-  return { hours, refreshKey, triggerRefresh, startAutoRefresh, stopAutoRefresh }
+  return { hours, refreshKey, reportGroupBy, triggerRefresh, startAutoRefresh, stopAutoRefresh }
 })
