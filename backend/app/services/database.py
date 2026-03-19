@@ -494,17 +494,22 @@ class LocalDatabase:
         hours: int = 24,
         category: str | None = None,
         company: str | None = None,
+        client_ip: str | None = None,
         excluded_categories: list[str] | None = None,
         excluded_companies: list[str] | None = None,
         excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-domain query counts for the given time window, optionally
-        filtered to a single tracker category or company.
+        filtered to a single tracker category, company, or client device.
         """
         from_ts = time.time() - hours * 3600
         conditions = ["q.timestamp >= ?"]
         params: list[Any] = [from_ts]
+
+        if client_ip is not None:
+            conditions.append("q.client_ip = ?")
+            params.append(client_ip)
 
         if category is not None:
             conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
@@ -829,14 +834,14 @@ class LocalDatabase:
         async with self._conn() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
-                SELECT q.client_ip, cn.name, COUNT(*) AS query_count
+                SELECT q.client_ip, cn.name AS client_name, COUNT(*) AS query_count
                 FROM queries q
                 LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
                 GROUP BY q.client_ip
                 ORDER BY query_count DESC
             """) as cur:
                 return [
-                    {"client_ip": r["client_ip"], "name": r["name"], "query_count": r["query_count"]}
+                    {"client_ip": r["client_ip"], "client_name": r["client_name"], "query_count": r["query_count"]}
                     for r in await cur.fetchall()
                 ]
 

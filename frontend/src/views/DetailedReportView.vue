@@ -49,9 +49,21 @@ const selectedGroupBy = computed({
 // Domain mode: filter state — initialised from URL query params
 const selectedCategory = ref<string | null>((route.query.category as string) ?? null)
 const selectedCompany = ref<string | null>((route.query.company as string) ?? null)
+const selectedClientIp = ref<string | null>((route.query.client_ip as string) ?? null)
 const categoryOptions = ref<string[]>([])
 const companyOptions = ref<string[]>([])
-const hasFilters = computed(() => selectedCategory.value != null || selectedCompany.value != null)
+
+interface ClientOption {
+  client_ip: string
+  client_name: string | null
+  query_count: number
+}
+const clientOptions = ref<ClientOption[]>([])
+
+const hasFilters = computed(() =>
+  selectedCategory.value != null || selectedCompany.value != null ||
+  (windowStore.reportGroupBy === 'domain' && selectedClientIp.value != null)
+)
 
 // Data state
 const domainData = ref<DomainStats | null>(null)
@@ -67,15 +79,21 @@ function syncUrlParams() {
   const query: Record<string, string> = {}
   if (selectedCategory.value) query.category = selectedCategory.value
   if (selectedCompany.value) query.company = selectedCompany.value
+  if (selectedClientIp.value) query.client_ip = selectedClientIp.value
   router.replace({ path: '/detailed-report', query })
 }
 
 async function fetchOptions() {
   try {
-    const res = await fetch('/api/config/options')
-    const json = await res.json()
-    categoryOptions.value = json.categories ?? []
-    companyOptions.value = json.companies ?? []
+    const [configRes, clientsRes] = await Promise.all([
+      fetch('/api/config/options'),
+      fetch('/api/clients'),
+    ])
+    const configJson = await configRes.json()
+    categoryOptions.value = configJson.categories ?? []
+    companyOptions.value = configJson.companies ?? []
+    const clientsJson = await clientsRes.json()
+    clientOptions.value = clientsJson.clients ?? []
   } catch (e) {
     console.warn('Failed to fetch filter options:', e)
   }
@@ -95,6 +113,7 @@ async function fetchData() {
       const params = new URLSearchParams({ hours: String(windowStore.hours) })
       if (selectedCategory.value) params.set('category', selectedCategory.value)
       if (selectedCompany.value) params.set('company', selectedCompany.value)
+      if (selectedClientIp.value) params.set('client_ip', selectedClientIp.value)
       const res = await fetch(`/api/stats/domains?${params}`)
       domainData.value = await res.json()
     }
@@ -108,6 +127,7 @@ async function fetchData() {
 function resetFilters() {
   selectedCategory.value = null
   selectedCompany.value = null
+  selectedClientIp.value = null
 }
 
 function onClientSaved(client: ClientStat, newName: string | null) {
@@ -134,7 +154,7 @@ watch(() => windowStore.refreshKey, () => {
   }
 })
 watch(() => windowStore.reportGroupBy, fetchData)
-watch([selectedCategory, selectedCompany], () => {
+watch([selectedCategory, selectedCompany, selectedClientIp], () => {
   syncUrlParams()
   fetchData()
 })
@@ -143,8 +163,10 @@ watch([selectedCategory, selectedCompany], () => {
 watch(() => route.query, (q) => {
   const cat = (q.category as string) ?? null
   const co = (q.company as string) ?? null
+  const ip = (q.client_ip as string) ?? null
   if (cat !== selectedCategory.value) selectedCategory.value = cat
   if (co !== selectedCompany.value) selectedCompany.value = co
+  if (ip !== selectedClientIp.value) selectedClientIp.value = ip
 })
 </script>
 
@@ -159,7 +181,7 @@ watch(() => route.query, (q) => {
         </h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
           {{ windowStore.reportGroupBy === 'client' ? 'Devices' : 'Domains' }}
-          grouped by query count — {{ selectedWindow.label }}
+          grouped by query count
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -213,6 +235,28 @@ watch(() => route.query, (q) => {
         showClear
         class="w-64"
       />
+
+      <Select
+        v-if="windowStore.reportGroupBy === 'domain'"
+        v-model="selectedClientIp"
+        :options="clientOptions"
+        option-value="client_ip"
+        :option-label="(c: ClientOption) => c.client_name ?? c.client_ip"
+        placeholder="All devices"
+        filter
+        showClear
+        class="w-64"
+      >
+        <template #value="{ value }">
+          {{ value ? (clientOptions.find(c => c.client_ip === value)?.client_name ?? value) : 'All devices' }}
+        </template>
+        <template #option="{ option }">
+          <span class="block">
+            {{ option.client_name ?? option.client_ip }}
+            <span v-if="option.client_name" class="text-xs block text-gray-400 font-mono">{{ option.client_ip }}</span>
+          </span>
+        </template>
+      </Select>
 
       <Button
         v-if="hasFilters"
