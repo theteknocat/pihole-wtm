@@ -70,6 +70,7 @@ const domainData = ref<DomainStats | null>(null)
 const clientData = ref<ClientStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+let fetchController: AbortController | null = null
 
 // Client name editing and device stats inspection
 const editingClient = ref<ClientStat | null>(null)
@@ -100,6 +101,11 @@ async function fetchOptions() {
 }
 
 async function fetchData() {
+  // Cancel any in-flight request so a stale response can't overwrite fresh data
+  fetchController?.abort()
+  const controller = new AbortController()
+  fetchController = controller
+
   loading.value = true
   error.value = null
   try {
