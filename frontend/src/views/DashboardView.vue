@@ -110,7 +110,7 @@ watch(trackerOnly, fetchRecentQueries)
   <div class="p-6 space-y-6">
 
     <!-- Header row -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between sticky-header">
       <div>
         <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
