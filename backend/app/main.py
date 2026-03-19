@@ -220,6 +220,8 @@ async def set_client(client_ip: str, request: Request) -> dict[str, str]:
     name = body.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=422, detail="name is required")
+    if len(name) > 64:
+        raise HTTPException(status_code=422, detail="name must be 64 characters or fewer")
     await db.set_client_name(client_ip, name)
     return {"status": "ok"}
 

@@ -35,20 +35,21 @@ async function save() {
   const trimmed = name.value.trim()
 
   try {
+    let res: Response
     if (trimmed) {
-      await fetch(`/api/clients/${encodeURIComponent(props.clientIp)}`, {
+      res = await fetch(`/api/clients/${encodeURIComponent(props.clientIp)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmed }),
       })
-      emit('saved', trimmed)
     } else {
       // Empty name = remove mapping
-      await fetch(`/api/clients/${encodeURIComponent(props.clientIp)}`, {
+      res = await fetch(`/api/clients/${encodeURIComponent(props.clientIp)}`, {
         method: 'DELETE',
       })
-      emit('saved', null)
     }
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
+    emit('saved', trimmed || null)
     visible.value = false
   } catch {
     error.value = 'Failed to save. Is the backend reachable?'
@@ -87,6 +88,7 @@ function onKeydown(e: KeyboardEvent) {
           v-model="name"
           placeholder="e.g. Living Room TV"
           class="w-full"
+          :maxlength="64"
           autofocus
           @keydown="onKeydown"
         />
