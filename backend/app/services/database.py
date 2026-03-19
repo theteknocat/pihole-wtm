@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 #
 # Rules for adding migrations:
 #   - Append a new tuple; never modify existing entries.
-#   - Use IF NOT EXISTS / IF EXISTS so migrations are idempotent.
-#   - For data transforms that can't be expressed as SQL, use an async
-#     callable instead of a string (see _apply_migrations).
+#   - Use IF NOT EXISTS / IF EXISTS where possible so migrations are safe.
 # ---------------------------------------------------------------------------
 
 _MIGRATIONS: list[tuple[int, str, str]] = [
