@@ -120,6 +120,7 @@ async function fetchStats() {
       client_ip: props.clientIp,
     })
     const res = await fetch(`/api/stats/trackers?${params}`)
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
   } catch {
     error.value = 'Failed to load device stats.'
