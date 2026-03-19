@@ -138,6 +138,14 @@ watch([selectedCategory, selectedCompany], () => {
   syncUrlParams()
   fetchData()
 })
+
+// Sync refs when the route query changes externally (e.g. navigation from a modal)
+watch(() => route.query, (q) => {
+  const cat = (q.category as string) ?? null
+  const co = (q.company as string) ?? null
+  if (cat !== selectedCategory.value) selectedCategory.value = cat
+  if (co !== selectedCompany.value) selectedCompany.value = co
+})
 </script>
 
 <template>

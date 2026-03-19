@@ -7,6 +7,7 @@
  * the chart in place for smooth animated transitions.
  */
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import PvChart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
@@ -18,6 +19,7 @@ import type { TrackerStats, CompanyStat } from '@/types/api'
 
 interface ChartItem {
   name: string
+  key: string  // raw value for URL filter (category slug or company name)
   query_count: number
   blocked_count: number
   allowed_count: number
@@ -30,6 +32,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 
+const router = useRouter()
 const windowStore = useWindowStore()
 const visible = ref(true)
 const stats = ref<TrackerStats | null>(null)
@@ -69,23 +72,40 @@ const chartItems = computed<ChartItem[]>(() => {
   if (selectedMode.value.value === 'category') {
     return [...stats.value.by_category]
       .sort((a, b) => b.query_count - a.query_count)
-      .map(c => ({ name: formatCategory(c.category), query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
+      .map(c => ({ name: formatCategory(c.category), key: c.category, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
   }
   return [...allCompanies.value]
     .sort((a, b) => b.query_count - a.query_count)
     .slice(0, 15)
-    .map(c => ({ name: c.company_name, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
+    .map(c => ({ name: c.company_name, key: c.company_name, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
 })
 
 const trackerQueries = computed(() => stats.value?.tracker_queries ?? 0)
 
-const { isDark, chartRef, chartHeight, chartData, chartOptions } = useTrackerBarChart({
+const { isDark, chartRef, chartHeight, chartData, chartOptions: baseOptions } = useTrackerBarChart({
   items: chartItems,
   totalTrackerQueries: trackerQueries,
   label: c => c.name,
   tooltipTitle: c => `${c.name} — ${c.query_count.toLocaleString()} queries`,
   rowHeight: 38,
 })
+
+const chartOptions = computed(() => ({
+  ...baseOptions.value,
+  onClick: (_: unknown, elements: { index: number }[]) => {
+    if (!elements.length) return
+    const item = chartItems.value[elements[0].index]
+    const query: Record<string, string> = selectedMode.value.value === 'category'
+      ? { category: item.key }
+      : { company: item.key }
+    visible.value = false
+    router.push({ path: '/detailed-report', query })
+  },
+  onHover: (event: { native: MouseEvent | null }, elements: unknown[]) => {
+    if (event.native?.target)
+      (event.native.target as HTMLElement).style.cursor = elements.length ? 'pointer' : 'default'
+  },
+}))
 
 async function fetchStats() {
   loading.value = true
