@@ -90,6 +90,7 @@ async function fetchOptions() {
       fetch('/api/config/options'),
       fetch('/api/clients'),
     ])
+    if (!configRes.ok || !clientsRes.ok) throw new Error('Failed to fetch filter options')
     const configJson = await configRes.json()
     categoryOptions.value = configJson.categories ?? []
     companyOptions.value = configJson.companies ?? []
@@ -113,17 +114,20 @@ async function fetchData() {
       const params = new URLSearchParams({ hours: String(windowStore.hours) })
       if (selectedCategory.value) params.set('category', selectedCategory.value)
       if (selectedCompany.value) params.set('company', selectedCompany.value)
-      const res = await fetch(`/api/stats/clients?${params}`)
+      const res = await fetch(`/api/stats/clients?${params}`, { signal: controller.signal })
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
       clientData.value = await res.json()
     } else {
       const params = new URLSearchParams({ hours: String(windowStore.hours) })
       if (selectedCategory.value) params.set('category', selectedCategory.value)
       if (selectedCompany.value) params.set('company', selectedCompany.value)
       if (selectedClientIp.value) params.set('client_ip', selectedClientIp.value)
-      const res = await fetch(`/api/stats/domains?${params}`)
+      const res = await fetch(`/api/stats/domains?${params}`, { signal: controller.signal })
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
       domainData.value = await res.json()
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
     error.value = 'Failed to load data. Is the backend reachable?'
   } finally {
     loading.value = false
