@@ -141,9 +141,9 @@ const hasData = computed(() =>
   windowStore.reportGroupBy === 'client' ? clientData.value != null : domainData.value != null
 )
 
-onMounted(async () => {
-  await fetchOptions()
-  await fetchData()
+onMounted(() => {
+  fetchOptions()
+  fetchData()
 })
 
 watch(() => windowStore.hours, fetchData)
