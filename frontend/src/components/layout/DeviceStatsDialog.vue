@@ -84,8 +84,9 @@ watch(() => windowStore.refreshKey, fetchStats)
     v-model:visible="visible"
     modal
     :closable="true"
+    position="top"
+    :draggable="false"
     :style="{ width: '90vw', maxWidth: '1100px' }"
-    :content-style="{ minHeight: '400px' }"
     @hide="onHide"
   >
     <template #header>
