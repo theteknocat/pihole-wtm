@@ -360,7 +360,8 @@ watch(() => route.query, (q) => {
                 />
                 <span class="block">
                   <a
-                    @click="inspectingClient = row"
+                    href="#client-details"
+                    @click.prevent="inspectingClient = row"
                   >{{ row.client_name ?? row.client_ip }}</a>
                   <span v-if="row.client_name" class="text-xs block text-gray-400 font-mono">{{ row.client_ip }}</span>
                 </span>
