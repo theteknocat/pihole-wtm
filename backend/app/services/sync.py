@@ -178,7 +178,6 @@ async def _sync_once(
             "timestamp": q.timestamp,
             "domain": q.domain,
             "client_ip": q.client,
-            "client_name": q.client_name,
             "status": q.status,
             "query_type": q.query_type,
             "reply_type": q.reply_type,

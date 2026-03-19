@@ -15,7 +15,6 @@ class RawQuery(BaseModel):
     timestamp: float
     domain: str
     client: str          # client IP address
-    client_name: str | None = None  # client hostname (if Pi-hole has rDNS/DHCP)
     status: str
     status_label: str
     query_type: str

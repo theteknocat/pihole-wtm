@@ -93,6 +93,18 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         );
         """,
     ),
+    (
+        3,
+        "replace client_name column with client_names table",
+        """
+        ALTER TABLE queries DROP COLUMN client_name;
+
+        CREATE TABLE IF NOT EXISTS client_names (
+            client_ip   TEXT PRIMARY KEY,
+            name        TEXT NOT NULL
+        );
+        """,
+    ),
 ]
 
 
@@ -269,10 +281,10 @@ class LocalDatabase:
         async with self._conn() as db:
             await db.executemany(
                 """INSERT OR IGNORE INTO queries
-                   (id, timestamp, domain, client_ip, client_name, status,
+                   (id, timestamp, domain, client_ip, status,
                     query_type, reply_type, reply_time, upstream, list_id)
                    VALUES
-                   (:id, :timestamp, :domain, :client_ip, :client_name, :status,
+                   (:id, :timestamp, :domain, :client_ip, :status,
                     :query_type, :reply_type, :reply_time, :upstream, :list_id)""",
                 rows,
             )
@@ -312,12 +324,14 @@ class LocalDatabase:
         params.append(limit)
 
         sql = f"""
-            SELECT q.id, q.timestamp, q.domain, q.client_ip, q.client_name,
+            SELECT q.id, q.timestamp, q.domain, q.client_ip,
+                   cn.name AS client_name,
                    q.status, q.query_type, q.reply_type, q.reply_time,
                    q.upstream, q.list_id,
                    d.tracker_name, d.category, d.company_name, d.company_country
             FROM queries q
             LEFT JOIN domains d ON q.domain = d.domain
+            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
             {where}
             ORDER BY q.id DESC
             LIMIT ?
