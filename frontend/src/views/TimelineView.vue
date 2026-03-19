@@ -7,9 +7,11 @@ import SelectButton from 'primevue/selectbutton'
 import TimelineChart from '@/components/timeline/TimelineChart.vue'
 import DeviceTimelineChart from '@/components/timeline/DeviceTimelineChart.vue'
 import { useWindowStore } from '@/stores/window'
+import { useScrolled } from '@/composables/useScrolled'
 import type { TimelineStats, ClientTimelineStats } from '@/types/api'
 
 const windowStore = useWindowStore()
+const scrolled = useScrolled()
 
 const windowOptions = [
   { label: '24h', value: 24 },
@@ -67,7 +69,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
   <div class="p-6 space-y-6">
 
     <!-- Header row -->
-    <div class="flex items-center justify-between sticky-header">
+    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
       <div>
         <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Query Timeline</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -80,6 +82,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
           :options="windowOptions"
           option-label="label"
           :allow-empty="false"
+          :size="scrolled ? 'small' : undefined"
         />
         <Button
           icon="pi pi-refresh"
@@ -87,6 +90,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
           text
           rounded
           :loading="loading"
+          :size="scrolled ? 'small' : undefined"
           aria-label="Refresh"
           @click="fetchTimeline()"
         />

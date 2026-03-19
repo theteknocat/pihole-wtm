@@ -24,6 +24,25 @@
   @tailwind utilities;
 
   .sticky-header {
-    @apply sticky top-0 z-10 -mx-6 -mt-6 px-6 py-4 backdrop-blur-md bg-stone-100/80 dark:bg-stone-900/80;
+    @apply sticky top-0 z-10 -mx-6 -mt-6 px-6 py-4 transition-all duration-200;
+  }
+
+  .sticky-header.scrolled {
+    @apply py-2 backdrop-blur-md bg-stone-100/80 dark:bg-stone-900/80;
+  }
+
+  .sticky-header h1,
+  .sticky-header p,
+  .sticky-header button,
+  .sticky-header .p-selectbutton {
+    @apply transition-all duration-200;
+  }
+
+  .sticky-header.scrolled h1 {
+    @apply text-base;
+  }
+
+  .sticky-header.scrolled p {
+    @apply text-xs;
   }
 }

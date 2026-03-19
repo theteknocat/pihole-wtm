@@ -19,12 +19,14 @@ import Button from 'primevue/button'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
 import { useWindowStore } from '@/stores/window'
+import { useScrolled } from '@/composables/useScrolled'
 import { formatCategory } from '@/utils/format'
 import type { DomainStats, ClientStats, ClientStat } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const windowStore = useWindowStore()
+const scrolled = useScrolled()
 
 // Time window toggle
 const windowOptions = [
@@ -184,7 +186,7 @@ watch(() => route.query, (q) => {
   <div class="p-6 space-y-6">
 
     <!-- Header -->
-    <div class="flex items-center justify-between sticky-header">
+    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
       <div>
         <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
           {{ windowStore.reportGroupBy === 'client' ? 'Device Report' : 'Domain Report' }}
@@ -200,12 +202,14 @@ watch(() => route.query, (q) => {
           :options="groupByOptions"
           option-label="label"
           :allow-empty="false"
+          :size="scrolled ? 'small' : undefined"
         />
         <SelectButton
           v-model="selectedWindow"
           :options="windowOptions"
           option-label="label"
           :allow-empty="false"
+          :size="scrolled ? 'small' : undefined"
         />
         <Button
           icon="pi pi-refresh"
@@ -213,6 +217,7 @@ watch(() => route.query, (q) => {
           text
           rounded
           :loading="loading"
+          :size="scrolled ? 'small' : undefined"
           aria-label="Refresh"
           @click="fetchData()"
         />

@@ -11,10 +11,12 @@ import CompanyBarChart from '@/components/dashboard/CompanyBarChart.vue'
 import TopCompaniesTable from '@/components/dashboard/TopCompaniesTable.vue'
 import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
 import { useWindowStore } from '@/stores/window'
+import { useScrolled } from '@/composables/useScrolled'
 import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
 
 const router = useRouter()
 const windowStore = useWindowStore()
+const scrolled = useScrolled()
 
 const windowOptions = [
   { label: '24h', value: 24 },
@@ -110,7 +112,7 @@ watch(trackerOnly, fetchRecentQueries)
   <div class="p-6 space-y-6">
 
     <!-- Header row -->
-    <div class="flex items-center justify-between sticky-header">
+    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
       <div>
         <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -123,6 +125,7 @@ watch(trackerOnly, fetchRecentQueries)
           :options="windowOptions"
           option-label="label"
           :allow-empty="false"
+          :size="scrolled ? 'small' : undefined"
         />
         <Button
           icon="pi pi-refresh"
@@ -130,6 +133,7 @@ watch(trackerOnly, fetchRecentQueries)
           text
           rounded
           :loading="loading"
+          :size="scrolled ? 'small' : undefined"
           aria-label="Refresh"
           @click="fetchStats()"
         />
