@@ -74,6 +74,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] Tracker source architecture refactor — `TrackerSource` protocol, pluggable source plugins with self-registration, per-source API routes, health checks, and lifecycle management; `main.py` fully source-agnostic
 - [x] Tracker source configuration — `user_config` table in SQLite; excluded categories, companies, and domains stored as JSON arrays; exclusions applied at query time (display-only, data still collected)
 - [x] `GET /api/stats/timeline` — bucketed query/block counts over time (hourly for 24h, 6-hourly for 7d)
+- [x] `GET /api/stats/timeline/clients` — per-device bucketed query counts over time
 - [x] Automatic data retention — configurable via `DATA_RETENTION_DAYS` (default 7); old queries purged each sync cycle, orphaned domains cleaned up
 - [x] `/api/stats/clients` — per-client query aggregation with category/company filters
 - [x] `/api/clients` — client IP listing with names and query counts; `PUT`/`DELETE` for name management
@@ -84,6 +85,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 - [x] Tracker source configuration dialog — category checkboxes, company checkboxes with search, domain exclusion list; accessible from settings sidebar
 - [x] `TimelineView` — dedicated page with summary stats and line + area chart, period selector (24h / 7d)
+- [x] `DeviceTimelineChart` — stacked area chart showing per-device query volume below the main timeline
 - [x] Header navigation — Dashboard and Timeline links with active-state highlighting
 - [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
 - [x] URL query param sync for Detailed Report filters (category, company, client_ip)

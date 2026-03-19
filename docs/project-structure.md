@@ -61,6 +61,7 @@ pihole-wtm/
 │       │
 │       ├── composables/
 │       │   ├── useAuth.ts             # Authentication state composable
+│       │   ├── useScrolled.ts         # Reactive scroll-position tracker for sticky header compaction
 │       │   └── useTrackerBarChart.ts  # Shared bar chart config (datasets, tooltips, scales)
 │       │
 │       ├── components/
@@ -70,7 +71,8 @@ pihole-wtm/
 │       │   │   ├── ClientNameDialog.vue    # Modal for setting/clearing a friendly name for a client IP
 │       │   │   └── DeviceStatsDialog.vue   # Near-fullscreen modal: per-device tracker breakdown chart
 │       │   ├── timeline/
-│       │   │   └── TimelineChart.vue       # Line + area chart: blocked/allowed query volume over time
+│       │   │   ├── TimelineChart.vue       # Line + area chart: blocked/allowed query volume over time
+│       │   │   └── DeviceTimelineChart.vue # Stacked area chart: per-device query volume over time
 │       │   └── dashboard/
 │       │       ├── CategoryBarChart.vue    # Horizontal stacked bar: tracker categories (clickable)
 │       │       ├── CompanyBarChart.vue     # Horizontal stacked bar: top companies (clickable)

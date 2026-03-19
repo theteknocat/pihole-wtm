@@ -87,7 +87,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
-**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (categories and companies by query share) and a line/area chart (query timeline). No pie or doughnut charts. Bar chart configuration is shared via the `useTrackerBarChart` composable, which provides dark-mode-aware datasets, tooltip formatting, and scale options.
+**Chart.js** is used via PrimeVue's Chart component for bar chart visualisations (categories and companies by query share), a line/area chart (query timeline), and a stacked area chart (per-device activity timeline). No pie or doughnut charts. Bar chart configuration is shared via the `useTrackerBarChart` composable, which provides dark-mode-aware datasets, tooltip formatting, and scale options. The device timeline uses a categorical colour palette (top 10 devices) with remaining devices grouped into a grey "Other" series.
 
 **Tailwind CSS** provides utility-class layout and spacing. Tailwind's dark mode uses the `class` strategy, toggled by `@vueuse/core`'s `useDark()` which defaults to the system preference and persists the user's choice to localStorage.
 
