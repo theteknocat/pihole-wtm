@@ -119,6 +119,7 @@ onMounted(load)
   <Dialog
     v-model:visible="visible"
     modal
+    :draggable="false"
     header="Tracker Source Configuration"
     :style="{ width: '720px', maxHeight: '85vh' }"
     :closable="true"

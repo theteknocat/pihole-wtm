@@ -67,6 +67,7 @@ function onKeydown(e: KeyboardEvent) {
     v-model:visible="visible"
     header="Set Device Name"
     modal
+    :draggable="false"
     :closable="true"
     :style="{ width: '24rem' }"
     @hide="onHide"
