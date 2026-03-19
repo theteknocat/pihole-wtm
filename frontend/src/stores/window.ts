@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 const AUTO_REFRESH_SECONDS = 30
@@ -6,7 +6,10 @@ const AUTO_REFRESH_SECONDS = 30
 export const useWindowStore = defineStore('window', () => {
   const hours = ref(24)
   const refreshKey = ref(0)
-  const reportGroupBy = ref<'domain' | 'client'>('domain')
+  const stored = localStorage.getItem('reportGroupBy')
+  const reportGroupBy = ref<'domain' | 'client'>(
+    stored === 'client' ? 'client' : 'domain'
+  )
   let intervalId: ReturnType<typeof setInterval> | null = null
 
   function triggerRefresh() { refreshKey.value = 1 - refreshKey.value }
@@ -22,6 +25,8 @@ export const useWindowStore = defineStore('window', () => {
       intervalId = null
     }
   }
+
+  watch(reportGroupBy, (v) => localStorage.setItem('reportGroupBy', v))
 
   // Start immediately — runs for the lifetime of the app
   startAutoRefresh()
