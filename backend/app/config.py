@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Disconnect.me
     disconnect_update_interval_hours: int = 24
 
+    # Session
+    session_timeout_hours: int = 24  # Idle timeout — session expires after this many hours of inactivity
+
     # Local database
     local_db_path: str = "/app/data/pihole_wtm.db"
     sync_interval_seconds: int = 60

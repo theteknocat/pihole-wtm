@@ -151,13 +151,14 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
     # Create our session
     session = session_store.create(pihole_url=url, pihole_password=body.password)
 
+    from app.config import settings
     response.set_cookie(
         key=SESSION_COOKIE,
         value=session.session_id,
         httponly=True,
         samesite="strict",
         secure=False,  # Local network — no HTTPS typically
-        max_age=86400,
+        max_age=settings.session_timeout_hours * 3600,
     )
 
     # Start the sync service with the new session credentials

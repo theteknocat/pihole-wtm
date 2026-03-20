@@ -28,6 +28,18 @@ Do not include a trailing slash or path — the backend appends `/api/...` autom
 
 ---
 
+## Session
+
+### `SESSION_TIMEOUT_HOURS`
+
+How many hours an idle session lasts before the user must log in again. The timeout resets on each authenticated API request.
+
+**Default:** `24`
+
+On session expiry the sync service stops and the user is redirected to the login page. Setting a higher value is fine for a local dashboard — sessions are memory-only and cleared on server restart regardless.
+
+---
+
 ## Local Database
 
 ### `LOCAL_DB_PATH`

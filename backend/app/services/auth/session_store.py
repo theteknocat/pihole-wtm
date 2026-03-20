@@ -30,9 +30,13 @@ class Session:
 class SessionStore:
     """In-memory session store. Only one active session at a time."""
 
-    def __init__(self, max_idle_seconds: int = 86400) -> None:
+    def __init__(self) -> None:
         self._session: Session | None = None
-        self._max_idle = max_idle_seconds
+
+    @property
+    def _max_idle(self) -> int:
+        from app.config import settings
+        return settings.session_timeout_hours * 3600
 
     def create(self, pihole_url: str, pihole_password: str) -> Session:
         """Create a new session, replacing any existing one."""
