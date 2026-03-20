@@ -23,6 +23,10 @@ This eliminates the `DROP COLUMN` (which has no `IF EXISTS` in SQLite) and simpl
 ## Documentation
 
 - [ ] All `docs/` pages reviewed and up to date
+- [ ] README deployment guide covering:
+  - Docker Compose setup (standard Linux/Mac)
+  - QNAP Container Station specific instructions
+  - General guidance for other container managers (env vars, volumes, networking)
 - [ ] Screenshots in README showing dashboard, timeline, and detailed report views
 - [ ] API reference generated from FastAPI OpenAPI spec
 - [ ] `CONTRIBUTING.md` with code style guide and PR process
@@ -32,10 +36,10 @@ This eliminates the `DROP COLUMN` (which has no `IF EXISTS` in SQLite) and simpl
 
 ## Infrastructure
 
-- [ ] `docker-compose.yml` for production deployment
-- [ ] `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`
-- [ ] `nginx.conf` — SPA routing + `/api` proxy
-- [ ] `.env.example` with documented defaults
+- [x] `docker-compose.yml` for production deployment
+- [x] `Dockerfile` — multi-stage build (frontend + backend + nginx)
+- [x] `docker/nginx.conf` — SPA routing + `/api` proxy
+- [x] `.env.example` with documented defaults
 - [ ] Multi-arch Docker image builds (`linux/amd64` + `linux/arm64`)
 - [ ] GitHub Actions CI: lint + type-check + test
 
