@@ -52,10 +52,10 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 ### Phase 1 — Infrastructure
 
 - [x] `.ddev/config.yaml` with `web_extra_daemons` for uvicorn and Vite dev server
-- [ ] `docker-compose.yml` for production deployment
-- [ ] `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`
-- [ ] `nginx.conf` — SPA routing + `/api` proxy
-- [ ] `.env.example`
+- [x] `docker-compose.yml` for production deployment
+- [x] `Dockerfile` — multi-stage build (frontend + backend + nginx in single image)
+- [x] `docker/nginx.conf` — SPA routing + `/api` proxy to uvicorn
+- [x] `.env.example` — all configurable environment variables
 
 **Phase 1 outcome:** A deployable dashboard showing tracker stats, a browsable enriched query log, and category/company breakdown charts — all served from a local pre-enriched database.
 
