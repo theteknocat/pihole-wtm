@@ -14,14 +14,6 @@ services:
       - TRACKERDB_UPDATE_INTERVAL_HOURS=${TRACKERDB_UPDATE_INTERVAL_HOURS:-24}
       - DATA_RETENTION_DAYS=${DATA_RETENTION_DAYS:-7}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-    networks:
-      - default
-      - pihole
 
 volumes:
   pihole-wtm-data:
-
-networks:
-  pihole:
-    name: ${PIHOLE_NETWORK:-pihole_default}
-    external: true
