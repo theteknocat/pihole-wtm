@@ -5,6 +5,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { useAuth } from './composables/useAuth'
 import SettingsSidebar from './components/layout/SettingsSidebar.vue'
+import AppFooter from './components/layout/AppFooter.vue'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -85,6 +86,7 @@ async function handleLogout() {
     <main class="flex-1 overflow-auto">
       <RouterView />
     </main>
+    <AppFooter v-if="isAuthenticated && !checking" />
     <SettingsSidebar v-if="settingsOpen" @close="settingsOpen = false" />
   </div>
 </template>
