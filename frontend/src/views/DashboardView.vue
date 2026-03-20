@@ -12,6 +12,7 @@ import TopCompaniesTable from '@/components/dashboard/TopCompaniesTable.vue'
 import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
 import { useWindowStore } from '@/stores/window'
 import { useScrolled } from '@/composables/useScrolled'
+import { apiFetch } from '@/utils/api'
 import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
 
 const router = useRouter()
@@ -63,8 +64,8 @@ async function fetchRecentQueries() {
   recentLoading.value = true
   try {
     const [blockedRes, allowedRes] = await Promise.all([
-      fetch(recentQueryUrl('blocked')),
-      fetch(recentQueryUrl('allowed')),
+      apiFetch(recentQueryUrl('blocked')),
+      apiFetch(recentQueryUrl('allowed')),
     ])
     if (!blockedRes.ok || !allowedRes.ok) throw new Error('Server error')
     recentBlocked.value = (await blockedRes.json()).queries
@@ -81,9 +82,9 @@ async function fetchStats() {
   error.value = null
   try {
     const [statsRes, blockedRes, allowedRes] = await Promise.all([
-      fetch(`/api/stats/trackers?hours=${windowStore.hours}`),
-      fetch(recentQueryUrl('blocked')),
-      fetch(recentQueryUrl('allowed')),
+      apiFetch(`/api/stats/trackers?hours=${windowStore.hours}`),
+      apiFetch(recentQueryUrl('blocked')),
+      apiFetch(recentQueryUrl('allowed')),
     ])
     if (!statsRes.ok || !blockedRes.ok || !allowedRes.ok) throw new Error('Server error')
     stats.value = await statsRes.json()

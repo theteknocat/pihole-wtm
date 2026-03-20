@@ -18,6 +18,15 @@
   a {
     @apply text-blue-600 dark:text-blue-400 hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500;
   }
+
+  /* Override browser autofill background (Chrome forces a light yellow/blue) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px transparent inset;
+    -webkit-text-fill-color: inherit;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 @layer tailwind-utilities {

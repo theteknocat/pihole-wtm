@@ -8,6 +8,7 @@ import TimelineChart from '@/components/timeline/TimelineChart.vue'
 import DeviceTimelineChart from '@/components/timeline/DeviceTimelineChart.vue'
 import { useWindowStore } from '@/stores/window'
 import { useScrolled } from '@/composables/useScrolled'
+import { apiFetch } from '@/utils/api'
 import type { TimelineStats, ClientTimelineStats } from '@/types/api'
 
 const windowStore = useWindowStore()
@@ -32,8 +33,8 @@ async function fetchTimeline() {
   error.value = null
   try {
     const [timelineRes, clientRes] = await Promise.all([
-      fetch(`/api/stats/timeline?hours=${windowStore.hours}`),
-      fetch(`/api/stats/timeline/clients?hours=${windowStore.hours}`),
+      apiFetch(`/api/stats/timeline?hours=${windowStore.hours}`),
+      apiFetch(`/api/stats/timeline/clients?hours=${windowStore.hours}`),
     ])
     if (!timelineRes.ok || !clientRes.ok) throw new Error('Server error')
     timeline.value = await timelineRes.json()

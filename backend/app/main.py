@@ -1,31 +1,33 @@
-import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.routers.auth import router as auth_router
+from app.services.auth.middleware import require_session
+from app.services.auth.session_store import session_store
 from app.services.database import LocalDatabase
 from app.services.pihole.api_client import (
-    PiholeApiClient,
     PiholeAuthError,
     PiholeConnectionError,
 )
 from app.services.sources import TrackerSource, get_tracker_sources
-from app.services.sync import run_sync_loop
+import app.services.sync_manager as sync_manager
 
-pihole: PiholeApiClient
+logger = logging.getLogger(__name__)
+
 sources: list[TrackerSource]
 db: LocalDatabase
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pihole, sources, db
+    global sources, db
 
-    pihole = PiholeApiClient()
     sources = get_tracker_sources()
     db = LocalDatabase()
 
@@ -42,16 +44,14 @@ async def lifespan(app: FastAPI):
     await db.init()
     await db.flag_heuristic_uncategorized_for_reenrichment()
 
-    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db))
+    # If there's an active session (e.g. from a quick restart), resume sync
+    active = session_store.get_active()
+    if active:
+        await sync_manager.start_sync_service(active, sources, db)
 
     yield
 
-    sync_task.cancel()
-    try:
-        await sync_task
-    except asyncio.CancelledError:
-        pass
-    await pihole.close()
+    await sync_manager.stop_sync_service()
 
 
 app = FastAPI(
@@ -69,8 +69,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Auth routes — no session required
+app.include_router(auth_router)
 
-@app.get("/api/health")
+
+@app.get("/api/health", dependencies=[Depends(require_session)])
 async def health() -> dict[str, Any]:
     sync_status = await db.get_sync_status()
     source_statuses = [
@@ -83,33 +86,37 @@ async def health() -> dict[str, Any]:
     ]
     return {
         "status": "ok",
-        "pihole_api_url": settings.pihole_api_url,
+        "pihole_api_url": sync_manager.pihole._base_url if sync_manager.pihole else None,
         "version": "0.1.0",
         "sources": source_statuses,
         **sync_status,
     }
 
 
-@app.get("/api/pihole/test")
+@app.get("/api/pihole/test", dependencies=[Depends(require_session)])
 async def pihole_test() -> dict[str, Any]:
+    if sync_manager.pihole is None:
+        raise HTTPException(status_code=503, detail="Sync service not running")
     try:
-        return await pihole.test_connection()
+        return await sync_manager.pihole.test_connection()
     except PiholeAuthError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except PiholeConnectionError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
-@app.get("/api/pihole/summary")
+@app.get("/api/pihole/summary", dependencies=[Depends(require_session)])
 async def pihole_summary() -> dict[str, Any]:
+    if sync_manager.pihole is None:
+        raise HTTPException(status_code=503, detail="Sync service not running")
     try:
-        summary = await pihole.get_summary()
+        summary = await sync_manager.pihole.get_summary()
         return summary.model_dump()
     except (PiholeAuthError, PiholeConnectionError) as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
-@app.get("/api/queries")
+@app.get("/api/queries", dependencies=[Depends(require_session)])
 async def queries(
     limit: int = Query(default=100, ge=1, le=500),
     cursor: int | None = Query(default=None),
@@ -135,7 +142,7 @@ async def _get_exclusions() -> dict[str, list[str]]:
     }
 
 
-@app.get("/api/stats/trackers")
+@app.get("/api/stats/trackers", dependencies=[Depends(require_session)])
 async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=168),
     client_ip: str | None = Query(default=None),
@@ -144,7 +151,7 @@ async def stats_trackers(
     return await db.fetch_tracker_stats(hours=hours, client_ip=client_ip, **excl)
 
 
-@app.get("/api/stats/timeline")
+@app.get("/api/stats/timeline", dependencies=[Depends(require_session)])
 async def stats_timeline(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict[str, Any]:
@@ -152,7 +159,7 @@ async def stats_timeline(
     return await db.fetch_timeline_stats(hours=hours, **excl)
 
 
-@app.get("/api/stats/timeline/clients")
+@app.get("/api/stats/timeline/clients", dependencies=[Depends(require_session)])
 async def stats_timeline_clients(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict[str, Any]:
@@ -160,7 +167,7 @@ async def stats_timeline_clients(
     return await db.fetch_client_timeline_stats(hours=hours, **excl)
 
 
-@app.get("/api/stats/domains")
+@app.get("/api/stats/domains", dependencies=[Depends(require_session)])
 async def stats_domains(
     hours: int = Query(default=24, ge=1, le=168),
     category: str | None = Query(default=None),
@@ -176,7 +183,7 @@ async def stats_domains(
     )
 
 
-@app.get("/api/domains/search")
+@app.get("/api/domains/search", dependencies=[Depends(require_session)])
 async def search_domains(
     q: str = Query(min_length=2),
     hours: int = Query(default=24, ge=1, le=168),
@@ -184,7 +191,7 @@ async def search_domains(
     return await db.search_domains(query=q, hours=hours)
 
 
-@app.get("/api/stats/clients")
+@app.get("/api/stats/clients", dependencies=[Depends(require_session)])
 async def stats_clients(
     hours: int = Query(default=24, ge=1, le=168),
     category: str | None = Query(default=None),
@@ -194,7 +201,7 @@ async def stats_clients(
     return await db.fetch_client_stats(hours=hours, category=category, company=company, **excl)
 
 
-@app.get("/api/config")
+@app.get("/api/config", dependencies=[Depends(require_session)])
 async def get_config() -> dict[str, Any]:
     """Return all user configuration as a structured object."""
     raw = await db.get_all_config()
@@ -205,7 +212,7 @@ async def get_config() -> dict[str, Any]:
     }
 
 
-@app.put("/api/config")
+@app.put("/api/config", dependencies=[Depends(require_session)])
 async def put_config(request: Request) -> dict[str, str]:
     """Update user configuration. Accepts partial updates."""
     body = await request.json()
@@ -220,7 +227,7 @@ async def put_config(request: Request) -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/config/options")
+@app.get("/api/config/options", dependencies=[Depends(require_session)])
 async def config_options() -> dict[str, Any]:
     """Return the available categories and companies from stored data."""
     categories = await db.get_available_categories()
@@ -228,13 +235,13 @@ async def config_options() -> dict[str, Any]:
     return {"categories": categories, "companies": companies}
 
 
-@app.get("/api/clients")
+@app.get("/api/clients", dependencies=[Depends(require_session)])
 async def get_clients() -> dict[str, Any]:
     """Return all distinct client IPs with query counts and assigned names."""
     return {"clients": await db.get_clients()}
 
 
-@app.put("/api/clients/{client_ip:path}")
+@app.put("/api/clients/{client_ip:path}", dependencies=[Depends(require_session)])
 async def set_client(client_ip: str, request: Request) -> dict[str, str]:
     """Set or update a friendly name for a client IP."""
     body = await request.json()
@@ -247,30 +254,32 @@ async def set_client(client_ip: str, request: Request) -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.delete("/api/clients/{client_ip:path}")
+@app.delete("/api/clients/{client_ip:path}", dependencies=[Depends(require_session)])
 async def delete_client(client_ip: str) -> dict[str, str]:
     """Remove a client name mapping."""
     await db.delete_client_name(client_ip)
     return {"status": "ok"}
 
 
-@app.post("/api/admin/reenrich")
+@app.post("/api/admin/reenrich", dependencies=[Depends(require_session)])
 async def admin_reenrich() -> dict[str, Any]:
     """Flag heuristic and rdap_failed domains for re-enrichment."""
     count = await db.flag_for_reenrichment()
     return {"status": "ok", "flagged": count}
 
 
-@app.post("/api/admin/reset")
+@app.post("/api/admin/reset", dependencies=[Depends(require_session)])
 async def admin_reset() -> dict[str, str]:
     await db.reset()
     return {"status": "ok"}
 
 
-@app.get("/api/debug/raw-query")
+@app.get("/api/debug/raw-query", dependencies=[Depends(require_session)])
 async def debug_raw_query(status: str = "GRAVITY") -> dict[str, Any]:
     """Returns the raw Pi-hole API response for one query of the given status."""
-    data = await pihole._get("/api/queries", params={"length": 50})  # noqa: SLF001
+    if sync_manager.pihole is None:
+        raise HTTPException(status_code=503, detail="Sync service not running")
+    data = await sync_manager.pihole._get("/api/queries", params={"length": 50})  # noqa: SLF001
     pi_queries = data.get("queries", [])
     match = next(
         (q for q in pi_queries if q.get("status") == status),
@@ -279,7 +288,9 @@ async def debug_raw_query(status: str = "GRAVITY") -> dict[str, Any]:
     return {"raw": match, "all_fields": list(match.keys()) if match else []}
 
 
-@app.get("/api/debug/pihole")
+@app.get("/api/debug/pihole", dependencies=[Depends(require_session)])
 async def debug_pihole(path: str) -> dict[str, Any]:
     """Proxy a raw authenticated GET request to the Pi-hole API for exploration."""
-    return await pihole._get(f"/{path.lstrip('/')}")  # noqa: SLF001
+    if sync_manager.pihole is None:
+        raise HTTPException(status_code=503, detail="Sync service not running")
+    return await sync_manager.pihole._get(f"/{path.lstrip('/')}")  # noqa: SLF001

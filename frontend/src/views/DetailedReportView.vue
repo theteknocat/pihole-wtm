@@ -24,6 +24,7 @@ import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
 import { useWindowStore } from '@/stores/window'
 import { useScrolled } from '@/composables/useScrolled'
 import { formatCategory } from '@/utils/format'
+import { apiFetch } from '@/utils/api'
 import type { DomainStats, ClientStats, ClientStat } from '@/types/api'
 
 const route = useRoute()
@@ -98,8 +99,8 @@ function syncUrlParams() {
 async function fetchOptions() {
   try {
     const [configRes, clientsRes] = await Promise.all([
-      fetch('/api/config/options'),
-      fetch('/api/clients'),
+      apiFetch('/api/config/options'),
+      apiFetch('/api/clients'),
     ])
     if (!configRes.ok || !clientsRes.ok) throw new Error('Failed to fetch filter options')
     const configJson = await configRes.json()
@@ -119,7 +120,7 @@ async function searchDomains(event: { query: string }) {
   }
   try {
     const params = new URLSearchParams({ q: event.query, hours: String(windowStore.hours) })
-    const res = await fetch(`/api/domains/search?${params}`)
+    const res = await apiFetch(`/api/domains/search?${params}`)
     if (res.ok) domainSuggestions.value = await res.json()
   } catch {
     domainSuggestions.value = []
@@ -160,7 +161,7 @@ async function fetchData() {
       const params = new URLSearchParams({ hours: String(windowStore.hours) })
       if (selectedCategory.value) params.set('category', selectedCategory.value)
       if (selectedCompany.value) params.set('company', selectedCompany.value)
-      const res = await fetch(`/api/stats/clients?${params}`, { signal: controller.signal })
+      const res = await apiFetch(`/api/stats/clients?${params}`, { signal: controller.signal })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       clientData.value = await res.json()
     } else {
@@ -172,7 +173,7 @@ async function fetchData() {
         params.set('domain', appliedDomain.value)
         if (domainExact.value) params.set('domain_exact', 'true')
       }
-      const res = await fetch(`/api/stats/domains?${params}`, { signal: controller.signal })
+      const res = await apiFetch(`/api/stats/domains?${params}`, { signal: controller.signal })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       domainData.value = await res.json()
     }

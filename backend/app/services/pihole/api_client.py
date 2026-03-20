@@ -4,7 +4,6 @@ from typing import Any
 
 import httpx
 
-from app.config import settings
 from app.models.pihole import RawQuery, SummaryStats
 
 logger = logging.getLogger(__name__)
@@ -49,9 +48,9 @@ class PiholeConnectionError(Exception):
 
 
 class PiholeApiClient:
-    def __init__(self) -> None:
-        self._base_url = settings.pihole_api_url.rstrip("/")
-        self._password = settings.pihole_api_password.get_secret_value()
+    def __init__(self, base_url: str, password: str) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._password = password
         self._sid: str | None = None
         self._client = httpx.AsyncClient(timeout=10.0)
         self._auth_lock = asyncio.Lock()

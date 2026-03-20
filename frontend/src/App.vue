@@ -1,24 +1,34 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from 'primevue/button'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { useAuth } from './composables/useAuth'
 import SettingsSidebar from './components/layout/SettingsSidebar.vue'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, checking, logout } = useAuth()
+const router = useRouter()
 const route = useRoute()
 const settingsOpen = ref(false)
+
+async function handleLogout() {
+  await logout()
+  router.push('/login')
+}
 </script>
 
 <template>
   <div class="h-screen flex flex-col text-gray-900 dark:text-gray-100">
-    <header class="shrink-0 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
+    <!-- Show header only when authenticated (and session check is done) -->
+    <header
+      v-if="isAuthenticated && !checking"
+      class="shrink-0 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between"
+    >
       <div class="flex items-center gap-6">
         <RouterLink
-          :to="isAuthenticated ? '/dashboard' : '/'"
+          to="/dashboard"
           class="font-semibold tracking-tight text-gray-900 dark:text-gray-100 no-underline hover:opacity-75 transition-opacity"
         >pihole-wtm</RouterLink>
         <nav class="flex items-center gap-1">
@@ -61,6 +71,14 @@ const settingsOpen = ref(false)
           rounded
           aria-label="Settings"
           @click="settingsOpen = true"
+        />
+        <Button
+          icon="pi pi-sign-out"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Sign out"
+          @click="handleLogout()"
         />
       </div>
     </header>

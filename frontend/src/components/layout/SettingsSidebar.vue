@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import ConfigDialog from './ConfigDialog.vue'
 import { useWindowStore } from '@/stores/window'
+import { apiFetch } from '@/utils/api'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const configOpen = ref(false)
@@ -27,7 +28,7 @@ async function doReenrich() {
   reenriching.value = true
   reenrichMessage.value = null
   try {
-    const res = await fetch('/api/admin/reenrich', { method: 'POST' })
+    const res = await apiFetch('/api/admin/reenrich', { method: 'POST' })
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     const data = await res.json()
     reenrichMessage.value = data.flagged > 0
@@ -50,7 +51,7 @@ async function doReset() {
   resetting.value = true
   resetError.value = null
   try {
-    const res = await fetch('/api/admin/reset', { method: 'POST' })
+    const res = await apiFetch('/api/admin/reset', { method: 'POST' })
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     windowStore.triggerRefresh()
     close()

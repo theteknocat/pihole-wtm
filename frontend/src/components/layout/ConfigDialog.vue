@@ -8,6 +8,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
 import { useWindowStore } from '@/stores/window'
 import { formatCategory } from '@/utils/format'
+import { apiFetch } from '@/utils/api'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const windowStore = useWindowStore()
@@ -69,8 +70,8 @@ async function load() {
   error.value = null
   try {
     const [optionsRes, configRes] = await Promise.all([
-      fetch('/api/config/options').then(r => r.json()),
-      fetch('/api/config').then(r => r.json()),
+      apiFetch('/api/config/options').then(r => r.json()),
+      apiFetch('/api/config').then(r => r.json()),
     ])
     availableCategories.value = optionsRes.categories
     availableCompanies.value = optionsRes.companies
@@ -88,7 +89,7 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    const res = await fetch('/api/config', {
+    const res = await apiFetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
