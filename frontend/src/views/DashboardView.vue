@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
-import ProgressSpinner from 'primevue/progressspinner'
+import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import ToggleButton from 'primevue/togglebutton'
@@ -143,10 +143,16 @@ watch(trackerOnly, fetchRecentQueries)
     <!-- Refresh error (shown over existing data) -->
     <div v-if="error && stats" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
 
-    <!-- Loading -->
-    <div v-if="loading && !stats" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
-      <ProgressSpinner />
-      <p>Loading{{ selectedWindow.value === 168 ? ' — 7 day window may take a moment' : '…' }}</p>
+    <!-- Loading skeletons -->
+    <div v-if="loading && !stats" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <Card v-for="i in 4" :key="i">
+        <template #title><Skeleton width="10rem" height="1.2rem" /></template>
+        <template #content>
+          <div class="space-y-3">
+            <Skeleton v-for="j in 5" :key="j" :width="`${85 - j * 10}%`" height="1.5rem" />
+          </div>
+        </template>
+      </Card>
     </div>
 
     <!-- Error -->
@@ -161,7 +167,9 @@ watch(trackerOnly, fetchRecentQueries)
         <template #title>Tracker Categories</template>
         <template #subtitle>By query count — {{ selectedWindow.label }}</template>
         <template #content>
+          <p v-if="stats!.by_category.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CategoryBarChart
+            v-else
             :data="stats!.by_category"
             :total-tracker-queries="stats!.tracker_queries"
             @select-category="drillCategory"
@@ -173,7 +181,9 @@ watch(trackerOnly, fetchRecentQueries)
         <template #title>Top Companies</template>
         <template #subtitle>By query count — {{ selectedWindow.label }}</template>
         <template #content>
+          <p v-if="allCompanies.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CompanyBarChart
+            v-else
             :data="allCompanies"
             :total-tracker-queries="stats!.tracker_queries"
             @select-company="drillCompany"
@@ -218,8 +228,8 @@ watch(trackerOnly, fetchRecentQueries)
       <Card>
         <template #title>Recent Blocked</template>
         <template #content>
-          <div v-if="recentLoading" class="flex justify-center py-8">
-            <ProgressSpinner style="width: 32px; height: 32px" />
+          <div v-if="recentLoading" class="space-y-3 py-2">
+            <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
           <RecentQueriesTable v-else :queries="recentBlocked" type="blocked" />
         </template>
@@ -228,8 +238,8 @@ watch(trackerOnly, fetchRecentQueries)
       <Card>
         <template #title>Recent Allowed</template>
         <template #content>
-          <div v-if="recentLoading" class="flex justify-center py-8">
-            <ProgressSpinner style="width: 32px; height: 32px" />
+          <div v-if="recentLoading" class="space-y-3 py-2">
+            <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
           <RecentQueriesTable v-else :queries="recentAllowed" type="allowed" />
         </template>

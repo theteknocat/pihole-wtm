@@ -17,7 +17,7 @@ import Checkbox from 'primevue/checkbox'
 import InputGroup from 'primevue/inputgroup'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
-import ProgressSpinner from 'primevue/progressspinner'
+import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
@@ -374,11 +374,19 @@ watch(() => route.query, (q) => {
     <!-- Refresh error (shown over existing data) -->
     <div v-if="error && hasData" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
 
-    <!-- Loading -->
-    <div v-if="loading && !hasData" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
-      <ProgressSpinner />
-      <p>Loading…</p>
-    </div>
+    <!-- Loading skeleton -->
+    <Card v-if="loading && !hasData">
+      <template #content>
+        <div class="space-y-4">
+          <div v-for="i in 8" :key="i" class="flex gap-4">
+            <Skeleton width="14rem" height="1.2rem" />
+            <Skeleton width="6rem" height="1.2rem" />
+            <Skeleton width="6rem" height="1.2rem" />
+            <Skeleton width="4rem" height="1.2rem" />
+          </div>
+        </div>
+      </template>
+    </Card>
 
     <!-- Error -->
     <div v-else-if="error && !hasData" class="flex items-center justify-center py-24">
@@ -398,6 +406,11 @@ watch(() => route.query, (q) => {
           striped-rows
           class="text-sm"
         >
+          <template #empty>
+            <p class="py-8 text-center text-gray-400 dark:text-gray-500">
+              {{ hasFilters ? 'No domains match your filters' : 'No domain data for this time window' }}
+            </p>
+          </template>
           <Column field="domain" header="Domain" sortable style="min-width: 14rem">
             <template #body="{ data: row }">
               <span class="font-mono text-xs">{{ row.domain }}</span>
@@ -446,6 +459,11 @@ watch(() => route.query, (q) => {
           striped-rows
           class="text-sm"
         >
+          <template #empty>
+            <p class="py-8 text-center text-gray-400 dark:text-gray-500">
+              {{ hasFilters ? 'No devices match your filters' : 'No device data for this time window' }}
+            </p>
+          </template>
           <Column field="client_name" header="Device" sortable style="min-width: 14rem">
             <template #body="{ data: row }">
               <div class="flex items-center gap-2">

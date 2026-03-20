@@ -46,8 +46,8 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] Per-device query breakdown on Detailed Report (device grouping mode)
 - [x] ~~`QueryLogView`~~ `DetailedReportView` — domain/device grouped report with category, company, and device filters (replaces original query log concept)
 - [x] Domain search filter on Detailed Report (domain grouping mode) — autocomplete with exact match toggle
-- [ ] Loading skeleton states for all data tables and charts
-- [ ] Empty states for zero-data scenarios
+- [x] Loading skeleton states for all data tables and charts
+- [x] Empty states for zero-data scenarios
 
 ### Phase 1 — Infrastructure
 

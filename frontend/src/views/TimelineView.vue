@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
-import ProgressSpinner from 'primevue/progressspinner'
+import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import TimelineChart from '@/components/timeline/TimelineChart.vue'
@@ -100,11 +100,25 @@ watch(() => windowStore.refreshKey, fetchTimeline)
     <!-- Refresh error (shown over existing data) -->
     <div v-if="error && timeline" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
 
-    <!-- Loading -->
-    <div v-if="loading && !timeline" class="flex flex-col items-center justify-center py-24 gap-4 text-gray-500 dark:text-gray-400">
-      <ProgressSpinner />
-      <p>Loading{{ selectedWindow.value === 168 ? ' — 7 day window may take a moment' : '…' }}</p>
-    </div>
+    <!-- Loading skeletons -->
+    <template v-if="loading && !timeline">
+      <div class="grid grid-cols-3 gap-4">
+        <Card v-for="i in 3" :key="i">
+          <template #content>
+            <div class="text-center space-y-2">
+              <Skeleton width="4rem" height="1.8rem" class="mx-auto" />
+              <Skeleton width="6rem" height="0.9rem" class="mx-auto" />
+            </div>
+          </template>
+        </Card>
+      </div>
+      <Card>
+        <template #title><Skeleton width="8rem" height="1.2rem" /></template>
+        <template #content>
+          <Skeleton width="100%" height="16rem" />
+        </template>
+      </Card>
+    </template>
 
     <!-- Error -->
     <div v-else-if="error && !timeline" class="flex items-center justify-center py-24">
@@ -149,7 +163,9 @@ watch(() => windowStore.refreshKey, fetchTimeline)
           {{ selectedWindow.value === 24 ? 'Hourly' : '6-hour' }} buckets — {{ selectedWindow.label }}
         </template>
         <template #content>
+          <p v-if="timeline.buckets.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No query data for this time window</p>
           <TimelineChart
+            v-else
             :buckets="timeline.buckets"
             :bucket-seconds="timeline.bucket_seconds"
           />
