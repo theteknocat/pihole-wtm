@@ -35,12 +35,11 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
 
    ```bash
    PIHOLE_API_URL=http://192.168.1.1     # Pi-hole address (or container name)
-   PIHOLE_API_PASSWORD=your_password
    DASHBOARD_PORT=8080
    CORS_ORIGINS=http://your-host:8080
    ```
 
-   If Pi-hole is in Docker on the same host, use its container name and set `PIHOLE_NETWORK` to its Docker network name, then uncomment the external network block in `docker-compose.yml`.
+   `PIHOLE_API_URL` is optional — if left unset, you'll be prompted to enter it on the login page. If Pi-hole is in Docker on the same host, use its container name and set `PIHOLE_NETWORK` to its Docker network name, then uncomment the external network block in `docker-compose.yml`.
 
 3. Start the dashboard:
 
@@ -48,7 +47,7 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
    docker compose up -d
    ```
 
-4. Open `http://your-host:8080` in your browser.
+4. Open `http://your-host:8080` in your browser and log in with your Pi-hole password.
 
 ### Updating
 
@@ -103,14 +102,15 @@ Use this when you want to run pihole-wtm directly on the host without Docker.
 
    ```bash
    PIHOLE_API_URL=http://192.168.1.1
-   PIHOLE_API_PASSWORD=your_password
-   DB_PATH=/var/lib/pihole-wtm/pihole-wtm.db
+   LOCAL_DB_PATH=/var/lib/pihole-wtm/pihole-wtm.db
    TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
    APP_HOST=127.0.0.1
    APP_PORT=8000
    LOG_LEVEL=info
    CORS_ORIGINS=http://your-host
    ```
+
+   The Pi-hole password is not stored in config — you enter it on the login page.
 
 5. Configure nginx — copy `nginx.conf` to `/etc/nginx/sites-available/pihole-wtm`, set the `root` to your `frontend/dist/` path, then reload:
 
@@ -144,7 +144,7 @@ Use this when you want to run pihole-wtm directly on the host without Docker.
    systemctl daemon-reload && systemctl enable --now pihole-wtm
    ```
 
-7. Open `http://your-host` in your browser.
+7. Open `http://your-host` in your browser and log in with your Pi-hole password.
 
 ---
 

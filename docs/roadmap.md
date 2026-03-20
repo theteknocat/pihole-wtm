@@ -25,13 +25,13 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `/api/admin/reset` — clears all stored queries and domains, resets sync cursor
 - [x] Exact-match-only gating for allowed queries (TrackerDB + Disconnect.me); subdomain fallback retained for display enrichment of blocked queries
 - [x] Periodic source refresh via `refresh_if_stale()` — TrackerDB re-downloads when file is stale, Disconnect.me re-fetches when data age exceeds configured interval
-- [x] Per-source health check and status on `/api/health` endpoint; OverviewView displays source statuses with icons
+- [x] Per-source health check and status on `/api/health` endpoint
 
 ### Phase 1 — Frontend
 
 - [x] Vue 3 + Vite + TypeScript scaffold, Tailwind CSS, PrimeVue (Aura), Vue Router
 - [x] App header with dark mode toggle, settings sidebar trigger
-- [x] `OverviewView` — system health: backend status, Pi-hole connection, per-source loaded/unavailable indicators with tooltips
+- [x] ~~`OverviewView`~~ System health info moved to app footer (backend status, Pi-hole connection, per-source indicators)
 - [x] `DashboardView` — tracker category chart, top companies chart, top companies tables, recent query tables
 - [x] `CategoryBarChart`, `CompanyBarChart` — horizontal stacked bar charts (blocked/allowed), clickable to drill down
 - [x] `TopCompaniesTable` — clickable rows navigate to domain drill-down
@@ -129,7 +129,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 
 - [ ] Responsive layout (tablet and mobile friendly)
 - [ ] Empty states for zero-data scenarios (no Pi-hole connected, no queries in range)
-- [ ] Onboarding flow in `OverviewView` when no Pi-hole connection is configured
+- [x] ~~Onboarding flow in `OverviewView`~~ Login page handles first-time setup (Pi-hole URL entry + reachability check)
 - [ ] Country flag display for tracker companies
 - [ ] Tooltip explanations for each tracker category on hover
 
@@ -152,6 +152,6 @@ These are not committed to any phase but are worth tracking as potential future 
 - **Allowlist/blocklist suggestions** — surface domains that are pure trackers but not yet on the Pi-hole blocklist
 - **Multiple Pi-hole instances** — support monitoring multiple Pi-hole installations from one dashboard
 - **Export** — CSV/JSON export of enriched query data
-- **Authentication** — optional login to protect the dashboard on networks where it shouldn't be publicly accessible (see `docs/authentication.md`)
+- ~~**Authentication** — optional login to protect the dashboard~~ **Done** — see [authentication.md](authentication.md)
 - **Grafana data source plugin** — for users who already have Grafana dashboards
 - **DuckDuckGo Tracker Radar** — [duckduckgo/tracker-radar](https://github.com/duckduckgo/tracker-radar) as an additional enrichment source. Rich per-domain data (categories, company/owner, prevalence, fingerprinting scores) across ~1000+ categorized domains. Dataset is distributed as individual JSON files per domain per region (~100MB+ full tarball). Implementation challenge is efficient ingestion — options include downloading the full release tarball and extracting only domain JSON files, or using just the `build-data/static/categorized_trackers.csv` (~1000 domains, categories only, no company data) as a lighter alternative

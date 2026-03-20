@@ -32,12 +32,6 @@ The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual d
 
 Global `a` tag styling in `style.css` doesn't include `:focus-visible` for keyboard navigation. Add a focus ring style matching the hover underline.
 
-### `OverviewView` — non-2xx response from `/api/pihole/test` shows no error detail
-
-If the backend returns a 503, `res.json()` parses `{"detail": "..."}` as the pihole object. `pihole.connected` is `undefined` so the UI correctly shows "disconnected", but the backend error message is never displayed. Add a `res.ok` check and surface the `detail` field.
-
----
-
 ## Tooling
 
 ### Add ruff `B` and `S` rules to CI enforcement

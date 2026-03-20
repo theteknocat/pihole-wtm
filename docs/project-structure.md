@@ -21,6 +21,9 @@ pihole-wtm/
 │       ├── main.py                    # FastAPI app factory, lifespan, CORS config, all routes
 │       ├── config.py                  # Pydantic-settings: all env var definitions
 │       │
+│       ├── routers/
+│       │   └── auth.py                # Auth routes: login, logout, status, check-url
+│       │
 │       ├── models/
 │       │   ├── pihole.py              # Pydantic: RawQuery, SummaryStats
 │       │   └── tracker.py             # Pydantic: TrackerInfo
@@ -29,8 +32,13 @@ pihole-wtm/
 │           ├── sources.py             # TrackerSource protocol + get_tracker_sources() registry
 │           ├── database.py            # Local SQLite: schema, sync state, query/domain helpers
 │           ├── sync.py                # Background sync coroutine + enrichment orchestration
+│           ├── sync_manager.py        # Sync service lifecycle (start/stop), session-tied
 │           ├── heuristic.py           # eTLD+1 company name + subdomain keyword category
 │           ├── rdap.py                # RDAP company name lookup (async, LRU cached)
+│           ├── auth/
+│           │   ├── session_store.py   # In-memory session store (Session dataclass + SessionStore)
+│           │   ├── config_store.py    # Two-tier Pi-hole URL resolver (env var → database)
+│           │   └── middleware.py      # require_session dependency, SESSION_COOKIE constant
 │           ├── pihole/
 │           │   └── api_client.py      # httpx client for Pi-hole v6 HTTP API
 │           ├── trackerdb/
@@ -47,20 +55,21 @@ pihole-wtm/
 │   ├── postcss.config.js
 │   └── src/
 │       ├── main.ts                    # createApp, router, pinia, PrimeVue
-│       ├── App.vue                    # Root: header (logo, nav, dark mode, settings) + RouterView
+│       ├── router.ts                  # Route definitions, beforeEach auth guard, getRouter()
+│       ├── App.vue                    # Root: header (logo, nav, dark mode, settings, sign-out) + RouterView
 │       ├── style.css                  # CSS layer ordering, dark mode base styles
 │       │
 │       ├── stores/                    # Pinia stores
 │       │   └── window.ts              # Shared time window, refreshKey, reportGroupBy (localStorage-persisted)
 │       │
 │       ├── views/                     # Top-level route components
-│       │   ├── OverviewView.vue       # System health: backend, Pi-hole, and per-source status
+│       │   ├── LoginView.vue          # Authentication: Pi-hole URL + password, reachability check
 │       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
 │       │   ├── TimelineView.vue       # Query volume timeline with summary stats
 │       │   └── DetailedReportView.vue # Domain/device breakdown with filters; togglable grouping
 │       │
 │       ├── composables/
-│       │   ├── useAuth.ts             # Authentication state composable
+│       │   ├── useAuth.ts             # Module-level reactive auth state, login/logout/checkSession
 │       │   ├── useScrolled.ts         # Reactive scroll-position tracker for sticky header compaction
 │       │   └── useTrackerBarChart.ts  # Shared bar chart config (datasets, tooltips, scales)
 │       │
@@ -80,6 +89,7 @@ pihole-wtm/
 │       │       └── RecentQueriesTable.vue  # Recent blocked/allowed queries
 │       │
 │       ├── utils/
+│       │   ├── api.ts                 # apiFetch wrapper: 401 redirect handling
 │       │   └── format.ts              # Display formatting helpers (e.g. formatCategory)
 │       │
 │       └── types/
@@ -95,7 +105,7 @@ pihole-wtm/
     ├── roadmap.md                     # Phased implementation plan
     ├── release-prep.md                # One-time tasks before first public release
     ├── tracker-categories.md          # Tracker category reference
-    ├── authentication.md              # Planned authentication design
+    ├── authentication.md              # Authentication design and implementation
     └── tech-debt.md                   # Deferred fixes and lower-priority improvements
 ```
 
@@ -112,7 +122,7 @@ pihole-wtm/
 
 ### Frontend
 
-- View components own their data fetching — `fetch()` calls are made directly in `onMounted` and `watch` handlers within each view. This keeps data concerns local and avoids premature abstraction.
+- View components own their data fetching — `apiFetch()` calls (a thin wrapper around `fetch()` that handles 401 redirects) are made directly in `onMounted` and `watch` handlers within each view. Auth routes (`/api/auth/*`) use bare `fetch()` since they shouldn't trigger redirect loops.
 - Pinia stores hold only truly shared session state (time window, refresh signals). They do not hold fetched data.
 - Type definitions in `src/types/` are kept in sync with backend Pydantic response shapes.
 - Dark mode uses `useDark()` from `@vueuse/core`, which reads the system preference and persists the user's choice to localStorage.

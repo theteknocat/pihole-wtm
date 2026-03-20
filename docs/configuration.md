@@ -10,7 +10,7 @@ All configuration is provided via environment variables. In Docker Compose deplo
 
 ### `PIHOLE_API_URL`
 
-Base URL of the Pi-hole web interface.
+Base URL of the Pi-hole web interface. **Optional** — if not set, the user is prompted to enter the URL on the login page (see [authentication.md](authentication.md) for the two-tier URL system).
 
 **Default:** `http://pihole`
 
@@ -24,17 +24,7 @@ PIHOLE_API_URL=http://pihole          # Docker container name on shared network
 
 Do not include a trailing slash or path — the backend appends `/api/...` automatically.
 
----
-
-### `PIHOLE_API_PASSWORD`
-
-Pi-hole web interface password. Used to obtain a session token from the Pi-hole v6 API.
-
-**Default:** empty (works if Pi-hole has no password set)
-
-This value is treated as a secret and will never appear in logs.
-
-> **Note:** Pi-hole v6 is required. Pi-hole v5 is not supported.
+> **Note:** The Pi-hole password is entered via the login page and held in server memory only — it is never stored in environment variables, config files, or the database. Pi-hole v6 is required; Pi-hole v5 is not supported.
 
 ---
 
@@ -213,7 +203,6 @@ docker inspect <pihole-container-name> | grep NetworkMode
 
 ```bash
 PIHOLE_API_URL=http://pihole
-PIHOLE_API_PASSWORD=your-pihole-password
 PIHOLE_NETWORK=pihole_default
 DASHBOARD_PORT=8080
 CORS_ORIGINS=http://your-host:8080
@@ -223,7 +212,6 @@ CORS_ORIGINS=http://your-host:8080
 
 ```bash
 PIHOLE_API_URL=http://192.168.1.1
-PIHOLE_API_PASSWORD=your-pihole-password
 LOCAL_DB_PATH=/var/lib/pihole-wtm/pihole_wtm.db
 TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
 APP_HOST=127.0.0.1
@@ -231,6 +219,8 @@ APP_PORT=8000
 LOG_LEVEL=info
 CORS_ORIGINS=http://localhost:8080
 ```
+
+> **Note:** The Pi-hole password is not configured here — it is entered on the login page at runtime. See [authentication.md](authentication.md) for details.
 
 ---
 

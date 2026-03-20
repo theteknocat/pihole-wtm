@@ -35,12 +35,11 @@ This will:
 
 ### 3. Configure the Pi-hole connection
 
-Edit the `web_environment` section of `.ddev/config.yaml` to point to your Pi-hole:
+Optionally set the Pi-hole URL in `.ddev/config.local.yaml` (gitignored):
 
 ```yaml
 web_environment:
   - PIHOLE_API_URL=http://192.168.1.1   # your Pi-hole's address
-  - PIHOLE_API_PASSWORD=your_password
 ```
 
 Then restart ddev for the changes to take effect:
@@ -48,6 +47,8 @@ Then restart ddev for the changes to take effect:
 ```bash
 ddev restart
 ```
+
+If you leave `PIHOLE_API_URL` empty (the default in `config.yaml`), you'll be prompted to enter the URL on the login page. The Pi-hole password is always entered on the login page — it is never stored in config files.
 
 ### 4. Open the dashboard
 

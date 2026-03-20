@@ -81,7 +81,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Overview (system health with per-source status indicators), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Detailed Report (per-domain or per-device breakdown with drill-down from chart bars and company table rows). The app header includes a navigation bar with Dashboard, Timeline, and Detailed Report links, with active-state highlighting and icons based on the current route.
+**Vue Router** manages views: Login (authentication), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Detailed Report (per-domain or per-device breakdown with drill-down from chart bars and company table rows). A `beforeEach` navigation guard checks session status and redirects unauthenticated users to `/login`. The app header (visible only when authenticated) includes a navigation bar with Dashboard, Timeline, and Detailed Report links, with active-state highlighting and icons, plus a sign-out button.
 
 **Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d), a `refreshKey` counter used to signal cross-component data refreshes, and a `reportGroupBy` selection (`'domain'` or `'client'`) persisted to localStorage so the Detailed Report remembers whether you were viewing domains or devices.
 
@@ -274,7 +274,9 @@ pihole-wtm targets **Pi-hole v6** exclusively. Pi-hole v6 uses a REST API with s
 
 ## Security Considerations
 
-- The Pi-hole API password is stored only in the environment/config; it is never logged and never returned by the pihole-wtm API.
+- The Pi-hole password is entered on the login page and held **in server memory only** — never stored in environment variables, config files, or the database. It is never logged and never returned by the pihole-wtm API.
+- Session tokens are stored in HTTP-only cookies with `samesite=strict` to prevent XSS and CSRF attacks.
+- All API routes (except `/api/auth/*`) are protected by the `require_session` dependency, which returns 401 if the session is missing or expired.
 - `TRACKERDB_PATH` and `LOCAL_DB_PATH` are validated to prevent path traversal.
 - TrackerDB downloads are verified against the GitHub release asset (not arbitrary URLs).
 - nginx sets appropriate Content Security Policy headers.
