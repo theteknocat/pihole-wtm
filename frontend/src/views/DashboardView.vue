@@ -63,13 +63,14 @@ async function fetchRecentQueries() {
   recentLoading.value = true
   try {
     const [blockedRes, allowedRes] = await Promise.all([
-      fetch(recentQueryUrl('blocked')).then(r => r.json()),
-      fetch(recentQueryUrl('allowed')).then(r => r.json()),
+      fetch(recentQueryUrl('blocked')),
+      fetch(recentQueryUrl('allowed')),
     ])
-    recentBlocked.value = blockedRes.queries
-    recentAllowed.value = allowedRes.queries
-  } catch (e) {
-    console.warn('Failed to fetch recent queries:', e)
+    if (!blockedRes.ok || !allowedRes.ok) throw new Error('Server error')
+    recentBlocked.value = (await blockedRes.json()).queries
+    recentAllowed.value = (await allowedRes.json()).queries
+  } catch {
+    error.value = 'Failed to fetch recent queries.'
   } finally {
     recentLoading.value = false
   }
@@ -80,13 +81,14 @@ async function fetchStats() {
   error.value = null
   try {
     const [statsRes, blockedRes, allowedRes] = await Promise.all([
-      fetch(`/api/stats/trackers?hours=${windowStore.hours}`).then(r => r.json()),
-      fetch(recentQueryUrl('blocked')).then(r => r.json()),
-      fetch(recentQueryUrl('allowed')).then(r => r.json()),
+      fetch(`/api/stats/trackers?hours=${windowStore.hours}`),
+      fetch(recentQueryUrl('blocked')),
+      fetch(recentQueryUrl('allowed')),
     ])
-    stats.value = statsRes
-    recentBlocked.value = blockedRes.queries
-    recentAllowed.value = allowedRes.queries
+    if (!statsRes.ok || !blockedRes.ok || !allowedRes.ok) throw new Error('Server error')
+    stats.value = await statsRes.json()
+    recentBlocked.value = (await blockedRes.json()).queries
+    recentAllowed.value = (await allowedRes.json()).queries
   } catch {
     error.value = 'Failed to load dashboard data. Is the backend reachable?'
   } finally {

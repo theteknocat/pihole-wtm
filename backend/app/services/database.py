@@ -140,6 +140,11 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
 _BLOCKED_IN = ",".join(f"'{s}'" for s in BLOCKED_STATUSES)
 
 
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcard characters so they match literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class LocalDatabase:
     def __init__(self, path: str = settings.local_db_path) -> None:
         self._path = path
@@ -493,12 +498,12 @@ class LocalDatabase:
         sql = """
             SELECT DISTINCT q.domain
             FROM queries q
-            WHERE q.timestamp >= ? AND q.domain LIKE ?
+            WHERE q.timestamp >= ? AND q.domain LIKE ? ESCAPE '\\'
             ORDER BY q.domain
             LIMIT ?
         """
         async with self._conn() as db:
-            async with db.execute(sql, [from_ts, f"%{query}%", limit]) as cur:
+            async with db.execute(sql, [from_ts, f"%{_escape_like(query)}%", limit]) as cur:
                 return [row[0] for row in await cur.fetchall()]
 
     async def fetch_domain_stats(
@@ -536,8 +541,8 @@ class LocalDatabase:
                 conditions.append("q.domain = ?")
                 params.append(domain)
             else:
-                conditions.append("q.domain LIKE ?")
-                params.append(f"%{domain}%")
+                conditions.append("q.domain LIKE ? ESCAPE '\\\\'")
+                params.append(f"%{_escape_like(domain)}%")
         if excluded_categories:
             placeholders = ",".join("?" for _ in excluded_categories)
             conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
