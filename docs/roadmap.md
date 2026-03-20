@@ -91,8 +91,8 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] ~~Full filter panel on `QueryLogView`~~ Filters implemented on `DetailedReportView` (category, company, client IP)
 - [x] Domain search filter on Detailed Report (domain grouping mode) — autocomplete with exact match toggle
 - [x] URL query param sync for Detailed Report filters (category, company, client_ip)
-- [ ] Auto-refresh for Overview stats (configurable interval)
-- [ ] Connection error display when Pi-hole is unreachable
+- [x] Auto-refresh for Overview stats (uses shared refresh interval)
+- [x] Connection error display when Pi-hole is unreachable
 
 **Phase 2 outcome:** Full drill-down from tracker category → company → domain → individual queries. Richer company data from multiple enrichment sources. Historical timeline.
 

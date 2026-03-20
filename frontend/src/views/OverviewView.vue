@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import { useWindowStore } from '@/stores/window'
 
 interface SourceStatus {
   name: string
@@ -18,25 +19,33 @@ interface HealthResponse {
   sources: SourceStatus[]
 }
 
+const windowStore = useWindowStore()
+
 const health = ref<HealthResponse | null>(null)
 const pihole = ref<{ connected: boolean; version?: string; error?: string } | null>(null)
 const backendError = ref<string | null>(null)
 
-onMounted(async () => {
+async function fetchStatus() {
   try {
     const res = await fetch('/api/health')
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
     health.value = await res.json()
+    backendError.value = null
   } catch {
     backendError.value = 'Could not reach backend'
   }
 
   try {
     const res = await fetch('/api/pihole/test')
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
     pihole.value = await res.json()
   } catch {
     pihole.value = { connected: false, error: 'Could not reach Pi-hole' }
   }
-})
+}
+
+onMounted(fetchStatus)
+watch(() => windowStore.refreshKey, fetchStatus)
 </script>
 
 <template>
@@ -82,6 +91,9 @@ onMounted(async () => {
               <span class="text-blue-600 dark:text-blue-400">Pi-hole version</span>
               <span class="text-gray-500 dark:text-gray-400">{{ pihole.version }}</span>
             </div>
+            <p v-if="!pihole.connected" class="text-xs text-red-400">
+              {{ pihole.error || 'Cannot reach Pi-hole API' }}
+            </p>
           </template>
 
           <template v-if="health?.sources?.length">
