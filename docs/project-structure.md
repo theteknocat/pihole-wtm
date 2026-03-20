@@ -75,6 +75,7 @@ pihole-wtm/
 │       │
 │       ├── components/
 │       │   ├── layout/
+│       │   │   ├── AppFooter.vue           # Fixed footer: backend/Pi-hole/source status, sync info
 │       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
 │       │   │   ├── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
 │       │   │   ├── ClientNameDialog.vue    # Modal for setting/clearing a friendly name for a client IP
