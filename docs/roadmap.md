@@ -44,7 +44,8 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `ClientNameDialog` — modal for assigning/clearing friendly names for client IP addresses
 - [x] `DeviceStatsDialog` — per-device tracker breakdown chart with category/company toggle and click-through drill-down
 - [x] Per-device query breakdown on Detailed Report (device grouping mode)
-- [ ] `QueryLogView` — full paginated, filterable query log (separate page)
+- [x] ~~`QueryLogView`~~ `DetailedReportView` — domain/device grouped report with category, company, and device filters (replaces original query log concept)
+- [x] Domain search filter on Detailed Report (domain grouping mode) — autocomplete with exact match toggle
 - [ ] Loading skeleton states for all data tables and charts
 - [ ] Empty states for zero-data scenarios
 
@@ -87,7 +88,8 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] `TimelineView` — dedicated page with summary stats and line + area chart, period selector (24h / 7d)
 - [x] `DeviceTimelineChart` — stacked area chart showing per-device query volume below the main timeline
 - [x] Header navigation — Dashboard and Timeline links with active-state highlighting
-- [ ] Full filter panel on `QueryLogView` (status, category, company, client IP, date range, domain search)
+- [x] ~~Full filter panel on `QueryLogView`~~ Filters implemented on `DetailedReportView` (category, company, client IP)
+- [x] Domain search filter on Detailed Report (domain grouping mode) — autocomplete with exact match toggle
 - [x] URL query param sync for Detailed Report filters (category, company, client_ip)
 - [ ] Auto-refresh for Overview stats (configurable interval)
 - [ ] Connection error display when Pi-hole is unreachable

@@ -12,6 +12,9 @@ import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import AutoComplete from 'primevue/autocomplete'
+import Checkbox from 'primevue/checkbox'
+import InputGroup from 'primevue/inputgroup'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -52,6 +55,10 @@ const selectedGroupBy = computed({
 const selectedCategory = ref<string | null>((route.query.category as string) ?? null)
 const selectedCompany = ref<string | null>((route.query.company as string) ?? null)
 const selectedClientIp = ref<string | null>((route.query.client_ip as string) ?? null)
+const domainInput = ref<string | null>((route.query.domain as string) ?? null)
+const appliedDomain = ref<string | null>((route.query.domain as string) ?? null)
+const domainExact = ref(route.query.domain_exact === '1')
+const domainSuggestions = ref<string[]>([])
 const categoryOptions = ref<string[]>([])
 const companyOptions = ref<string[]>([])
 
@@ -64,7 +71,7 @@ const clientOptions = ref<ClientOption[]>([])
 
 const hasFilters = computed(() =>
   selectedCategory.value != null || selectedCompany.value != null ||
-  (windowStore.reportGroupBy === 'domain' && selectedClientIp.value != null)
+  (windowStore.reportGroupBy === 'domain' && (selectedClientIp.value != null || appliedDomain.value != null))
 )
 
 // Data state
@@ -83,6 +90,8 @@ function syncUrlParams() {
   if (selectedCategory.value) query.category = selectedCategory.value
   if (selectedCompany.value) query.company = selectedCompany.value
   if (selectedClientIp.value) query.client_ip = selectedClientIp.value
+  if (appliedDomain.value) query.domain = appliedDomain.value
+  if (domainExact.value) query.domain_exact = '1'
   router.replace({ path: '/detailed-report', query })
 }
 
@@ -101,6 +110,41 @@ async function fetchOptions() {
   } catch (e) {
     console.warn('Failed to fetch filter options:', e)
   }
+}
+
+async function searchDomains(event: { query: string }) {
+  if (event.query.length < 2) {
+    domainSuggestions.value = []
+    return
+  }
+  try {
+    const params = new URLSearchParams({ q: event.query, hours: String(windowStore.hours) })
+    const res = await fetch(`/api/domains/search?${params}`)
+    if (res.ok) domainSuggestions.value = await res.json()
+  } catch {
+    domainSuggestions.value = []
+  }
+}
+
+function applyDomainFilter() {
+  const val = domainInput.value?.trim() || null
+  if (val !== appliedDomain.value) {
+    appliedDomain.value = val
+  } else {
+    // Same value but exact toggle may have changed
+    syncUrlParams()
+    fetchData()
+  }
+}
+
+function onDomainSelect(event: { value: string }) {
+  domainInput.value = event.value
+  appliedDomain.value = event.value
+}
+
+function onDomainClear() {
+  domainInput.value = null
+  appliedDomain.value = null
 }
 
 async function fetchData() {
@@ -124,6 +168,10 @@ async function fetchData() {
       if (selectedCategory.value) params.set('category', selectedCategory.value)
       if (selectedCompany.value) params.set('company', selectedCompany.value)
       if (selectedClientIp.value) params.set('client_ip', selectedClientIp.value)
+      if (appliedDomain.value) {
+        params.set('domain', appliedDomain.value)
+        if (domainExact.value) params.set('domain_exact', 'true')
+      }
       const res = await fetch(`/api/stats/domains?${params}`, { signal: controller.signal })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       domainData.value = await res.json()
@@ -140,6 +188,9 @@ function resetFilters() {
   selectedCategory.value = null
   selectedCompany.value = null
   selectedClientIp.value = null
+  domainInput.value = null
+  appliedDomain.value = null
+  domainExact.value = false
 }
 
 function onClientSaved(client: ClientStat, newName: string | null) {
@@ -166,9 +217,12 @@ watch(() => windowStore.refreshKey, () => {
   }
 })
 watch(() => windowStore.reportGroupBy, fetchData)
-watch([selectedCategory, selectedCompany, selectedClientIp], () => {
+watch([selectedCategory, selectedCompany, selectedClientIp, appliedDomain], () => {
   syncUrlParams()
   fetchData()
+})
+watch(domainExact, () => {
+  if (appliedDomain.value) applyDomainFilter()
 })
 
 // Sync refs when the route query changes externally (e.g. navigation from a modal)
@@ -176,9 +230,16 @@ watch(() => route.query, (q) => {
   const cat = (q.category as string) ?? null
   const co = (q.company as string) ?? null
   const ip = (q.client_ip as string) ?? null
+  const dom = (q.domain as string) ?? null
+  const exact = q.domain_exact === '1'
   if (cat !== selectedCategory.value) selectedCategory.value = cat
   if (co !== selectedCompany.value) selectedCompany.value = co
   if (ip !== selectedClientIp.value) selectedClientIp.value = ip
+  if (dom !== appliedDomain.value) {
+    domainInput.value = dom
+    appliedDomain.value = dom
+  }
+  if (exact !== domainExact.value) domainExact.value = exact
 })
 </script>
 
@@ -225,7 +286,7 @@ watch(() => route.query, (q) => {
     </div>
 
     <!-- Filters -->
-    <div class="flex items-center gap-3 flex-wrap">
+    <div class="flex items-start gap-3 flex-wrap">
       <Select
         v-model="selectedCategory"
         :options="categoryOptions"
@@ -272,6 +333,32 @@ watch(() => route.query, (q) => {
           </span>
         </template>
       </Select>
+
+      <!-- Domain search (domain mode only) -->
+      <div v-if="windowStore.reportGroupBy === 'domain'" class="flex flex-col gap-1">
+        <InputGroup class="w-64">
+          <AutoComplete
+            v-model="domainInput"
+            :suggestions="domainSuggestions"
+            placeholder="Search domains…"
+            :pt="{ pcInputText: { root: { spellcheck: false, autocorrect: 'off', autocapitalize: 'off' } } }"
+            @complete="searchDomains"
+            @item-select="onDomainSelect"
+            @clear="onDomainClear"
+            @keydown.enter="applyDomainFilter"
+          />
+          <Button
+            icon="pi pi-search"
+            outlined
+            aria-label="Search"
+            @click="applyDomainFilter"
+          />
+        </InputGroup>
+        <label class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none ml-1">
+          <Checkbox v-model="domainExact" :binary="true" />
+          Exact match
+        </label>
+      </div>
 
       <Button
         v-if="hasFilters"

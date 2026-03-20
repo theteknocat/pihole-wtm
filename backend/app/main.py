@@ -166,9 +166,22 @@ async def stats_domains(
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
     client_ip: str | None = Query(default=None),
+    domain: str | None = Query(default=None),
+    domain_exact: bool = Query(default=False),
 ) -> dict[str, Any]:
     excl = await _get_exclusions()
-    return await db.fetch_domain_stats(hours=hours, category=category, company=company, client_ip=client_ip, **excl)
+    return await db.fetch_domain_stats(
+        hours=hours, category=category, company=company,
+        client_ip=client_ip, domain=domain, domain_exact=domain_exact, **excl,
+    )
+
+
+@app.get("/api/domains/search")
+async def search_domains(
+    q: str = Query(min_length=2),
+    hours: int = Query(default=24, ge=1, le=168),
+) -> list[str]:
+    return await db.search_domains(query=q, hours=hours)
 
 
 @app.get("/api/stats/clients")

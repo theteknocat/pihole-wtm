@@ -487,12 +487,28 @@ class LocalDatabase:
             "by_category": by_category,
         }
 
+    async def search_domains(self, query: str, hours: int = 24, limit: int = 20) -> list[str]:
+        """Return domain names matching the query substring within the time window."""
+        from_ts = time.time() - hours * 3600
+        sql = """
+            SELECT DISTINCT q.domain
+            FROM queries q
+            WHERE q.timestamp >= ? AND q.domain LIKE ?
+            ORDER BY q.domain
+            LIMIT ?
+        """
+        async with self._conn() as db:
+            async with db.execute(sql, [from_ts, f"%{query}%", limit]) as cur:
+                return [row[0] for row in await cur.fetchall()]
+
     async def fetch_domain_stats(
         self,
         hours: int = 24,
         category: str | None = None,
         company: str | None = None,
         client_ip: str | None = None,
+        domain: str | None = None,
+        domain_exact: bool = False,
         excluded_categories: list[str] | None = None,
         excluded_companies: list[str] | None = None,
         excluded_domains: list[str] | None = None,
@@ -515,6 +531,13 @@ class LocalDatabase:
         if company is not None:
             conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
             params.append(company)
+        if domain is not None:
+            if domain_exact:
+                conditions.append("q.domain = ?")
+                params.append(domain)
+            else:
+                conditions.append("q.domain LIKE ?")
+                params.append(f"%{domain}%")
         if excluded_categories:
             placeholders = ",".join("?" for _ in excluded_categories)
             conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
