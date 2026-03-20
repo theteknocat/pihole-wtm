@@ -21,14 +21,10 @@ interface HealthData {
 const health = ref<HealthData | null>(null)
 const pihole = ref<{ connected: boolean; version?: string } | null>(null)
 const error = ref(false)
-const fetching = ref(false)
-let hasLoaded = false
-
 let timer: ReturnType<typeof setTimeout> | null = null
 let alive = true
 
 async function fetchStatus() {
-  fetching.value = true
   try {
     const res = await apiFetch('/api/health')
     if (!res.ok) throw new Error()
@@ -49,9 +45,6 @@ async function fetchStatus() {
   } catch {
     pihole.value = { connected: false }
   }
-
-  fetching.value = false
-  hasLoaded = true
 
   // Schedule next fetch after completion, so drift doesn't push us past the sync interval
   if (alive) timer = setTimeout(fetchStatus, 55_000)
@@ -135,8 +128,6 @@ onUnmounted(() => {
       <!-- Stored queries -->
       <span>{{ health.stored_queries.toLocaleString() }} queries</span>
 
-      <!-- Health check refresh indicator -->
-      <i v-if="fetching && hasLoaded" class="pi pi-spin pi-spinner ml-auto" />
     </template>
     <template v-else>
       <span class="text-gray-400">Loading...</span>
