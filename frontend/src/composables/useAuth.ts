@@ -9,6 +9,7 @@ import { resetRedirectFlag } from '@/utils/api'
  */
 const isAuthenticated = ref(false)
 const piholeUrl = ref<string | null>(null)
+const piholeUrlFromEnv = ref(false)
 const checking = ref(true) // true until the first checkSession completes
 
 async function checkSession(): Promise<boolean> {
@@ -21,6 +22,7 @@ async function checkSession(): Promise<boolean> {
     const data = await res.json()
     isAuthenticated.value = data.authenticated
     piholeUrl.value = data.pihole_url ?? null
+    piholeUrlFromEnv.value = data.pihole_url_from_env ?? false
     return data.authenticated
   } catch {
     isAuthenticated.value = false
@@ -59,6 +61,9 @@ async function logout(): Promise<void> {
     // Best-effort
   }
   isAuthenticated.value = false
+  if (!piholeUrlFromEnv.value) {
+    piholeUrl.value = null
+  }
 }
 
 export function useAuth() {
