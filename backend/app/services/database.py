@@ -6,6 +6,7 @@ We sync new queries from Pi-hole periodically, enrich them once, and serve all
 dashboard data from here — avoiding repeated live API calls and enrichment passes.
 """
 
+import json
 import logging
 import time
 from collections import defaultdict
@@ -373,13 +374,26 @@ class LocalDatabase:
 
         return results, next_cursor
 
+    async def _apply_exclusions(
+        self, conditions: list[str], params: list[Any],
+    ) -> None:
+        """Load user exclusion settings and append WHERE clauses in place."""
+        raw = await self.get_all_config()
+        for key, col in (
+            ("excluded_categories", "COALESCE(d.category, 'Uncategorized')"),
+            ("excluded_companies", "COALESCE(d.company_name, 'Unknown')"),
+            ("excluded_domains", "q.domain"),
+        ):
+            values = json.loads(raw.get(key, "[]"))
+            if values:
+                placeholders = ",".join("?" for _ in values)
+                conditions.append(f"{col} NOT IN ({placeholders})")
+                params.extend(values)
+
     async def fetch_tracker_stats(
         self,
         hours: int = 24,
         client_ip: str | None = None,
-        excluded_categories: list[str] | None = None,
-        excluded_companies: list[str] | None = None,
-        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Aggregate tracker stats over the given time window.
@@ -394,18 +408,7 @@ class LocalDatabase:
             conditions.append("q.client_ip = ?")
             params.append(client_ip)
 
-        if excluded_categories:
-            placeholders = ",".join("?" for _ in excluded_categories)
-            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
-            params.extend(excluded_categories)
-        if excluded_companies:
-            placeholders = ",".join("?" for _ in excluded_companies)
-            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
-            params.extend(excluded_companies)
-        if excluded_domains:
-            placeholders = ",".join("?" for _ in excluded_domains)
-            conditions.append(f"q.domain NOT IN ({placeholders})")
-            params.extend(excluded_domains)
+        await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -514,9 +517,6 @@ class LocalDatabase:
         client_ip: str | None = None,
         domain: str | None = None,
         domain_exact: bool = False,
-        excluded_categories: list[str] | None = None,
-        excluded_companies: list[str] | None = None,
-        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-domain query counts for the given time window, optionally
@@ -543,18 +543,8 @@ class LocalDatabase:
             else:
                 conditions.append("q.domain LIKE ? ESCAPE '\\\\'")
                 params.append(f"%{_escape_like(domain)}%")
-        if excluded_categories:
-            placeholders = ",".join("?" for _ in excluded_categories)
-            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
-            params.extend(excluded_categories)
-        if excluded_companies:
-            placeholders = ",".join("?" for _ in excluded_companies)
-            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
-            params.extend(excluded_companies)
-        if excluded_domains:
-            placeholders = ",".join("?" for _ in excluded_domains)
-            conditions.append(f"q.domain NOT IN ({placeholders})")
-            params.extend(excluded_domains)
+
+        await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -604,9 +594,6 @@ class LocalDatabase:
         hours: int = 24,
         category: str | None = None,
         company: str | None = None,
-        excluded_categories: list[str] | None = None,
-        excluded_companies: list[str] | None = None,
-        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-client query counts for the given time window,
@@ -624,18 +611,7 @@ class LocalDatabase:
             conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
             params.append(company)
 
-        if excluded_categories:
-            placeholders = ",".join("?" for _ in excluded_categories)
-            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
-            params.extend(excluded_categories)
-        if excluded_companies:
-            placeholders = ",".join("?" for _ in excluded_companies)
-            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
-            params.extend(excluded_companies)
-        if excluded_domains:
-            placeholders = ",".join("?" for _ in excluded_domains)
-            conditions.append(f"q.domain NOT IN ({placeholders})")
-            params.extend(excluded_domains)
+        await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -678,9 +654,6 @@ class LocalDatabase:
     async def fetch_timeline_stats(
         self,
         hours: int = 24,
-        excluded_categories: list[str] | None = None,
-        excluded_companies: list[str] | None = None,
-        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return query counts bucketed over time for the given window.
@@ -698,18 +671,7 @@ class LocalDatabase:
         conditions = ["q.timestamp >= ?"]
         params: list[Any] = [from_ts]
 
-        if excluded_categories:
-            placeholders = ",".join("?" for _ in excluded_categories)
-            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
-            params.extend(excluded_categories)
-        if excluded_companies:
-            placeholders = ",".join("?" for _ in excluded_companies)
-            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
-            params.extend(excluded_companies)
-        if excluded_domains:
-            placeholders = ",".join("?" for _ in excluded_domains)
-            conditions.append(f"q.domain NOT IN ({placeholders})")
-            params.extend(excluded_domains)
+        await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -756,9 +718,6 @@ class LocalDatabase:
     async def fetch_client_timeline_stats(
         self,
         hours: int = 24,
-        excluded_categories: list[str] | None = None,
-        excluded_companies: list[str] | None = None,
-        excluded_domains: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-client query counts bucketed over time.
@@ -775,18 +734,7 @@ class LocalDatabase:
         conditions = ["q.timestamp >= ?"]
         params: list[Any] = [from_ts]
 
-        if excluded_categories:
-            placeholders = ",".join("?" for _ in excluded_categories)
-            conditions.append(f"COALESCE(d.category, 'Uncategorized') NOT IN ({placeholders})")
-            params.extend(excluded_categories)
-        if excluded_companies:
-            placeholders = ",".join("?" for _ in excluded_companies)
-            conditions.append(f"COALESCE(d.company_name, 'Unknown') NOT IN ({placeholders})")
-            params.extend(excluded_companies)
-        if excluded_domains:
-            placeholders = ",".join("?" for _ in excluded_domains)
-            conditions.append(f"q.domain NOT IN ({placeholders})")
-            params.extend(excluded_domains)
+        await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -990,7 +938,15 @@ class LocalDatabase:
                 "SELECT last_query_id, last_synced_at FROM sync_state WHERE id = 1"
             ) as cur:
                 row = await cur.fetchone()
-            async with db.execute("SELECT COUNT(*) FROM queries") as cur:
+
+            # Count queries with exclusions applied
+            conditions: list[str] = []
+            params: list[Any] = []
+            await self._apply_exclusions(conditions, params)
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            sql = f"SELECT COUNT(*) FROM queries q JOIN domains d ON q.domain = d.domain {where}"
+            async with db.execute(sql, params) as cur:
                 count_row = await cur.fetchone()
 
         return {

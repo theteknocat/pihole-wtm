@@ -128,35 +128,26 @@ async def queries(
 _EXCLUSION_KEYS = ("excluded_categories", "excluded_companies", "excluded_domains")
 
 
-async def _get_exclusions() -> dict[str, list[str]]:
-    """Read user exclusion config from the database."""
-    raw = await db.get_all_config()
-    return {k: json.loads(raw.get(k, "[]")) for k in _EXCLUSION_KEYS}
-
-
 @app.get("/api/stats/trackers", dependencies=[Depends(require_session)])
 async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=168),
     client_ip: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    excl = await _get_exclusions()
-    return await db.fetch_tracker_stats(hours=hours, client_ip=client_ip, **excl)
+    return await db.fetch_tracker_stats(hours=hours, client_ip=client_ip)
 
 
 @app.get("/api/stats/timeline", dependencies=[Depends(require_session)])
 async def stats_timeline(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict[str, Any]:
-    excl = await _get_exclusions()
-    return await db.fetch_timeline_stats(hours=hours, **excl)
+    return await db.fetch_timeline_stats(hours=hours)
 
 
 @app.get("/api/stats/timeline/clients", dependencies=[Depends(require_session)])
 async def stats_timeline_clients(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict[str, Any]:
-    excl = await _get_exclusions()
-    return await db.fetch_client_timeline_stats(hours=hours, **excl)
+    return await db.fetch_client_timeline_stats(hours=hours)
 
 
 @app.get("/api/stats/domains", dependencies=[Depends(require_session)])
@@ -168,10 +159,9 @@ async def stats_domains(
     domain: str | None = Query(default=None),
     domain_exact: bool = Query(default=False),
 ) -> dict[str, Any]:
-    excl = await _get_exclusions()
     return await db.fetch_domain_stats(
         hours=hours, category=category, company=company,
-        client_ip=client_ip, domain=domain, domain_exact=domain_exact, **excl,
+        client_ip=client_ip, domain=domain, domain_exact=domain_exact,
     )
 
 
@@ -189,8 +179,7 @@ async def stats_clients(
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    excl = await _get_exclusions()
-    return await db.fetch_client_stats(hours=hours, category=category, company=company, **excl)
+    return await db.fetch_client_stats(hours=hours, category=category, company=company)
 
 
 @app.get("/api/settings/options", dependencies=[Depends(require_session)])
