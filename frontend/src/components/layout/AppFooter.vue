@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useWindowStore } from '@/stores/window'
 import { apiFetch } from '@/utils/api'
+
+const windowStore = useWindowStore()
 
 interface SourceStatus {
   name: string
@@ -22,8 +25,6 @@ interface HealthData {
 
 const health = ref<HealthData | null>(null)
 const error = ref(false)
-let timer: ReturnType<typeof setTimeout> | null = null
-let alive = true
 
 async function fetchStatus() {
   try {
@@ -35,9 +36,6 @@ async function fetchStatus() {
   } catch {
     error.value = true
   }
-
-  // Schedule next fetch after completion, so drift doesn't push us past the sync interval
-  if (alive) timer = setTimeout(fetchStatus, 55_000)
 }
 
 // Reactive sync time display — ticks every 5s so "Xs ago" stays current
@@ -53,14 +51,15 @@ function updateSyncAgo() {
   else syncAgo.value = `${Math.floor(ago / 3600)}h ago`
 }
 
+// Refresh on shared auto-refresh tick (30s) and on-demand triggers (e.g. data reset)
+watch(() => windowStore.refreshKey, fetchStatus)
+
 onMounted(() => {
   fetchStatus()
   tickTimer = setInterval(updateSyncAgo, 5_000)
 })
 
 onUnmounted(() => {
-  alive = false
-  if (timer) clearTimeout(timer)
   if (tickTimer) clearInterval(tickTimer)
 })
 </script>
