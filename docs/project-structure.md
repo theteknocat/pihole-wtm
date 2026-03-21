@@ -76,8 +76,12 @@ pihole-wtm/
 │       ├── components/
 │       │   ├── layout/
 │       │   │   ├── AppFooter.vue           # Fixed footer: backend/Pi-hole/source status, sync info
-│       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel (data reset, config access)
-│       │   │   ├── ConfigDialog.vue        # Tracker source exclusion config (categories, companies, domains)
+│       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel with accordion-style sections
+│       │   │   ├── settings/
+│       │   │   │   ├── DisplaySection.vue      # Exclusion config: categories, companies, domains (autocomplete chips)
+│       │   │   │   ├── SyncSection.vue         # Sync interval and data retention settings
+│       │   │   │   ├── DataSourcesSection.vue  # Tracker source update intervals (TrackerDB, Disconnect.me)
+│       │   │   │   └── DataManagementSection.vue # Re-enrich and reset data actions
 │       │   │   ├── ClientNameDialog.vue    # Modal for setting/clearing a friendly name for a client IP
 │       │   │   └── DeviceStatsDialog.vue   # Near-fullscreen modal: per-device tracker breakdown chart
 │       │   ├── timeline/

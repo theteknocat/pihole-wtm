@@ -70,17 +70,20 @@ Logging verbosity for both uvicorn and the Python logging module.
 
 ---
 
-## Hardcoded Defaults
+## Dashboard Settings
 
-The following settings use sensible defaults and do not require configuration. They will be made configurable via the dashboard UI in a future update.
+The following settings are configurable via the Settings sidebar in the dashboard UI. Changes take effect on the next sync cycle without a restart.
 
-| Setting | Default | Description |
-| --- | --- | --- |
-| Sync interval | 60 seconds | How often the sync service polls Pi-hole for new queries |
-| Data retention | 7 days | How long query data is kept before automatic purging |
-| TrackerDB update interval | 24 hours | How often to check for a newer TrackerDB release |
-| Disconnect.me update interval | 24 hours | How often to refresh the Disconnect.me tracking list |
-| Database paths | `backend/data/` | `pihole_wtm.db` and `trackerdb.db` are stored relative to the backend directory |
+| Setting                       | Default    | Range      | Description                                                         |
+| ----------------------------- | ---------- | ---------- | ------------------------------------------------------------------- |
+| Sync interval                 | 60 seconds | 10–3600s   | How often the sync service polls Pi-hole for new queries            |
+| Data retention                | 7 days     | 1–365 days | How long query data is kept before automatic purging                |
+| TrackerDB update interval     | 24 hours   | 0–720h     | How often to check for a newer TrackerDB release (0 = disabled)     |
+| Disconnect.me update interval | 24 hours   | 0–720h     | How often to refresh the Disconnect.me tracking list (0 = disabled) |
+
+The Settings sidebar also provides display exclusion filters (categories, companies, domains) and data management actions (re-enrich, reset).
+
+Database paths (`pihole_wtm.db` and `trackerdb.db`) are derived automatically from the backend directory and are not configurable.
 
 ---
 

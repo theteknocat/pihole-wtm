@@ -61,7 +61,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Routers** handle HTTP routing and input validation. They read exclusively from the local SQLite database — they never call the Pi-hole API directly.
 
-**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configurable retention period (default 7 days) and removes orphaned domain records. These settings will be adjustable via the dashboard UI (currently using hardcoded defaults). The Pi-hole API is only used by this service.
+**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configurable retention period (default 7 days) and removes orphaned domain records. These settings are configurable via the dashboard's Settings sidebar and are read from the database each cycle, so changes take effect without a restart. The Pi-hole API is only used by this service.
 
 **Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds five tables:
 
