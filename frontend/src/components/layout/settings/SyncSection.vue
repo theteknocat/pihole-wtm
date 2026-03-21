@@ -10,8 +10,18 @@ const loading = ref(true)
 const syncInterval = ref(60)
 const dataRetention = ref(7)
 
-async function saveSetting(key: string, value: number | null) {
+// Debounced auto-save
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleSave(key: string, value: number | null) {
+  if (saveTimer) clearTimeout(saveTimer)
   if (value === null) return
+  saveTimer = setTimeout(() => {
+    saveSetting(key, value)
+  }, 500)
+}
+
+async function saveSetting(key: string, value: number | null) {
   try {
     const res = await apiFetch(`/api/settings/${key}`, {
       method: 'PUT',
@@ -59,11 +69,21 @@ onMounted(async () => {
           v-model="syncInterval"
           :min="10"
           :max="3600"
+          :step="10"
           suffix=" seconds"
           class="w-full"
           size="small"
-          @update:model-value="saveSetting('sync_interval_seconds', $event)"
-        />
+          showButtons
+          buttonLayout="horizontal"
+          @update:model-value="scheduleSave('sync_interval_seconds', $event)"
+        >
+          <template #incrementicon>
+              <span class="pi pi-plus" />
+          </template>
+          <template #decrementicon>
+              <span class="pi pi-minus" />
+          </template>
+        </InputNumber>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
           How often Pi-hole is polled for new queries. Lower values mean more up-to-date data. (10–3600s)
         </p>
@@ -79,8 +99,17 @@ onMounted(async () => {
           suffix=" days"
           class="w-full"
           size="small"
-          @update:model-value="saveSetting('data_retention_days', $event)"
-        />
+          showButtons
+          buttonLayout="horizontal"
+          @update:model-value="scheduleSave('data_retention_days', $event)"
+        >
+          <template #incrementicon>
+              <span class="pi pi-plus" />
+          </template>
+          <template #decrementicon>
+              <span class="pi pi-minus" />
+          </template>
+        </InputNumber>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
           Queries older than this are automatically purged each sync cycle. (1–365 days)
         </p>
