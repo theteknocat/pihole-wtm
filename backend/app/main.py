@@ -16,6 +16,13 @@ from app.services.pihole.api_client import (
 from app.services.sources import TrackerSource, get_tracker_sources
 import app.services.sync_manager as sync_manager
 
+from app.config import settings as app_settings
+
+logging.basicConfig(
+    level=app_settings.log_level.upper(),
+    format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 sources: list[TrackerSource]
