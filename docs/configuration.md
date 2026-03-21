@@ -70,16 +70,6 @@ Logging verbosity for both uvicorn and the Python logging module.
 
 ---
 
-## Docker Deployment
-
-### `DASHBOARD_PORT`
-
-Host port that the dashboard container binds to.
-
-**Default:** `8080`
-
----
-
 ## Hardcoded Defaults
 
 The following settings use sensible defaults and do not require configuration. They will be made configurable via the dashboard UI in a future update.
@@ -101,7 +91,6 @@ The following settings use sensible defaults and do not require configuration. T
 ```bash
 PIHOLE_API_URL=http://pihole
 PIHOLE_API_PASSWORD=your-pihole-password
-DASHBOARD_PORT=8080
 ```
 
 ### Bare-metal

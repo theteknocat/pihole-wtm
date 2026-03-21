@@ -36,7 +36,6 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
    ```bash
    PIHOLE_API_URL=http://192.168.1.1     # Pi-hole address (or container name)
    PIHOLE_API_PASSWORD=your_password      # Enables always-on background sync
-   DASHBOARD_PORT=8080
    ```
 
    Both `PIHOLE_API_URL` and `PIHOLE_API_PASSWORD` are optional — you can skip them and configure everything via the login page instead. However, setting them is recommended so that background sync runs continuously. If Pi-hole is in Docker on the same host, use its container name and connect via a shared Docker network.
@@ -47,7 +46,7 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
    docker compose up -d
    ```
 
-4. Open `http://your-host:8080` in your browser and log in with your Pi-hole password.
+4. Open `http://your-host` in your browser and log in with your Pi-hole password.
 
 ### Updating
 
