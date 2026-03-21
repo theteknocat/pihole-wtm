@@ -16,10 +16,11 @@ interface HealthData {
   sources: SourceStatus[]
   last_synced_at: number | null
   stored_queries: number
+  sync_active: boolean
+  sync_source: 'env' | 'session' | null
 }
 
 const health = ref<HealthData | null>(null)
-const pihole = ref<{ connected: boolean; version?: string } | null>(null)
 const error = ref(false)
 let timer: ReturnType<typeof setTimeout> | null = null
 let alive = true
@@ -33,17 +34,6 @@ async function fetchStatus() {
     updateSyncAgo()
   } catch {
     error.value = true
-  }
-
-  try {
-    const res = await apiFetch('/api/pihole/test')
-    if (res.ok) {
-      pihole.value = await res.json()
-    } else {
-      pihole.value = { connected: false }
-    }
-  } catch {
-    pihole.value = { connected: false }
   }
 
   // Schedule next fetch after completion, so drift doesn't push us past the sync interval
@@ -93,11 +83,11 @@ onUnmounted(() => {
       <!-- Pi-hole status -->
       <span class="flex items-center gap-1">
         <i
-          :class="pihole?.connected
+          :class="health.pihole_api_url
             ? 'pi pi-check-circle text-green-500 dark:text-green-400'
             : 'pi pi-times-circle text-red-400'"
         />
-        Pi-hole{{ pihole?.version ? ` ${pihole.version}` : '' }}
+        Pi-hole
       </span>
 
       <span class="text-gray-300 dark:text-gray-600">|</span>
@@ -121,7 +111,20 @@ onUnmounted(() => {
       <span class="text-gray-300 dark:text-gray-600">|</span>
 
       <!-- Sync status -->
-      <span>Last sync {{ syncAgo }}</span>
+      <span
+        class="flex items-center gap-1"
+        :title="health.sync_source === 'session'
+          ? 'Sync runs only while logged in — set PIHOLE_API_PASSWORD for always-on sync'
+          : health.sync_source === 'env'
+            ? 'Sync runs continuously from environment config'
+            : 'Sync not running'"
+      >
+        Last sync {{ syncAgo }}
+        <i
+          v-if="health.sync_source === 'session'"
+          class="pi pi-info-circle text-amber-500 dark:text-amber-400"
+        />
+      </span>
 
       <span class="text-gray-300 dark:text-gray-600">|</span>
 

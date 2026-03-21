@@ -18,8 +18,8 @@ pihole-wtm/
 │   │   └── pihole_wtm.db              # Local sync database (auto-created on first run)
 │   │
 │   └── app/
-│       ├── main.py                    # FastAPI app factory, lifespan, CORS config, all routes
-│       ├── config.py                  # Pydantic-settings: all env var definitions
+│       ├── main.py                    # FastAPI app factory, lifespan, all routes
+│       ├── config.py                  # Pydantic-settings: env vars + derived paths
 │       │
 │       ├── routers/
 │       │   └── auth.py                # Auth routes: login, logout, status, check-url
@@ -32,12 +32,12 @@ pihole-wtm/
 │           ├── sources.py             # TrackerSource protocol + get_tracker_sources() registry
 │           ├── database.py            # Local SQLite: schema, sync state, query/domain helpers
 │           ├── sync.py                # Background sync coroutine + enrichment orchestration
-│           ├── sync_manager.py        # Sync service lifecycle (start/stop), session-tied
+│           ├── sync_manager.py        # Sync service lifecycle (start/stop), dual-mode (env var / session)
 │           ├── heuristic.py           # eTLD+1 company name + subdomain keyword category
 │           ├── rdap.py                # RDAP company name lookup (async, LRU cached)
 │           ├── auth/
 │           │   ├── session_store.py   # In-memory session store (Session dataclass + SessionStore)
-│           │   ├── config_store.py    # Two-tier Pi-hole URL resolver (env var → database)
+│           │   ├── config_store.py    # Pi-hole URL resolver (env var only)
 │           │   └── middleware.py      # require_session dependency, SESSION_COOKIE constant
 │           ├── pihole/
 │           │   └── api_client.py      # httpx client for Pi-hole v6 HTTP API
@@ -114,7 +114,7 @@ pihole-wtm/
 
 ### Backend
 
-- All configuration comes from environment variables, parsed by `pydantic-settings` in `app/config.py`. No hardcoded values.
+- Essential configuration (Pi-hole connection, session timeout, log level) comes from environment variables via `pydantic-settings` in `app/config.py`. Operational defaults (sync interval, retention, update intervals) are hardcoded with plans to make them UI-configurable. Database paths are derived from the application's base directory.
 - Routers are thin: they validate input and return output. Business logic lives in `services/`.
 - API routers read exclusively from the local SQLite database — never from the Pi-hole API directly. Only the sync service calls the Pi-hole API.
 - `aiosqlite` is used for all SQLite access (async, non-blocking). WAL mode is enabled on `pihole-wtm.db` for concurrent reads during writes.

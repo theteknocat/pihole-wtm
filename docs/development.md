@@ -33,13 +33,14 @@ This will:
 - Start the FastAPI backend with `uvicorn --reload` on port 8000
 - Start the Vite dev server on port 5173
 
-### 3. Configure the Pi-hole connection
+### 3. Configure the Pi-hole connection (optional)
 
-Optionally set the Pi-hole URL in `.ddev/config.local.yaml` (gitignored):
+For convenience during development, set the Pi-hole connection in `.ddev/config.local.yaml` (gitignored):
 
 ```yaml
 web_environment:
-  - PIHOLE_API_URL=http://192.168.1.1   # your Pi-hole's address
+  - PIHOLE_API_URL=http://192.168.1.1       # your Pi-hole's address
+  - PIHOLE_API_PASSWORD=your_password        # enables always-on sync
 ```
 
 Then restart ddev for the changes to take effect:
@@ -48,32 +49,21 @@ Then restart ddev for the changes to take effect:
 ddev restart
 ```
 
-If you leave `PIHOLE_API_URL` empty (the default in `config.yaml`), you'll be prompted to enter the URL on the login page. The Pi-hole password is always entered on the login page — it is never stored in config files.
+Both are optional — if not set, you'll enter the URL and password on the login page each session. For active development, setting both is convenient so sync runs immediately on `ddev start`.
 
 ### 4. Open the dashboard
 
-The Vite dev server is available at:
+The Vite dev server proxies `/api` requests to the FastAPI backend, so the dashboard is available at:
 
 ```text
-https://pihole-wtm.ddev.site:5174
+https://pihole-wtm.ddev.site
 ```
 
-The FastAPI backend is available at:
+The FastAPI backend is also accessible directly (useful for Swagger UI):
 
 ```text
 https://pihole-wtm.ddev.site:8443
-```
-
-Interactive API documentation (Swagger UI):
-
-```text
 https://pihole-wtm.ddev.site:8443/docs
-```
-
-Vite's dev server proxies `/api` requests to the backend automatically, so you can also access the API at:
-
-```text
-https://pihole-wtm.ddev.site:5174/api/health
 ```
 
 ## Daily Development

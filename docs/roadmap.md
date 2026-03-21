@@ -76,7 +76,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] Tracker source configuration — `user_config` table in SQLite; excluded categories, companies, and domains stored as JSON arrays; exclusions applied at query time (display-only, data still collected)
 - [x] `GET /api/stats/timeline` — bucketed query/block counts over time (hourly for 24h, 6-hourly for 7d)
 - [x] `GET /api/stats/timeline/clients` — per-device bucketed query counts over time
-- [x] Automatic data retention — configurable via `DATA_RETENTION_DAYS` (default 7); old queries purged each sync cycle, orphaned domains cleaned up
+- [x] Automatic data retention — default 7 days, purged each sync cycle, orphaned domains cleaned up (will be UI-configurable)
 - [x] `/api/stats/clients` — per-client query aggregation with category/company filters
 - [x] `/api/clients` — client IP listing with names and query counts; `PUT`/`DELETE` for name management
 - [x] `client_names` table — user-managed friendly names for client IPs, joined at query time

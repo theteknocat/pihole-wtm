@@ -16,7 +16,7 @@ import httpx
 from cachetools import LRUCache
 from fastapi import APIRouter, Query
 
-from app.config import settings
+from app.config import DATA_DIR
 from app.models.tracker import TrackerInfo
 
 logger = logging.getLogger(__name__)
@@ -84,8 +84,12 @@ class TrackerDBSource:
     gates = True
     priority = 10
 
+    # Defaults — will be overridable from UI settings in a future update
+    UPDATE_INTERVAL_HOURS = 24
+    RELEASE = "latest"  # "latest" or a specific tag e.g. "202603111257"
+
     def __init__(self) -> None:
-        self._path = Path(settings.trackerdb_path)
+        self._path = DATA_DIR / "trackerdb.db"
         self._cache: LRUCache = LRUCache(maxsize=_CACHE_SIZE)
 
     # -- Lifecycle ------------------------------------------------------------
@@ -199,14 +203,14 @@ class TrackerDBSource:
     def _is_stale(self) -> bool:
         if not self._path.exists():
             return True
-        if settings.trackerdb_update_interval_hours == 0:
+        if self.UPDATE_INTERVAL_HOURS == 0:
             return False
         age_hours = (time.time() - self._path.stat().st_mtime) / 3600
-        return age_hours >= settings.trackerdb_update_interval_hours
+        return age_hours >= self.UPDATE_INTERVAL_HOURS
 
     async def _get_download_url(self) -> tuple[str, str]:
         """Return (download_url, tag_name) for the configured release."""
-        release = settings.trackerdb_release
+        release = self.RELEASE
         if release == "latest":
             url = f"{_GITHUB_API}/latest"
         else:

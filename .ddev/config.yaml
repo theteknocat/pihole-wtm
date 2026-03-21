@@ -17,8 +17,8 @@ web_extra_exposed_ports:
     https_port: 8443
   - name: vite
     container_port: 5173
-    http_port: 5173
-    https_port: 5174
+    http_port: 80
+    https_port: 443
 
 web_extra_daemons:
   - name: fastapi
@@ -31,13 +31,8 @@ web_extra_daemons:
 
 web_environment:
   - PIHOLE_API_URL=
-  - PIHOLE_API_VERSION=auto
-  - TRACKERDB_PATH=/var/www/html/backend/data/trackerdb.db
-  - LOCAL_DB_PATH=/var/www/html/backend/data/pihole_wtm.db
-  - APP_HOST=0.0.0.0
-  - APP_PORT=8000
+  - PIHOLE_API_PASSWORD=
   - LOG_LEVEL=debug
-  - CORS_ORIGINS=https://pihole-wtm.ddev.site:5174,http://localhost:5173,http://localhost:5174
 
 hooks:
   post-start:

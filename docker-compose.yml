@@ -8,10 +8,9 @@ services:
     volumes:
       - pihole-wtm-data:/app/data
     environment:
-      - PIHOLE_API_URL=${PIHOLE_API_URL:-http://pihole}
-      - PIHOLE_API_VERSION=${PIHOLE_API_VERSION:-auto}
-      - TRACKERDB_UPDATE_INTERVAL_HOURS=${TRACKERDB_UPDATE_INTERVAL_HOURS:-24}
-      - DATA_RETENTION_DAYS=${DATA_RETENTION_DAYS:-7}
+      - PIHOLE_API_URL=${PIHOLE_API_URL:-}
+      - PIHOLE_API_PASSWORD=${PIHOLE_API_PASSWORD:-}
+      - SESSION_TIMEOUT_HOURS=${SESSION_TIMEOUT_HOURS:-24}
       - LOG_LEVEL=${LOG_LEVEL:-info}
 
 volumes:

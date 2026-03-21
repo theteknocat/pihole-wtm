@@ -35,11 +35,11 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
 
    ```bash
    PIHOLE_API_URL=http://192.168.1.1     # Pi-hole address (or container name)
+   PIHOLE_API_PASSWORD=your_password      # Enables always-on background sync
    DASHBOARD_PORT=8080
-   CORS_ORIGINS=http://your-host:8080
    ```
 
-   `PIHOLE_API_URL` is optional — if left unset, you'll be prompted to enter it on the login page. If Pi-hole is in Docker on the same host, use its container name and set `PIHOLE_NETWORK` to its Docker network name, then uncomment the external network block in `docker-compose.yml`.
+   Both `PIHOLE_API_URL` and `PIHOLE_API_PASSWORD` are optional — you can skip them and configure everything via the login page instead. However, setting them is recommended so that background sync runs continuously. If Pi-hole is in Docker on the same host, use its container name and connect via a shared Docker network.
 
 3. Start the dashboard:
 
@@ -92,25 +92,19 @@ Use this when you want to run pihole-wtm directly on the host without Docker.
 
    The built files are in `frontend/dist/`.
 
-4. Create the data directory and configure environment:
-
-   ```bash
-   mkdir -p /var/lib/pihole-wtm
-   ```
+4. Configure environment:
 
    Create `/etc/pihole-wtm/pihole-wtm.env`:
 
    ```bash
    PIHOLE_API_URL=http://192.168.1.1
-   LOCAL_DB_PATH=/var/lib/pihole-wtm/pihole-wtm.db
-   TRACKERDB_PATH=/var/lib/pihole-wtm/trackerdb.db
-   APP_HOST=127.0.0.1
-   APP_PORT=8000
+   PIHOLE_API_PASSWORD=your_password
    LOG_LEVEL=info
-   CORS_ORIGINS=http://your-host
    ```
 
-   The Pi-hole password is not stored in config — you enter it on the login page.
+   Both `PIHOLE_API_URL` and `PIHOLE_API_PASSWORD` are optional but recommended for continuous sync. If omitted, you configure via the login page and sync only runs while logged in.
+
+   The data directory (`backend/data/`) is created automatically on first run. Database files (`pihole_wtm.db`, `trackerdb.db`) are stored there.
 
 5. Configure nginx — copy `nginx.conf` to `/etc/nginx/sites-available/pihole-wtm`, set the `root` to your `frontend/dist/` path, then reload:
 
@@ -162,19 +156,19 @@ For bare-metal deployments, `git pull` the repository, reinstall backend depende
 
 ## Data Persistence
 
-pihole-wtm maintains two files in its data directory:
+pihole-wtm maintains two files in its data directory (`backend/data/`):
 
-- `pihole-wtm.db` — the local sync database. Contains your filtered query history and all enrichment results. **Back this up** if you want to preserve history.
+- `pihole_wtm.db` — the local sync database. Contains your filtered query history and all enrichment results. **Back this up** if you want to preserve history.
 - `trackerdb.db` — the Ghostery TrackerDB. Downloaded and updated automatically. Safe to delete (will be re-downloaded).
 
 In Docker deployments, mount a named volume so these persist across container restarts:
 
 ```yaml
 services:
-  backend:
+  pihole-wtm:
     volumes:
-      - pihole_wtm_data:/app/data
+      - pihole-wtm-data:/app/data
 
 volumes:
-  pihole_wtm_data:
+  pihole-wtm-data:
 ```

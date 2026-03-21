@@ -14,7 +14,7 @@ from typing import Any
 
 import aiosqlite
 
-from app.config import settings
+from app.config import DATA_DIR
 from app.services.pihole.api_client import BLOCKED_STATUSES, QUERY_STATUS_LABELS
 
 logger = logging.getLogger(__name__)
@@ -146,8 +146,8 @@ def _escape_like(value: str) -> str:
 
 
 class LocalDatabase:
-    def __init__(self, path: str = settings.local_db_path) -> None:
-        self._path = path
+    def __init__(self, path: str | None = None) -> None:
+        self._path = path or str(DATA_DIR / "pihole_wtm.db")
 
     @asynccontextmanager
     async def _conn(self):

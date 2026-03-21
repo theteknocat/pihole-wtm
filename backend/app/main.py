@@ -4,9 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
 from app.routers.auth import router as auth_router
 from app.services.auth.middleware import require_session
 from app.services.auth.session_store import session_store
@@ -44,10 +42,11 @@ async def lifespan(app: FastAPI):
     await db.init()
     await db.flag_heuristic_uncategorized_for_reenrichment()
 
-    # If there's an active session (e.g. from a quick restart), resume sync
-    active = session_store.get_active()
-    if active:
-        await sync_manager.start_sync_service(active, sources, db)
+    # Start sync: prefer env var credentials (always-on), fall back to active session
+    if not await sync_manager.start_sync_from_env(sources, db):
+        active = session_store.get_active()
+        if active:
+            await sync_manager.start_sync_from_session(active, sources, db)
 
     yield
 
@@ -59,14 +58,6 @@ app = FastAPI(
     description="Pi-hole dashboard enriched with WhoTracksMe tracker intelligence",
     version="0.1.0",
     lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 # Auth routes — no session required
@@ -89,6 +80,8 @@ async def health() -> dict[str, Any]:
         "pihole_api_url": sync_manager.pihole._base_url if sync_manager.pihole else None,
         "version": "0.1.0",
         "sources": source_statuses,
+        "sync_active": sync_manager.sync_task is not None,
+        "sync_source": sync_manager.sync_source.value if sync_manager.sync_source else None,
         **sync_status,
     }
 

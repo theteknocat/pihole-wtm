@@ -10,7 +10,6 @@ with an ID greater than the highest one we've already stored.
 import asyncio
 import logging
 
-from app.config import settings
 from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
 from app.services.database import LocalDatabase
@@ -281,10 +280,14 @@ async def run_sync_loop(
 ) -> None:
     """
     Long-running background task. Syncs once immediately on startup,
-    then repeats every sync_interval_seconds. Also refreshes stale sources
+    then repeats on a fixed interval (default 60s). Also refreshes stale sources
     and runs RDAP upgrade passes periodically.
     """
-    logger.info("Sync service started (interval: %ds)", settings.sync_interval_seconds)
+    # Defaults — will be overridable from UI settings in a future update
+    SYNC_INTERVAL_SECONDS = 60
+    DATA_RETENTION_DAYS = 7
+
+    logger.info("Sync service started (interval: %ds)", SYNC_INTERVAL_SECONDS)
     _rdap_cycle = 0
     _RDAP_EVERY_N_CYCLES = 10  # run RDAP pass every 10 sync cycles (~10 minutes)
 
@@ -302,7 +305,7 @@ async def run_sync_loop(
 
         # Purge data older than the configured retention period
         try:
-            q_del, d_del = await db.purge_old_data(settings.data_retention_days)
+            q_del, d_del = await db.purge_old_data(DATA_RETENTION_DAYS)
             if q_del or d_del:
                 logger.info("Retention: purged %d queries, %d orphaned domains", q_del, d_del)
         except Exception:
@@ -317,4 +320,4 @@ async def run_sync_loop(
             except Exception:
                 logger.exception("RDAP re-enrichment failed — will retry next cycle")
 
-        await asyncio.sleep(settings.sync_interval_seconds)
+        await asyncio.sleep(SYNC_INTERVAL_SECONDS)

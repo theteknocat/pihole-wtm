@@ -32,11 +32,8 @@ class SessionStore:
 
     def __init__(self) -> None:
         self._session: Session | None = None
-
-    @property
-    def _max_idle(self) -> int:
         from app.config import settings
-        return settings.session_timeout_hours * 3600
+        self._max_idle = settings.session_timeout_hours * 3600
 
     def create(self, pihole_url: str, pihole_password: str) -> Session:
         """Create a new session, replacing any existing one."""

@@ -61,7 +61,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **Routers** handle HTTP routing and input validation. They read exclusively from the local SQLite database — they never call the Pi-hole API directly.
 
-**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configured retention period (default 7 days) and removes orphaned domain records. The Pi-hole API is only used by this service.
+**Sync Service** is a background asyncio coroutine that runs on a configurable interval (default 60 seconds). It fetches new queries from Pi-hole using cursor-based pagination (tracking the highest query ID seen), applies the enrichment pipeline, and writes results to the local database. Each cycle also purges queries older than the configurable retention period (default 7 days) and removes orphaned domain records. These settings will be adjustable via the dashboard UI (currently using hardcoded defaults). The Pi-hole API is only used by this service.
 
 **Local SQLite database (`pihole-wtm.db`)** is the single source of truth for the dashboard. It holds five tables:
 
@@ -95,7 +95,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **`trackerdb.db`** is Ghostery's TrackerDB compiled to SQLite. It contains tables for trackers, organisations, categories, and domain patterns. Released periodically on GitHub at [ghostery/trackerdb](https://github.com/ghostery/trackerdb/releases). Managed by `TrackerDBSource`.
 
-**Disconnect.me tracking protection lists** — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Loaded into memory on startup and refreshed when stale (configurable via `DISCONNECT_UPDATE_INTERVAL_HOURS`). Managed by `DisconnectSource`. Used as a secondary enrichment source for domains not in TrackerDB.
+**Disconnect.me tracking protection lists** — categorised domain lists covering Advertising, Analytics, Social, Content, and Cryptomining. Loaded into memory on startup and refreshed when stale (default 24 hours). Managed by `DisconnectSource`. Used as a secondary enrichment source for domains not in TrackerDB.
 
 **eTLD+1 heuristic** — a lightweight fallback for domains not matched by TrackerDB or Disconnect.me. Extracts a company name from the registered domain label and infers a tracker category from well-known subdomain keywords (e.g. `telemetry.*` → "telemetry", `analytics.*` → "analytics"). Less reliable than a curated database but meaningfully better than showing nothing.
 
@@ -140,7 +140,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 7. Update sync_state.last_query_id = highest ID processed
 
-8. Purge queries older than DATA_RETENTION_DAYS (default 7)
+8. Purge queries older than retention period (default 7 days)
    └─ Delete orphaned domain rows that no longer have any associated queries
 ```
 
@@ -169,9 +169,9 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
       └─ DisconnectSource: download and parse services.json into memory
 
 2. Each sync cycle: await source.refresh_if_stale() for each source
-   ├─ TrackerDBSource: re-downloads if file mtime exceeds TRACKERDB_UPDATE_INTERVAL_HOURS;
+   ├─ TrackerDBSource: re-downloads if file mtime exceeds update interval (default 24h);
    │  clears LRU cache only if the file actually changed
-   └─ DisconnectSource: re-downloads if loaded_at exceeds DISCONNECT_UPDATE_INTERVAL_HOURS
+   └─ DisconnectSource: re-downloads if loaded_at exceeds update interval (default 24h)
 
 3. Each source optionally registers debug routes via api_router():
    └─ /api/sources/{source_name}/status, /api/sources/{source_name}/lookup
@@ -274,10 +274,10 @@ pihole-wtm targets **Pi-hole v6** exclusively. Pi-hole v6 uses a REST API with s
 
 ## Security Considerations
 
-- The Pi-hole password is entered on the login page and held **in server memory only** — never stored in environment variables, config files, or the database. It is never logged and never returned by the pihole-wtm API.
+- The Pi-hole password is held **in server memory only** at runtime — either read from the `PIHOLE_API_PASSWORD` environment variable (for always-on sync) or entered on the login page (for session-driven sync). It is never written to disk by the application, never logged, and never returned by the pihole-wtm API.
 - Session tokens are stored in HTTP-only cookies with `samesite=strict` to prevent XSS and CSRF attacks.
 - All API routes (except `/api/auth/*`) are protected by the `require_session` dependency, which returns 401 if the session is missing or expired.
-- `TRACKERDB_PATH` and `LOCAL_DB_PATH` are validated to prevent path traversal.
+- Database paths are derived from the application's base directory — not user-configurable, preventing path traversal.
 - TrackerDB downloads are verified against the GitHub release asset (not arbitrary URLs).
 - nginx sets appropriate Content Security Policy headers.
 - The local SQLite database is read-write only by the backend process; it is never exposed directly.

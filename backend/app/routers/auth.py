@@ -13,11 +13,7 @@ import httpx
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
-from app.services.auth.config_store import (
-    get_pihole_url,
-    is_url_from_env,
-    save_pihole_url,
-)
+from app.services.auth.config_store import get_pihole_url_from_env
 from app.services.auth.middleware import SESSION_COOKIE
 from app.services.auth.session_store import session_store
 
@@ -28,7 +24,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 class LoginRequest(BaseModel):
     password: str
-    pihole_url: str | None = None  # Only used on first setup (tier 2)
+    pihole_url: str | None = None  # Required when no env var is set
 
 
 class LoginResponse(BaseModel):
@@ -40,7 +36,6 @@ class AuthStatusResponse(BaseModel):
     authenticated: bool
     pihole_url: str | None = None
     pihole_url_from_env: bool = False
-    pihole_url_saved: bool = False
 
 
 @router.get("/status")
@@ -49,12 +44,14 @@ async def auth_status(request: Request) -> AuthStatusResponse:
     session_id = request.cookies.get(SESSION_COOKIE)
     session = session_store.get(session_id) if session_id else None
 
-    url = await get_pihole_url()
+    env_url = get_pihole_url_from_env()
+    # URL comes from env var, or from the active session if logged in
+    url = env_url or (session.pihole_url if session else None)
+
     return AuthStatusResponse(
         authenticated=session is not None,
         pihole_url=url,
-        pihole_url_from_env=is_url_from_env(),
-        pihole_url_saved=url is not None and not is_url_from_env(),
+        pihole_url_from_env=env_url is not None,
     )
 
 
@@ -64,7 +61,7 @@ async def check_pihole_url(url: str | None = None) -> dict[str, Any]:
     Check if a Pi-hole URL is reachable. Uses the configured URL if none provided.
     Calls the unauthenticated Pi-hole API info endpoint.
     """
-    target_url = url or await get_pihole_url()
+    target_url = url or get_pihole_url_from_env()
     if not target_url:
         return {"reachable": False, "error": "No Pi-hole URL configured"}
 
@@ -95,12 +92,9 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
     Authenticate using the Pi-hole password.
 
     On success, creates a server-side session and sets an HTTP-only cookie.
-    If pihole_url is provided and no URL is set via env var, saves it for future use.
     """
-    # Resolve Pi-hole URL
-    url = await get_pihole_url()
-    if body.pihole_url and not is_url_from_env():
-        url = body.pihole_url.rstrip("/")
+    # Resolve Pi-hole URL: env var takes priority, otherwise use the one from the login form
+    url = get_pihole_url_from_env() or (body.pihole_url.rstrip("/") if body.pihole_url else None)
 
     if not url:
         response.status_code = 400
@@ -133,10 +127,6 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
             status="Invalid password", pihole_url=url
         )
 
-    # Password verified — save URL if it was entered manually (tier 2)
-    if body.pihole_url and not is_url_from_env():
-        await save_pihole_url(url)
-
     # Invalidate the Pi-hole session we just created for verification —
     # PiholeApiClient will create its own when the sync service starts
     try:
@@ -162,9 +152,10 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
     )
 
     # Start the sync service with the new session credentials
-    from app.services.sync_manager import start_sync_service
+    # (no-op if already running from env vars)
+    from app.services.sync_manager import start_sync_from_session
     from app.main import sources, db
-    await start_sync_service(session, sources, db)
+    await start_sync_from_session(session, sources, db)
 
     logger.info("User authenticated successfully for Pi-hole at %s", url)
     return LoginResponse(status="ok", pihole_url=url)
@@ -177,9 +168,9 @@ async def logout(request: Request, response: Response) -> dict[str, str]:
     if session_id:
         session_store.delete(session_id)
 
-    # Stop the sync service — no active session means no sync
-    from app.services.sync_manager import stop_sync_service
-    await stop_sync_service()
+    # Stop session-driven sync (no-op if sync is running from env vars)
+    from app.services.sync_manager import stop_session_sync
+    await stop_session_sync()
 
     response.delete_cookie(key=SESSION_COOKIE)
     return {"status": "ok"}
