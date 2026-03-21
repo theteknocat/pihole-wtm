@@ -22,24 +22,21 @@ const excludedCompanies = ref<string[]>([])
 const excludedDomains = ref<string[]>([])
 
 
-// Split categories into two columns (first half / second half, both alphabetical)
-const excludedCategoriesFormatted = computed(() => {
-  return excludedCategories.value.map(c => formatCategory(c))
-})
+// Category objects: { label: "Advertising", value: "ad" }
+interface CategoryOption { label: string; value: string }
 
-// Category autocomplete suggestions (filtered against already-excluded)
-const categorySuggestions = ref<string[]>([])
+const excludedCategoryObjects = computed(() =>
+  excludedCategories.value.map(c => ({ label: formatCategory(c), value: c }))
+)
+
+const categorySuggestions = ref<CategoryOption[]>([])
 
 function searchCategories(event: { query: string }) {
-  const q = event.query.toLowerCase();
-  categorySuggestions.value = availableCategories.value.filter(
-    c => c.toLowerCase().includes(q) && !excludedCategories.value.includes(c)
-  )
+  const q = event.query.toLowerCase()
+  categorySuggestions.value = availableCategories.value
+    .filter(c => !excludedCategories.value.includes(c) && formatCategory(c).toLowerCase().includes(q))
+    .map(c => ({ label: formatCategory(c), value: c }))
 }
-
-const categorySuggestionsFormatted = computed(() => {
-  return categorySuggestions.value.map(c => formatCategory(c))
-})
 
 // Company autocomplete suggestions (filtered against already-excluded)
 const companySuggestions = ref<string[]>([])
@@ -56,11 +53,8 @@ function onCompaniesChanged(value: string[]) {
   scheduleSave()
 }
 
-function onCategoriesChanged(value: string[]) {
-  excludedCategories.value = availableCategories.value.filter(c => {
-    let cFormatted = formatCategory(c)
-    return value.includes(cFormatted)
-  })
+function onCategoriesChanged(value: CategoryOption[]) {
+  excludedCategories.value = value.map(v => v.value)
   scheduleSave()
 }
 
@@ -169,10 +163,11 @@ onMounted(async () => {
       <div>
         <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Excluded Categories</h3>
         <AutoComplete
-          :model-value="excludedCategoriesFormatted"
+          :model-value="excludedCategoryObjects"
           :multiple="true"
-          :suggestions="categorySuggestionsFormatted"
+          :suggestions="categorySuggestions"
           :dropdown="true"
+          optionLabel="label"
           placeholder="Category name..."
           class="w-full"
           @complete="searchCategories"
