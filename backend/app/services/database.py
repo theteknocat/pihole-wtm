@@ -149,25 +149,33 @@ def _escape_like(value: str) -> str:
 class LocalDatabase:
     def __init__(self, path: str | None = None) -> None:
         self._path = path or str(DATA_DIR / "pihole_wtm.db")
+        self._db: aiosqlite.Connection | None = None
 
     @asynccontextmanager
     async def _conn(self):
-        """Open a database connection with foreign keys enforced."""
-        async with aiosqlite.connect(self._path) as db:
-            await db.execute("PRAGMA foreign_keys=ON")
-            yield db
+        """Yield the persistent database connection."""
+        if self._db is None:
+            raise RuntimeError("Database not initialised — call init() first")
+        yield self._db
 
     async def init(self) -> None:
-        """Apply pending migrations and seed sync_state if this is a fresh database."""
-        async with self._conn() as db:
-            await db.execute("PRAGMA journal_mode=WAL")
-            await _apply_migrations(db)
-            # Seed sync_state row if missing (fresh DB)
-            await db.execute(
-                "INSERT OR IGNORE INTO sync_state (id, last_query_id) VALUES (1, 0)"
-            )
-            await db.commit()
+        """Open the persistent connection, apply migrations, and seed sync_state."""
+        self._db = await aiosqlite.connect(self._path)
+        await self._db.execute("PRAGMA foreign_keys=ON")
+        await self._db.execute("PRAGMA journal_mode=WAL")
+        await _apply_migrations(self._db)
+        # Seed sync_state row if missing (fresh DB)
+        await self._db.execute(
+            "INSERT OR IGNORE INTO sync_state (id, last_query_id) VALUES (1, 0)"
+        )
+        await self._db.commit()
         logger.info("Local database initialised at %s", self._path)
+
+    async def close(self) -> None:
+        """Close the persistent database connection."""
+        if self._db is not None:
+            await self._db.close()
+            self._db = None
 
     # -------------------------------------------------------------------------
     # Sync state

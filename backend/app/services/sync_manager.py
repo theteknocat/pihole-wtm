@@ -35,6 +35,7 @@ class SyncSource(Enum):
 pihole: PiholeApiClient | None = None
 sync_task: asyncio.Task | None = None
 sync_source: SyncSource | None = None
+_wake_event: asyncio.Event = asyncio.Event()
 
 
 async def start_sync_from_env(sources: list[Any], db: Any) -> bool:
@@ -53,7 +54,7 @@ async def start_sync_from_env(sources: list[Any], db: Any) -> bool:
         base_url=settings.pihole_api_url,
         password=settings.pihole_api_password,
     )
-    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db))
+    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db, _wake_event))
     sync_source = SyncSource.ENV
     logger.info("Sync service started from env vars for %s", settings.pihole_api_url)
     return True
@@ -77,9 +78,14 @@ async def start_sync_from_session(session: Session, sources: list[Any], db: Any)
         base_url=session.pihole_url,
         password=session.pihole_password,
     )
-    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db))
+    sync_task = asyncio.create_task(run_sync_loop(pihole, sources, db, _wake_event))
     sync_source = SyncSource.SESSION
     logger.info("Sync service started from session for %s", session.pihole_url)
+
+
+def trigger_sync() -> None:
+    """Signal the sync loop to wake up and run immediately."""
+    _wake_event.set()
 
 
 async def stop_session_sync() -> None:

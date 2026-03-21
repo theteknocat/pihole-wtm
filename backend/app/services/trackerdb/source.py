@@ -91,8 +91,31 @@ class TrackerDBSource:
     def __init__(self) -> None:
         self._path = DATA_DIR / "trackerdb.db"
         self._cache: LRUCache = LRUCache(maxsize=_CACHE_SIZE)
+        self._db: aiosqlite.Connection | None = None  # persistent read connection
+        self._refreshing = False  # True while the DB file is being re-downloaded
+        self._lookup_failed = False  # Set on first lookup error; cleared on next successful refresh
 
     # -- Lifecycle ------------------------------------------------------------
+
+    async def _open_db(self) -> None:
+        """Open (or reopen) the persistent read connection to trackerdb.db."""
+        if self._db is not None:
+            try:
+                await self._db.close()
+            except Exception:
+                pass
+        if self._path.exists():
+            self._db = await aiosqlite.connect(str(self._path))
+            self._db.row_factory = aiosqlite.Row
+
+    async def _close_db(self) -> None:
+        """Close the persistent connection (e.g. before replacing the file)."""
+        if self._db is not None:
+            try:
+                await self._db.close()
+            except Exception:
+                pass
+            self._db = None
 
     async def initialize(self) -> None:
         """Download trackerdb.db from GitHub Releases if missing or stale."""
@@ -100,9 +123,12 @@ class TrackerDBSource:
 
         if not self._is_stale():
             logger.debug("TrackerDB is up to date at %s", self._path)
+            await self._open_db()
             return
 
         logger.info("TrackerDB is missing or stale — downloading from GitHub Releases")
+        self._refreshing = True
+        await self._close_db()
         try:
             download_url, tag = await self._get_download_url()
             logger.info("Downloading TrackerDB release %s", tag)
@@ -113,13 +139,17 @@ class TrackerDBSource:
                 logger.warning("TrackerDB download failed, keeping existing file: %s", e)
             else:
                 raise TrackerDbLoadError(f"TrackerDB unavailable and no local copy: {e}") from e
+        finally:
+            self._refreshing = False
+            self._lookup_failed = False
+            await self._open_db()
 
     async def refresh_if_stale(self) -> None:
         """Re-download TrackerDB if the file has become stale."""
         if not self._is_stale():
             return
         mtime_before = self._path.stat().st_mtime if self._path.exists() else None
-        await self.initialize()
+        await self.initialize()  # handles close/reopen internally
         mtime_after = self._path.stat().st_mtime if self._path.exists() else None
         if mtime_after != mtime_before:
             self._cache.clear()
@@ -188,12 +218,12 @@ class TrackerDBSource:
 
     async def get_categories(self) -> list[dict[str, Any]]:
         """Return all TrackerDB categories with their domain counts."""
+        if self._db is None:
+            return []
         try:
-            async with aiosqlite.connect(str(self._path)) as db:
-                db.row_factory = aiosqlite.Row
-                async with db.execute(_CATEGORIES_SQL) as cursor:
-                    rows = await cursor.fetchall()
-                    return [{"category": row["name"], "domain_count": row["domain_count"]} for row in rows]
+            async with self._db.execute(_CATEGORIES_SQL) as cursor:
+                rows = await cursor.fetchall()
+                return [{"category": row["name"], "domain_count": row["domain_count"]} for row in rows]
         except Exception as e:
             logger.warning("TrackerDB categories query failed: %s", e)
             return []
@@ -271,21 +301,23 @@ class TrackerDBSource:
 
     async def _lookup_domain(self, domain: str) -> TrackerInfo | None:
         """Return tracker info for an exact domain match, or None."""
+        if self._refreshing or self._lookup_failed or self._db is None:
+            return None
         try:
-            async with aiosqlite.connect(str(self._path)) as db:
-                db.row_factory = aiosqlite.Row
-                async with db.execute(_LOOKUP_SQL, (domain,)) as cursor:
-                    row = await cursor.fetchone()
-                    if row is None:
-                        return None
-                    return TrackerInfo(
-                        tracker_name=row["tracker_name"],
-                        category=row["category"] or "misc",
-                        company_name=row["company_name"],
-                        company_country=row["company_country"],
-                    )
+            async with self._db.execute(_LOOKUP_SQL, (domain,)) as cursor:
+                row = await cursor.fetchone()
+                if row is None:
+                    return None
+                return TrackerInfo(
+                    tracker_name=row["tracker_name"],
+                    category=row["category"] or "misc",
+                    company_name=row["company_name"],
+                    company_country=row["company_country"],
+                )
         except Exception as e:
-            logger.warning("TrackerDB lookup failed for %s: %s", domain, e)
+            if not self._lookup_failed:
+                logger.warning("TrackerDB unavailable, skipping lookups until next refresh: %s", e)
+            self._lookup_failed = True
             return None
 
     async def _lookup_with_fallback(self, domain: str) -> TrackerInfo | None:

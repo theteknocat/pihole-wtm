@@ -9,6 +9,7 @@ with an ID greater than the highest one we've already stored.
 
 import asyncio
 import logging
+import time
 
 from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
@@ -74,72 +75,38 @@ async def _gate_from_sources(
     return None, None
 
 
-async def _sync_once(
-    pihole: PiholeApiClient,
+async def _process_batch(
+    raw_queries: list[RawQuery],
     sources: list[TrackerSource],
     db: LocalDatabase,
+    exact_cache: dict[str, tuple[TrackerInfo | None, str | None]],
 ) -> int:
     """
-    Run one sync cycle. Fetches all queries newer than our last stored ID,
-    filters to relevant ones (blocked + known-tracker allowed), enriches,
-    and persists. Returns the number of new queries stored.
+    Filter, enrich, and persist a batch of raw Pi-hole queries.
+
+    Returns the number of queries stored. The exact_cache is shared across
+    batches within a sync cycle so repeated domains aren't re-looked-up.
     """
-    last_id = await db.get_last_query_id()
-
-    # Collect all new queries by paging backwards through Pi-hole until we
-    # reach a query ID we've already seen. Cap at 500 pages (50k queries)
-    # to avoid runaway fetching on a Pi-hole with a very large history.
-    _MAX_PAGES = 500
-    new_queries: list[RawQuery] = []
-    cursor: int | None = None
-
-    for _ in range(_MAX_PAGES):
-        batch, _ = await pihole.get_queries(limit=100, cursor=cursor)
-        if not batch:
-            break
-
-        # Queries come newest-first; separate new from already-seen
-        new_in_batch = [q for q in batch if q.id > last_id]
-        new_queries.extend(new_in_batch)
-
-        # If the batch contains any already-seen ID, we've caught up
-        if len(new_in_batch) < len(batch):
-            break
-
-        # Advance cursor to fetch the next (older) page
-        cursor = batch[-1].id
-    else:
-        logger.warning("Sync hit page cap (%d pages) — some older queries may be skipped", _MAX_PAGES)
-
-    if not new_queries:
-        return 0
-
     # Filter: always store blocked queries; store allowed queries only when the
     # domain is an exact match in any configured source. No subdomain fallback
     # here — fallback would cause legitimate subdomains (mail.google.com,
     # calendar.google.com) to match their parent company's tracker entry and be
     # incorrectly stored as ad-network traffic.
-    #
-    # A per-cycle cache avoids repeated lookups for the same domain within one
-    # batch. The gating result is reused directly for allowed-query enrichment,
-    # eliminating a redundant second lookup.
     to_store: list[RawQuery] = []
-    allowed_enrichment: dict[int, tuple[TrackerInfo, str]] = {}  # query id → (result, source)
-    _exact_cache: dict[str, tuple[TrackerInfo | None, str | None]] = {}
+    allowed_enrichment: dict[int, tuple[TrackerInfo, str]] = {}
 
-    for q in new_queries:
+    for q in raw_queries:
         if q.status in BLOCKED_STATUSES:
             to_store.append(q)
         else:
-            if q.domain not in _exact_cache:
-                _exact_cache[q.domain] = await _gate_from_sources(q.domain, sources)
-            result, source_name = _exact_cache[q.domain]
+            if q.domain not in exact_cache:
+                exact_cache[q.domain] = await _gate_from_sources(q.domain, sources)
+            result, source_name = exact_cache[q.domain]
             if result is not None:
                 to_store.append(q)
                 allowed_enrichment[q.id] = (result, source_name)
 
     if not to_store:
-        await db.update_sync_state(max(q.id for q in new_queries))
         return 0
 
     # Ensure a domain row exists for each unique domain
@@ -188,22 +155,101 @@ async def _sync_once(
     ]
     await db.insert_queries(query_rows)
 
-    # Update the sync cursor to the highest ID we processed from Pi-hole
-    # (not just to_store — we don't want to re-examine skipped allowed queries)
-    await db.update_sync_state(max(q.id for q in new_queries))
+    return len(to_store)
 
-    logger.info(
-        "Sync: %d new Pi-hole queries → %d stored (%d skipped as non-tracker allowed)",
-        len(new_queries),
-        len(to_store),
-        len(new_queries) - len(to_store),
-    )
+
+_BATCH_SIZE = 5000  # queries per processing batch during sync
+
+
+async def _sync_once(
+    pihole: PiholeApiClient,
+    sources: list[TrackerSource],
+    db: LocalDatabase,
+) -> int:
+    """
+    Run one sync cycle. Fetches queries newer than our last stored ID in
+    pages from Pi-hole, processing them in batches so data appears on the
+    dashboard progressively rather than all at once.
+
+    Stops fetching once queries fall outside the configured data retention
+    period — there's no point pulling in data that would be immediately purged.
+    """
+    last_id = await db.get_last_query_id()
+
+    # Don't fetch queries older than the retention window
+    retention_val = await db.get_config("data_retention_days")
+    retention_days = int(retention_val) if retention_val is not None else 7
+    cutoff_ts = time.time() - (retention_days * 86400)
+
+    # Shared across batches so repeated domains aren't re-looked-up
+    exact_cache: dict[str, tuple[TrackerInfo | None, str | None]] = {}
+
+    total_fetched = 0
+    total_stored = 0
+    cursor: int | None = None
+    pending: list[RawQuery] = []
+    highest_id = last_id
+    done = False
+
+    while not done:
+        batch, _ = await pihole.get_queries(limit=100, cursor=cursor)
+        if not batch:
+            break
+
+        # Queries come newest-first; separate new from already-seen
+        new_in_batch = [q for q in batch if q.id > last_id]
+
+        # Drop queries older than the retention cutoff and stop paging
+        within_retention = [q for q in new_in_batch if q.timestamp >= cutoff_ts]
+        if len(within_retention) < len(new_in_batch):
+            done = True
+            new_in_batch = within_retention
+
+        pending.extend(new_in_batch)
+        total_fetched += len(new_in_batch)
+
+        # Track the highest ID across all fetched queries
+        if new_in_batch:
+            highest_id = max(highest_id, max(q.id for q in new_in_batch))
+
+        # If the batch contains any already-seen ID, we've caught up
+        if not done and len(new_in_batch) < len(batch):
+            done = True
+
+        # Process a batch once we've accumulated enough (or we're done fetching)
+        if len(pending) >= _BATCH_SIZE or done:
+            if pending:
+                stored = await _process_batch(pending, sources, db, exact_cache)
+                total_stored += stored
+                await db.update_sync_state(highest_id)
+                logger.info(
+                    "Sync: processed %d queries (%d stored, %d total so far)",
+                    len(pending), stored, total_stored,
+                )
+                pending = []
+
+        if not done:
+            # Advance cursor to fetch the next (older) page
+            cursor = batch[-1].id
+
+    if total_fetched == 0:
+        return 0
+
+    # Update sync cursor to the highest ID even if nothing was stored
+    # (so we don't re-examine skipped allowed queries)
+    await db.update_sync_state(highest_id)
+
+    if total_stored:
+        logger.info(
+            "Sync complete: %d Pi-hole queries → %d stored (%d skipped as non-tracker allowed)",
+            total_fetched, total_stored, total_fetched - total_stored,
+        )
 
     # Re-enrich any previously stored domains that had no enrichment yet.
     # This catches domains stored before a new source was available.
     await _reenrich_missing(sources, db)
 
-    return len(to_store)
+    return total_stored
 
 
 async def _reenrich_missing(
@@ -277,6 +323,7 @@ async def run_sync_loop(
     pihole: PiholeApiClient,
     sources: list[TrackerSource],
     db: LocalDatabase,
+    wake_event: asyncio.Event | None = None,
 ) -> None:
     """
     Long-running background task. Syncs once immediately on startup,
@@ -285,6 +332,9 @@ async def run_sync_loop(
 
     Settings are read from the database each cycle so changes take effect
     without a restart.
+
+    If wake_event is provided, setting it will skip the sleep and trigger
+    an immediate sync cycle (e.g. after a data reset).
     """
     # Defaults used when no database setting exists
     _DEFAULTS = {
@@ -342,4 +392,13 @@ async def run_sync_loop(
                 logger.exception("RDAP re-enrichment failed — will retry next cycle")
 
         interval = await _get_setting("sync_interval_seconds")
-        await asyncio.sleep(interval)
+        if wake_event:
+            # Wait for the interval OR until the event is signalled, whichever
+            # comes first. Clear the event so the next cycle sleeps normally.
+            try:
+                await asyncio.wait_for(wake_event.wait(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass
+            wake_event.clear()
+        else:
+            await asyncio.sleep(interval)
