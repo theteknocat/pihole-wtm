@@ -112,14 +112,14 @@ onUnmounted(() => {
 
       <!-- Sync status -->
       <span
-        class="flex items-center gap-1"
-        :title="health.sync_source === 'session'
+        class="flex items-center gap-3"
+        v-tooltip.top="health.sync_source === 'session'
           ? 'Sync runs only while logged in — set PIHOLE_API_PASSWORD for always-on sync'
           : health.sync_source === 'env'
             ? 'Sync runs continuously from environment config'
             : 'Sync not running'"
       >
-        Last sync {{ syncAgo }}
+        <span>Last sync {{ syncAgo }}</span>
         <i
           v-if="health.sync_source === 'session'"
           class="pi pi-info-circle text-amber-500 dark:text-amber-400"
