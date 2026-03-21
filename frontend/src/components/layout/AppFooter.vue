@@ -81,7 +81,7 @@ onUnmounted(() => {
       <span class="text-gray-300 dark:text-gray-600">|</span>
 
       <!-- Pi-hole status -->
-      <span class="flex items-center gap-1">
+      <span class="flex items-center gap-2">
         <i
           :class="health.pihole_api_url
             ? 'pi pi-check-circle text-green-500 dark:text-green-400'
@@ -96,7 +96,7 @@ onUnmounted(() => {
       <template v-for="(source, i) in health.sources" :key="source.name">
         <span v-if="i > 0" class="text-gray-300 dark:text-gray-600">|</span>
         <span
-          class="flex items-center gap-1"
+          class="flex items-center gap-2"
           :title="source.loaded ? `${source.domain_count.toLocaleString()} domains` : 'Not loaded'"
         >
         <i
@@ -111,7 +111,8 @@ onUnmounted(() => {
       <span class="text-gray-300 dark:text-gray-600">|</span>
 
       <!-- Sync status -->
-      <span class="flex items-center gap-3">
+      <span class="flex items-center gap-2">
+        <i class="pi pi-sync" />
         <span>Last sync {{ syncAgo }}</span>
         <span v-if="health.sync_source === 'session'"
           v-tooltip.top="'Sync runs only while logged in — set PIHOLE_API_PASSWORD for always-on sync'"
@@ -125,7 +126,10 @@ onUnmounted(() => {
       <span class="text-gray-300 dark:text-gray-600">|</span>
 
       <!-- Stored queries -->
-      <span>{{ health.stored_queries.toLocaleString() }} queries</span>
+      <span class="flex items-center gap-2">
+        <i class="pi pi-globe" />
+        {{ health.stored_queries.toLocaleString() }} queries
+      </span>
 
     </template>
     <template v-else>
