@@ -39,8 +39,8 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [x] 24h / 7d time window selection, persisted across views via Pinia store
 - [x] Dark mode (system default, persisted to localStorage)
 - [x] `DetailedReportView` — domain/device breakdown with togglable grouping, category/company/device filters, navigated from dashboard
-- [x] `SettingsSidebar` — slide-in panel with data reset (inline confirm/cancel) and manual refresh
-- [x] Auto-refresh of all visible reports after data reset; manual refresh button on each view
+- [x] `SettingsSidebar` — slide-in panel with data reset (inline confirm/cancel)
+- [x] Auto-refresh of all visible reports (30s interval and after settings changes)
 - [x] `ClientNameDialog` — modal for assigning/clearing friendly names for client IP addresses
 - [x] `DeviceStatsDialog` — per-device tracker breakdown chart with category/company toggle and click-through drill-down
 - [x] Per-device query breakdown on Detailed Report (device grouping mode)
