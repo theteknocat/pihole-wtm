@@ -25,7 +25,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 │  │   Routers   │──────────────────────────────┐                  │
 │  │ /stats      │                              │                  │
 │  │ /queries    │                              │                  │
-│  │ /config     │                              ▼                  │
+│  │ /settings   │                              ▼                  │
 │  │ /clients    │         ┌────────────────────────────────────┐  │
 │  │ /debug      │         │     Local SQLite (pihole-wtm.db)   │  │
 │  └─────────────┘         │                                    │  │

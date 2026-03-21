@@ -29,6 +29,7 @@ This means:
    - Deletes the pihole-wtm session
    - Stops the background sync service (only if session-driven — env-var-driven sync continues)
    - Clears the session cookie
+   - Clears the Pi-hole URL from frontend state (unless configured via `PIHOLE_API_URL` env var, in which case it is preserved)
 
 ## Pi-hole URL Configuration
 
@@ -76,7 +77,7 @@ All API routes except `/api/auth/*` are protected by the `require_session` FastA
 
 - **Vue Router guard** (`beforeEach` in `router.ts`): checks session status on first navigation via `GET /api/auth/status`. Redirects unauthenticated users to `/login` and authenticated users away from `/login`.
 - **`apiFetch` wrapper** (`utils/api.ts`): wraps `fetch()` for all authenticated API calls. On a 401 response (session expired mid-use), clears the auth state and navigates to `/login` via the Vue Router. A `redirecting` flag prevents multiple concurrent redirects.
-- **Auth composable** (`useAuth.ts`): module-level reactive refs shared across all consumers. Provides `isAuthenticated`, `piholeUrl`, `checking`, `checkSession()`, `login()`, and `logout()`.
+- **Auth composable** (`useAuth.ts`): module-level reactive refs shared across all consumers. Provides `isAuthenticated`, `piholeUrl`, `piholeUrlFromEnv`, `checking`, `checkSession()`, `login()`, and `logout()`.
 
 ## Sync Service Lifecycle
 
@@ -127,6 +128,6 @@ The sync manager (`sync_manager.py`) tracks which mode started the sync and ensu
 
 - `views/LoginView.vue` — URL field (read-only or editable with InputGroup), reachability check, password field, login form
 - `router.ts` — route definitions, `beforeEach` navigation guard, `getRouter()` export for use by `apiFetch`
-- `composables/useAuth.ts` — module-level reactive auth state, `checkSession()`, `login()`, `logout()`
+- `composables/useAuth.ts` — module-level reactive auth state (`isAuthenticated`, `piholeUrl`, `piholeUrlFromEnv`, `checking`), `checkSession()`, `login()`, `logout()`
 - `utils/api.ts` — `apiFetch` wrapper with 401 redirect handling
 - `App.vue` — header/nav hidden when unauthenticated, sign-out button
