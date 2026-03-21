@@ -2,9 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
+import AutoComplete from 'primevue/autocomplete'
 import ProgressSpinner from 'primevue/progressspinner'
-import Button from 'primevue/button'
 import { useWindowStore } from '@/stores/window'
 import { formatCategory } from '@/utils/format'
 import { apiFetch } from '@/utils/api'
@@ -23,7 +22,7 @@ const availableCompanies = ref<string[]>([])
 const excludedCategories = ref<Set<string>>(new Set())
 const excludedCompanies = ref<Set<string>>(new Set())
 const excludedDomains = ref<string[]>([])
-const newDomain = ref('')
+
 
 // Split categories into two columns (first half / second half, both alphabetical)
 const categoryColumns = computed(() => {
@@ -102,17 +101,8 @@ function toggleCompany(company: string) {
   scheduleSave()
 }
 
-function addDomain() {
-  const d = newDomain.value.trim().toLowerCase()
-  if (d && !excludedDomains.value.includes(d)) {
-    excludedDomains.value.push(d)
-    scheduleSave()
-  }
-  newDomain.value = ''
-}
-
-function removeDomain(domain: string) {
-  excludedDomains.value = excludedDomains.value.filter(d => d !== domain)
+function onDomainsChanged(value: string[]) {
+  excludedDomains.value = value.map(d => d.trim().toLowerCase()).filter(Boolean)
   scheduleSave()
 }
 
@@ -211,33 +201,16 @@ onMounted(async () => {
       <div>
         <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Excluded Domains</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          Specific domains to always hide.
+          Specific domains to always hide. Press Enter to add.
         </p>
-        <div class="flex gap-2 mb-2">
-          <InputText
-            v-model="newDomain"
-            placeholder="e.g. example.tracker.com"
-            class="flex-1"
-            size="small"
-            @keyup.enter="addDomain"
-          />
-          <Button label="Add" icon="pi pi-plus" size="small" :disabled="!newDomain.trim()" @click="addDomain" />
-        </div>
-        <div v-if="excludedDomains.length" class="flex flex-wrap gap-1">
-          <Tag
-            v-for="domain in excludedDomains"
-            :key="domain"
-            severity="secondary"
-            class="cursor-pointer"
-            @click="removeDomain(domain)"
-            v-tooltip.top="'Click to remove'"
-          >
-            <template #default>
-              <span class="text-xs">{{ domain }}</span>
-              <i class="pi pi-times text-xs ml-1" />
-            </template>
-          </Tag>
-        </div>
+        <AutoComplete
+          :model-value="excludedDomains"
+          :multiple="true"
+          :typeahead="false"
+          placeholder="e.g. example.tracker.com"
+          class="w-full"
+          @update:model-value="onDomainsChanged"
+        />
       </div>
     </div>
   </div>
