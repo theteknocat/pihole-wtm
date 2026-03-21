@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Skeleton from 'primevue/skeleton'
-import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import ToggleButton from 'primevue/togglebutton'
 import CategoryBarChart from '@/components/dashboard/CategoryBarChart.vue'
@@ -130,20 +129,10 @@ watch(trackerOnly, fetchRecentQueries)
           :allow-empty="false"
           :size="scrolled ? 'small' : undefined"
         />
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          :size="scrolled ? 'small' : undefined"
-          aria-label="Refresh"
-          @click="fetchStats()"
-        />
       </div>
     </div>
 
-    <!-- Refresh error (shown over existing data) -->
+    <!-- Auto-refresh error (shown over existing data) -->
     <div v-if="error && stats" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
 
     <!-- Loading skeletons -->

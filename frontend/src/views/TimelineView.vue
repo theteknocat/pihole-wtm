@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Skeleton from 'primevue/skeleton'
-import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import TimelineChart from '@/components/timeline/TimelineChart.vue'
 import DeviceTimelineChart from '@/components/timeline/DeviceTimelineChart.vue'
@@ -85,20 +84,10 @@ watch(() => windowStore.refreshKey, fetchTimeline)
           :allow-empty="false"
           :size="scrolled ? 'small' : undefined"
         />
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          :size="scrolled ? 'small' : undefined"
-          aria-label="Refresh"
-          @click="fetchTimeline()"
-        />
       </div>
     </div>
 
-    <!-- Refresh error (shown over existing data) -->
+    <!-- Auto-refresh error (shown over existing data) -->
     <div v-if="error && timeline" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
 
     <!-- Loading skeletons -->

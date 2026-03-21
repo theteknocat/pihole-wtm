@@ -273,16 +273,6 @@ watch(() => route.query, (q) => {
           :allow-empty="false"
           :size="scrolled ? 'small' : undefined"
         />
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          :size="scrolled ? 'small' : undefined"
-          aria-label="Refresh"
-          @click="fetchData()"
-        />
       </div>
     </div>
 
