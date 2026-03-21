@@ -125,14 +125,13 @@ async def queries(
     return {"queries": results, "cursor": next_cursor}
 
 
+_EXCLUSION_KEYS = ("excluded_categories", "excluded_companies", "excluded_domains")
+
+
 async def _get_exclusions() -> dict[str, list[str]]:
     """Read user exclusion config from the database."""
     raw = await db.get_all_config()
-    return {
-        "excluded_categories": json.loads(raw.get("excluded_categories", "[]")),
-        "excluded_companies": json.loads(raw.get("excluded_companies", "[]")),
-        "excluded_domains": json.loads(raw.get("excluded_domains", "[]")),
-    }
+    return {k: json.loads(raw.get(k, "[]")) for k in _EXCLUSION_KEYS}
 
 
 @app.get("/api/stats/trackers", dependencies=[Depends(require_session)])
@@ -194,38 +193,62 @@ async def stats_clients(
     return await db.fetch_client_stats(hours=hours, category=category, company=company, **excl)
 
 
-@app.get("/api/config", dependencies=[Depends(require_session)])
-async def get_config() -> dict[str, Any]:
-    """Return all user configuration as a structured object."""
-    raw = await db.get_all_config()
-    return {
-        "excluded_categories": json.loads(raw.get("excluded_categories", "[]")),
-        "excluded_companies": json.loads(raw.get("excluded_companies", "[]")),
-        "excluded_domains": json.loads(raw.get("excluded_domains", "[]")),
-    }
-
-
-@app.put("/api/config", dependencies=[Depends(require_session)])
-async def put_config(request: Request) -> dict[str, str]:
-    """Update user configuration. Accepts partial updates."""
-    body = await request.json()
-    items: dict[str, str] = {}
-    for key in ("excluded_categories", "excluded_companies", "excluded_domains"):
-        if key in body:
-            if not isinstance(body[key], list):
-                raise HTTPException(status_code=422, detail=f"{key} must be an array")
-            items[key] = json.dumps(body[key])
-    if items:
-        await db.set_config_bulk(items)
-    return {"status": "ok"}
-
-
-@app.get("/api/config/options", dependencies=[Depends(require_session)])
-async def config_options() -> dict[str, Any]:
+@app.get("/api/settings/options", dependencies=[Depends(require_session)])
+async def settings_options() -> dict[str, Any]:
     """Return the available categories and companies from stored data."""
     categories = await db.get_available_categories()
     companies = await db.get_available_companies()
     return {"categories": categories, "companies": companies}
+
+
+# ---- Settings (all stored in user_config, auto-saved from the UI) -----------
+
+# Key → (default, min, max) for each integer setting.
+_INT_SETTINGS: dict[str, tuple[int, int, int]] = {
+    "sync_interval_seconds": (60, 10, 3600),
+    "data_retention_days": (7, 1, 365),
+    "trackerdb_update_interval_hours": (24, 0, 720),
+    "disconnect_update_interval_hours": (24, 0, 720),
+}
+
+
+@app.get("/api/settings", dependencies=[Depends(require_session)])
+async def get_settings() -> dict[str, Any]:
+    """Return all settings: integer operational settings + exclusion lists."""
+    raw = await db.get_all_config()
+    result: dict[str, Any] = {}
+    for key, (default, _, _) in _INT_SETTINGS.items():
+        val = raw.get(key)
+        result[key] = int(val) if val is not None else default
+    for key in _EXCLUSION_KEYS:
+        result[key] = json.loads(raw.get(key, "[]"))
+    return result
+
+
+@app.put("/api/settings/{key}", dependencies=[Depends(require_session)])
+async def put_setting(key: str, request: Request) -> dict[str, str]:
+    """Update a single setting. Integer settings expect { "value": <int> },
+    exclusion lists expect { "value": [<strings>] }."""
+    body = await request.json()
+    value = body.get("value")
+
+    if key in _INT_SETTINGS:
+        if not isinstance(value, int):
+            raise HTTPException(status_code=422, detail="value must be an integer")
+        _, min_val, max_val = _INT_SETTINGS[key]
+        if value < min_val or value > max_val:
+            raise HTTPException(
+                status_code=422, detail=f"{key} must be between {min_val} and {max_val}"
+            )
+        await db.set_config(key, str(value))
+    elif key in _EXCLUSION_KEYS:
+        if not isinstance(value, list):
+            raise HTTPException(status_code=422, detail="value must be an array")
+        await db.set_config(key, json.dumps(value))
+    else:
+        raise HTTPException(status_code=404, detail=f"Unknown setting: {key}")
+
+    return {"status": "ok"}
 
 
 @app.get("/api/clients", dependencies=[Depends(require_session)])

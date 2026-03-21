@@ -280,20 +280,40 @@ async def run_sync_loop(
 ) -> None:
     """
     Long-running background task. Syncs once immediately on startup,
-    then repeats on a fixed interval (default 60s). Also refreshes stale sources
+    then repeats on a configurable interval. Also refreshes stale sources
     and runs RDAP upgrade passes periodically.
-    """
-    # Defaults — will be overridable from UI settings in a future update
-    SYNC_INTERVAL_SECONDS = 60
-    DATA_RETENTION_DAYS = 7
 
-    logger.info("Sync service started (interval: %ds)", SYNC_INTERVAL_SECONDS)
+    Settings are read from the database each cycle so changes take effect
+    without a restart.
+    """
+    # Defaults used when no database setting exists
+    _DEFAULTS = {
+        "sync_interval_seconds": 60,
+        "data_retention_days": 7,
+    }
+
+    async def _get_setting(key: str) -> int:
+        val = await db.get_config(key)
+        return int(val) if val is not None else _DEFAULTS[key]
+
+    logger.info("Sync service started")
     _rdap_cycle = 0
     _RDAP_EVERY_N_CYCLES = 10  # run RDAP pass every 10 sync cycles (~10 minutes)
 
+    # Source setting keys mapped to source_name
+    _SOURCE_INTERVAL_KEYS = {
+        "trackerdb": "trackerdb_update_interval_hours",
+        "disconnect": "disconnect_update_interval_hours",
+    }
+
     while True:
-        # Refresh any sources whose data has become stale
+        # Update source intervals from database settings, then refresh if stale
         for source in sources:
+            interval_key = _SOURCE_INTERVAL_KEYS.get(source.source_name)
+            if interval_key:
+                val = await db.get_config(interval_key)
+                if val is not None:
+                    source.UPDATE_INTERVAL_HOURS = int(val)
             await source.refresh_if_stale()
 
         try:
@@ -305,7 +325,8 @@ async def run_sync_loop(
 
         # Purge data older than the configured retention period
         try:
-            q_del, d_del = await db.purge_old_data(DATA_RETENTION_DAYS)
+            retention = await _get_setting("data_retention_days")
+            q_del, d_del = await db.purge_old_data(retention)
             if q_del or d_del:
                 logger.info("Retention: purged %d queries, %d orphaned domains", q_del, d_del)
         except Exception:
@@ -320,4 +341,5 @@ async def run_sync_loop(
             except Exception:
                 logger.exception("RDAP re-enrichment failed — will retry next cycle")
 
-        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+        interval = await _get_setting("sync_interval_seconds")
+        await asyncio.sleep(interval)

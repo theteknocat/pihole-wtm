@@ -99,7 +99,7 @@ function syncUrlParams() {
 async function fetchOptions() {
   try {
     const [configRes, clientsRes] = await Promise.all([
-      apiFetch('/api/config/options'),
+      apiFetch('/api/settings/options'),
       apiFetch('/api/clients'),
     ])
     if (!configRes.ok || !clientsRes.ok) throw new Error('Failed to fetch filter options')
