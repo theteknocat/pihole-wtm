@@ -31,13 +31,13 @@ const sections = [
 
 const contentVisible = ref(false)
 const expanded = ref(false)
-const expandDelay = 200 // ms — used for both CSS transition-delay and JS timeout
 
 function openSection(id: string) {
   contentVisible.value = false
   activeSection.value = id
   nextTick(() => requestAnimationFrame(() => { contentVisible.value = true }))
-  setTimeout(() => { expanded.value = true }, expandDelay)
+  // Use the same timeout value here as the delay class on the section content.
+  setTimeout(() => { expanded.value = true }, 200)
 }
 
 async function closeSection() {
@@ -132,7 +132,7 @@ async function flushIfNeeded() {
           <!-- Section content — scrollable, fades in after width expansion -->
           <div
             class="p-4 h-0 grow transition-opacity duration-150"
-            :class="[`delay-${expandDelay}`, contentVisible ? 'opacity-100' : 'opacity-0', expanded ? 'overflow-auto' : 'overflow-hidden', flushing ? 'pointer-events-none opacity-50' : '']"
+            :class="['delay-200', contentVisible ? 'opacity-100' : 'opacity-0', expanded ? 'overflow-auto' : 'overflow-hidden', flushing ? 'pointer-events-none opacity-50' : '']"
           >
             <component ref="sectionRef" :is="sections.find(s => s.id === activeSection)!.component" @saved="onSaved" />
           </div>
