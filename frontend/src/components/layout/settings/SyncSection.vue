@@ -94,7 +94,7 @@ onMounted(async () => {
         <label class="text-sm text-gray-700 dark:text-gray-300 mb-1 block">Data retention</label>
         <InputNumber
           v-model="dataRetention"
-          :min="1"
+          :min="7"
           :max="365"
           suffix=" days"
           class="w-full"
@@ -111,7 +111,7 @@ onMounted(async () => {
           </template>
         </InputNumber>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          Queries older than this are automatically purged each sync cycle. (1–365 days)
+          Queries older than this are automatically purged each sync cycle. (7–365 days)
         </p>
       </div>
 
