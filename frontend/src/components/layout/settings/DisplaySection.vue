@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import Checkbox from 'primevue/checkbox'
-import InputText from 'primevue/inputtext'
 import AutoComplete from 'primevue/autocomplete'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useWindowStore } from '@/stores/window'
@@ -19,25 +17,75 @@ const availableCategories = ref<string[]>([])
 const availableCompanies = ref<string[]>([])
 
 // Current exclusion selections
-const excludedCategories = ref<Set<string>>(new Set())
-const excludedCompanies = ref<Set<string>>(new Set())
+const excludedCategories = ref<string[]>([])
+const excludedCompanies = ref<string[]>([])
 const excludedDomains = ref<string[]>([])
 
 
 // Split categories into two columns (first half / second half, both alphabetical)
-const categoryColumns = computed(() => {
-  const cats = availableCategories.value
-  const mid = Math.ceil(cats.length / 2)
-  return [cats.slice(0, mid), cats.slice(mid)]
+const excludedCategoriesFormatted = computed(() => {
+  return excludedCategories.value.map(c => formatCategory(c))
 })
 
-// Company search
-const companySearch = ref('')
-const filteredCompanies = computed(() => {
-  if (!companySearch.value) return availableCompanies.value
-  const q = companySearch.value.toLowerCase()
-  return availableCompanies.value.filter(c => c.toLowerCase().includes(q))
+// Category autocomplete suggestions (filtered against already-excluded)
+const categorySuggestions = ref<string[]>([])
+
+function searchCategories(event: { query: string }) {
+  const q = event.query.toLowerCase();
+  categorySuggestions.value = availableCategories.value.filter(
+    c => c.toLowerCase().includes(q) && !excludedCategories.value.includes(c)
+  )
+}
+
+const categorySuggestionsFormatted = computed(() => {
+  return categorySuggestions.value.map(c => formatCategory(c))
 })
+
+// Company autocomplete suggestions (filtered against already-excluded)
+const companySuggestions = ref<string[]>([])
+
+function searchCompanies(event: { query: string }) {
+  const q = event.query.toLowerCase()
+  companySuggestions.value = availableCompanies.value.filter(
+    c => c.toLowerCase().includes(q) && !excludedCompanies.value.includes(c)
+  )
+}
+
+function onCompaniesChanged(value: string[]) {
+  excludedCompanies.value = value
+  scheduleSave()
+}
+
+function onCategoriesChanged(value: string[]) {
+  excludedCategories.value = availableCategories.value.filter(c => {
+    let cFormatted = formatCategory(c)
+    return value.includes(cFormatted)
+  })
+  scheduleSave()
+}
+
+function onDomainsChanged(value: string[]) {
+  excludedDomains.value = value.map(d => d.trim().toLowerCase()).filter(Boolean)
+  scheduleSave()
+}
+
+// Domain autocomplete suggestions
+const domainSuggestions = ref<string[]>([])
+
+async function searchDomains(event: { query: string }) {
+  if (event.query.length < 2) {
+    domainSuggestions.value = []
+    return
+  }
+  try {
+    const params = new URLSearchParams({ q: event.query, hours: '168' })
+    const res = await apiFetch(`/api/domains/search?${params}`)
+    if (res.ok) domainSuggestions.value = await res.json()
+  } catch {
+    domainSuggestions.value = []
+  }
+}
+
 
 // Debounced auto-save
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -46,7 +94,7 @@ let dirty = false
 function scheduleSave() {
   dirty = true
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(doSave, 2000)
+  saveTimer = setTimeout(doSave, 1200)
 }
 
 /** Flush any pending save immediately. Returns when save is complete. */
@@ -83,29 +131,6 @@ async function doSave() {
   }
 }
 
-function toggleCategory(cat: string) {
-  if (excludedCategories.value.has(cat)) {
-    excludedCategories.value.delete(cat)
-  } else {
-    excludedCategories.value.add(cat)
-  }
-  scheduleSave()
-}
-
-function toggleCompany(company: string) {
-  if (excludedCompanies.value.has(company)) {
-    excludedCompanies.value.delete(company)
-  } else {
-    excludedCompanies.value.add(company)
-  }
-  scheduleSave()
-}
-
-function onDomainsChanged(value: string[]) {
-  excludedDomains.value = value.map(d => d.trim().toLowerCase()).filter(Boolean)
-  scheduleSave()
-}
-
 onMounted(async () => {
   try {
     const [optionsRes, configRes] = await Promise.all([
@@ -114,8 +139,8 @@ onMounted(async () => {
     ])
     availableCategories.value = optionsRes.categories
     availableCompanies.value = optionsRes.companies
-    excludedCategories.value = new Set(configRes.excluded_categories)
-    excludedCompanies.value = new Set(configRes.excluded_companies)
+    excludedCategories.value = configRes.excluded_categories
+    excludedCompanies.value = configRes.excluded_companies
     excludedDomains.value = configRes.excluded_domains
   } catch {
     error.value = 'Failed to load configuration'
@@ -142,73 +167,44 @@ onMounted(async () => {
 
       <!-- Categories -->
       <div>
-        <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Categories</h3>
-        <div v-if="availableCategories.length === 0" class="text-xs text-gray-400 italic">
-          No categories found yet.
-        </div>
-        <div v-else class="flex flex-col sm:flex-row gap-0 sm:gap-4">
-          <div v-for="(col, i) in categoryColumns" :key="i" class="flex-1 space-y-1">
-            <label
-              v-for="cat in col"
-              :key="cat"
-              class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              :class="{ 'opacity-50': excludedCategories.has(cat) }"
-            >
-              <Checkbox
-                :model-value="!excludedCategories.has(cat)"
-                :binary="true"
-                @update:model-value="toggleCategory(cat)"
-              />
-              <span class="text-sm">{{ formatCategory(cat) }}</span>
-            </label>
-          </div>
-        </div>
+        <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Excluded Categories</h3>
+        <AutoComplete
+          :model-value="excludedCategoriesFormatted"
+          :multiple="true"
+          :suggestions="categorySuggestionsFormatted"
+          :dropdown="true"
+          placeholder="Category name..."
+          class="w-full"
+          @complete="searchCategories"
+          @update:model-value="onCategoriesChanged"
+        />
       </div>
 
       <!-- Companies -->
       <div>
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Companies</h3>
-          <span v-if="excludedCompanies.size > 0" class="text-xs text-amber-500">{{ excludedCompanies.size }} excluded</span>
-        </div>
-        <InputText
-          v-model="companySearch"
-          placeholder="Search companies..."
-          class="w-full mb-2"
-          size="small"
+        <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Excluded Companies</h3>
+        <AutoComplete
+          :model-value="excludedCompanies"
+          :multiple="true"
+          :suggestions="companySuggestions"
+          :dropdown="true"
+          placeholder="Company name..."
+          class="w-full"
+          @complete="searchCompanies"
+          @update:model-value="onCompaniesChanged"
         />
-        <div v-if="availableCompanies.length === 0" class="text-xs text-gray-400 italic">
-          No companies found yet.
-        </div>
-        <div v-else class="max-h-48 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
-          <label
-            v-for="company in filteredCompanies"
-            :key="company"
-            class="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0"
-            :class="{ 'opacity-50': excludedCompanies.has(company) }"
-          >
-            <Checkbox
-              :model-value="!excludedCompanies.has(company)"
-              :binary="true"
-              @update:model-value="toggleCompany(company)"
-            />
-            <span class="text-sm">{{ company }}</span>
-          </label>
-        </div>
       </div>
 
       <!-- Domains -->
       <div>
         <h3 class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Excluded Domains</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          Specific domains to always hide. Press Enter to add.
-        </p>
         <AutoComplete
           :model-value="excludedDomains"
           :multiple="true"
-          :typeahead="false"
+          :suggestions="domainSuggestions"
           placeholder="e.g. example.tracker.com"
           class="w-full"
+          @complete="searchDomains"
           @update:model-value="onDomainsChanged"
         />
       </div>
