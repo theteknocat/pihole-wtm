@@ -16,13 +16,9 @@ from app.services.pihole.api_client import (
 from app.services.sources import TrackerSource, get_tracker_sources
 import app.services.sync_manager as sync_manager
 
-from app.config import settings as app_settings
+from app.log import setup_logging
 
-logging.basicConfig(
-    level=app_settings.log_level.upper(),
-    format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 sources: list[TrackerSource]
@@ -58,6 +54,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await sync_manager.stop_sync_service()
+    await db.close()
 
 
 app = FastAPI(
@@ -283,6 +280,7 @@ async def admin_reenrich() -> dict[str, Any]:
 @app.post("/api/admin/reset", dependencies=[Depends(require_session)])
 async def admin_reset() -> dict[str, str]:
     await db.reset()
+    sync_manager.trigger_sync()
     return {"status": "ok"}
 
 
