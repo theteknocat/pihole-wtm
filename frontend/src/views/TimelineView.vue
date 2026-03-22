@@ -70,6 +70,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
   <div class="p-6 space-y-6">
 
     <PageHeader
+      icon="pi pi-chart-line"
       title="Query Timeline"
     />
 

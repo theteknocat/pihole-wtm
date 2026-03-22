@@ -10,6 +10,7 @@ import TimeWindowNav from '@/components/layout/TimeWindowNav.vue'
 
 defineProps<{
   title: string
+  icon?: string
   subtitle?: string
 }>()
 
@@ -19,11 +20,13 @@ const scrolled = useScrolled()
 <template>
   <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
     <div>
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h1>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ subtitle }}</p>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+        <i v-if="icon" :class="[icon, scrolled ? 'text-sm' : '']" />
+        {{ title }}
+      </h1>
+      <p v-if="subtitle" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ subtitle }}</p>
     </div>
     <div class="flex items-center gap-2">
-      <slot :compact="scrolled" />
       <TimeWindowNav :compact="scrolled" />
     </div>
   </div>

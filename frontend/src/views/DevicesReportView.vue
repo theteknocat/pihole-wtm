@@ -43,7 +43,10 @@ function onClientSaved(client: ClientStat, newName: string | null) {
 
 <template>
   <div class="p-6 space-y-6">
-    <PageHeader title="Devices Report" />
+    <PageHeader
+      icon="pi pi-mobile"
+      title="Devices Report"
+    />
 
     <!-- Filters -->
     <div class="flex items-start gap-3 flex-wrap">

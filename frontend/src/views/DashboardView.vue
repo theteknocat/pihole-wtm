@@ -104,6 +104,7 @@ watch(trackerOnly, fetchRecentQueries)
   <div class="p-6 space-y-6">
 
     <PageHeader
+      icon="pi pi-gauge"
       title="Dashboard"
     />
 

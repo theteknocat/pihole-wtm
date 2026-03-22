@@ -33,7 +33,10 @@ const domainData = computed(() => data.value as DomainStats | null)
 
 <template>
   <div class="p-6 space-y-6">
-    <PageHeader title="Domains Report" />
+    <PageHeader
+      icon="pi pi-globe"
+      title="Domains Report"
+    />
 
     <!-- Filters -->
     <div class="flex items-start gap-3 flex-wrap">
