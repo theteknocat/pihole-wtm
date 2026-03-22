@@ -60,9 +60,7 @@ function formatTs(ts: number): string {
 
 const rangeLabel = computed(() => {
   const from = formatTs(windowStore.fromTs)
-  const to = windowStore.isHistorical
-    ? formatTs(windowStore.effectiveEndTs)
-    : 'Now'
+  const to = formatTs(windowStore.effectiveEndTs)
   return `${from} – ${to}`
 })
 </script>
@@ -91,9 +89,21 @@ const rangeLabel = computed(() => {
         @click="windowStore.goPrev()"
         v-tooltip.top="'Previous period'"
       />
-      <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[10rem] text-center">
-        {{ rangeLabel }}
-      </span>
+      <div class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[10rem] text-center">
+        <Button
+          severity="secondary"
+          text
+          @click="periodMenu?.toggle($event)"
+          size="small"
+          :class="{ 'pointer-events-none': windowStore.availablePeriods.length <= 1 }"
+          :tabindex="windowStore.availablePeriods.length <= 1 ? -1 : 0"
+        >
+          <i class="pi pi-history" />
+          <span class="whitespace-nowrap"><strong>{{ selectedPeriod.label }}</strong>: {{ rangeLabel }}</span>
+          <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs" />
+        </Button>
+        <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
+      </div>
       <Button
         icon="pi pi-angle-right"
         severity="secondary"
@@ -114,19 +124,6 @@ const rangeLabel = computed(() => {
         @click="windowStore.goLatest()"
         v-tooltip.top="'Latest data'"
       />
-    </div>
-
-    <!-- Period selection -->
-    <div>
-      <Button
-        :label="selectedPeriod.label"
-        icon="pi pi-history"
-        severity="secondary"
-        @click="periodMenu?.toggle($event)"
-        :size="props.compact ? 'small' : undefined"
-        :disabled="windowStore.availablePeriods.length <= 1"
-      />
-      <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
     </div>
   </div>
 </template>
