@@ -82,13 +82,18 @@ export const useWindowStore = defineStore('window', () => {
   function goNext() {
     if (endTs.value === null) return
     const newEnd = endTs.value + hours.value * 3600
-    const now = Date.now() / 1000
-    // If the new end is at or past now, snap back to live mode
-    if (newEnd >= now) {
+    // Snap to live if the new end reaches or passes the newest available data
+    if (newestTs.value == null || newEnd >= newestTs.value) {
       endTs.value = null
     } else {
       endTs.value = newEnd
     }
+  }
+
+  /** Jump to the oldest available data */
+  function goOldest() {
+    if (oldestTs.value == null) return
+    endTs.value = oldestTs.value + hours.value * 3600
   }
 
   /** Jump back to live (latest) view */
@@ -126,6 +131,6 @@ export const useWindowStore = defineStore('window', () => {
     isHistorical, effectiveEndTs, fromTs,
     availablePeriods, canGoPrev, canGoNext,
     triggerRefresh, startAutoRefresh, stopAutoRefresh,
-    goPrev, goNext, goLatest, setDataRange, queryParams,
+    goPrev, goNext, goOldest, goLatest, setDataRange, queryParams,
   }
 })

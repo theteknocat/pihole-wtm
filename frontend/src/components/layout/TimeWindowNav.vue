@@ -84,10 +84,20 @@ const rangeLabel = computed(() => {
       <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
     </div>
 
-    <!-- Prev / Next navigation -->
+    <!-- Time navigation -->
     <div class="flex items-center gap-1">
       <Button
-        icon="pi pi-chevron-left"
+        icon="pi pi-angle-double-left"
+        severity="secondary"
+        text
+        rounded
+        :size="props.compact ? 'small' : undefined"
+        :disabled="!windowStore.canGoPrev"
+        @click="windowStore.goOldest()"
+        v-tooltip.top="'Oldest data'"
+      />
+      <Button
+        icon="pi pi-angle-left"
         severity="secondary"
         text
         rounded
@@ -100,7 +110,7 @@ const rangeLabel = computed(() => {
         {{ rangeLabel }}
       </span>
       <Button
-        icon="pi pi-chevron-right"
+        icon="pi pi-angle-right"
         severity="secondary"
         text
         rounded
@@ -109,17 +119,16 @@ const rangeLabel = computed(() => {
         @click="windowStore.goNext()"
         v-tooltip.top="'Next period'"
       />
+      <Button
+        icon="pi pi-angle-double-right"
+        severity="secondary"
+        text
+        rounded
+        :size="props.compact ? 'small' : undefined"
+        :disabled="!windowStore.canGoNext"
+        @click="windowStore.goLatest()"
+        v-tooltip.top="'Latest data'"
+      />
     </div>
-
-    <!-- Latest button — only when viewing historical data -->
-    <Button
-      v-if="windowStore.isHistorical"
-      label="Latest"
-      icon="pi pi-forward"
-      severity="secondary"
-      text
-      :size="props.compact ? 'small' : undefined"
-      @click="windowStore.goLatest()"
-    />
   </div>
 </template>
