@@ -172,10 +172,10 @@ watch(trackerOnly, fetchRecentQueries)
       </Card>
 
       <!-- Recent queries section — spans full width for the toggle header -->
-      <div class="xl:col-span-2 flex items-center justify-between">
-        <div>
+      <div class="xl:col-span-2 flex flex-col items-center gap-2 md:flex-row md:justify-between">
+        <div class="text-center md:text-left">
           <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Recent Domain Activity</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <p class="text-sm text-muted mt-0.5">
             {{ trackerOnly ? 'Showing known tracker domains only' : 'Showing all queries' }}
           </p>
         </div>

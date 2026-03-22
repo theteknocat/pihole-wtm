@@ -10,13 +10,11 @@ function formatTime(ts: number): string {
   return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function truncateDomain(domain: string, max = 35): string {
-  return domain.length > max ? '…' + domain.slice(-(max - 1)) : domain
-}
 </script>
 
 <template>
-  <table class="w-full text-sm">
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm min-w-[24rem]">
     <thead>
       <tr class="table-header-row">
         <th class="table-header-cell">Time</th>
@@ -33,8 +31,8 @@ function truncateDomain(domain: string, max = 35): string {
         <td class="py-2 pr-3 tabular-nums text-muted-inverse whitespace-nowrap">
           {{ formatTime(q.timestamp) }}
         </td>
-        <td class="py-2 pr-3 font-mono text-xs" :title="q.domain">
-          {{ truncateDomain(q.domain) }}
+        <td class="py-2 pr-3 font-mono text-xs truncate" :title="q.domain">
+          {{ q.domain }}
         </td>
         <td class="py-2 text-muted truncate">
           {{ q.company_name ?? '—' }}
@@ -45,4 +43,5 @@ function truncateDomain(domain: string, max = 35): string {
       </tr>
     </tbody>
   </table>
+  </div>
 </template>
