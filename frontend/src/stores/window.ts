@@ -15,23 +15,32 @@ export const useWindowStore = defineStore('window', () => {
   const hours = ref(24)
   const refreshKey = ref(0)
 
-  // null = "now" (live window), number = fixed end timestamp (historical)
-  const endTs = ref<number | null>(null)
+  // How many periods back from the latest data (0 = live)
+  const periodsBack = ref(0)
 
-  // Data range from the health endpoint — set by AppFooter or wherever health is fetched
+  // Data range from the health endpoint — set by wherever health is fetched
   const oldestTs = ref<number | null>(null)
   const newestTs = ref<number | null>(null)
 
   let intervalId: ReturnType<typeof setInterval> | null = null
 
   /** Whether the user is viewing a historical (non-live) window */
-  const isHistorical = computed(() => endTs.value !== null)
+  const isHistorical = computed(() => periodsBack.value > 0)
 
-  /** The effective end timestamp (defaults to now when live) */
-  const effectiveEndTs = computed(() => endTs.value ?? Date.now() / 1000)
+  /** The effective end timestamp — derived from newestTs and periodsBack */
+  const effectiveEndTs = computed(() => {
+    const base = newestTs.value ?? Date.now() / 1000
+    return base - periodsBack.value * hours.value * 3600
+  })
 
   /** Start timestamp of the current window */
   const fromTs = computed(() => effectiveEndTs.value - hours.value * 3600)
+
+  /**
+   * The end_ts value for API queries — null when live (let backend use now),
+   * or the computed end timestamp when viewing a historical window.
+   */
+  const endTs = computed(() => isHistorical.value ? effectiveEndTs.value : null)
 
   /** Available period options based on how much data we actually have */
   const availablePeriods = computed(() => {
@@ -53,7 +62,7 @@ export const useWindowStore = defineStore('window', () => {
   })
 
   /** Whether navigating forward is possible (not already at the latest) */
-  const canGoNext = computed(() => endTs.value !== null)
+  const canGoNext = computed(() => periodsBack.value > 0)
 
   function triggerRefresh() { refreshKey.value = 1 - refreshKey.value }
 
@@ -69,32 +78,27 @@ export const useWindowStore = defineStore('window', () => {
     }
   }
 
-  /** Navigate backward by the current window size */
+  /** Navigate backward by one period */
   function goPrev() {
-    endTs.value = fromTs.value
+    periodsBack.value++
   }
 
-  /** Navigate forward by the current window size */
+  /** Navigate forward by one period */
   function goNext() {
-    if (endTs.value === null) return
-    const newEnd = endTs.value + hours.value * 3600
-    // Snap to live if the new end reaches or passes the newest available data
-    if (newestTs.value == null || newEnd >= newestTs.value) {
-      endTs.value = null
-    } else {
-      endTs.value = newEnd
-    }
+    if (periodsBack.value > 0) periodsBack.value--
   }
 
   /** Jump to the oldest available data */
   function goOldest() {
-    if (oldestTs.value == null) return
-    endTs.value = oldestTs.value + hours.value * 3600
+    if (oldestTs.value == null || newestTs.value == null) return
+    const totalSpan = newestTs.value - oldestTs.value
+    const periodSeconds = hours.value * 3600
+    periodsBack.value = Math.floor(totalSpan / periodSeconds)
   }
 
   /** Jump back to live (latest) view */
   function goLatest() {
-    endTs.value = null
+    periodsBack.value = 0
   }
 
   /** Update data range info (call when health data is fetched) */
@@ -102,6 +106,10 @@ export const useWindowStore = defineStore('window', () => {
     oldestTs.value = oldest
     newestTs.value = newest
   }
+
+  // Reset to live when changing period — "1 period back" means something
+  // completely different at 24h vs 7d
+  watch(hours, () => { periodsBack.value = 0 })
 
   // Start immediately — runs for the lifetime of the app
   startAutoRefresh()
