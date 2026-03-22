@@ -401,6 +401,7 @@ class LocalDatabase:
     async def fetch_tracker_stats(
         self,
         hours: int = 24,
+        end_ts: float | None = None,
         client_ip: str | None = None,
     ) -> dict[str, Any]:
         """
@@ -408,9 +409,10 @@ class LocalDatabase:
         Optionally filter to a single client device by IP.
         Returns the same shape as the old get_tracker_stats() response.
         """
-        from_ts = time.time() - hours * 3600
-        conditions = ["q.timestamp >= ?"]
-        params: list[Any] = [from_ts]
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
 
         if client_ip:
             conditions.append("q.client_ip = ?")
@@ -503,23 +505,25 @@ class LocalDatabase:
             "by_category": by_category,
         }
 
-    async def search_domains(self, query: str, hours: int = 24, limit: int = 20) -> list[str]:
+    async def search_domains(self, query: str, hours: int = 24, end_ts: float | None = None, limit: int = 20) -> list[str]:
         """Return domain names matching the query substring within the time window."""
-        from_ts = time.time() - hours * 3600
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
         sql = """
             SELECT DISTINCT q.domain
             FROM queries q
-            WHERE q.timestamp >= ? AND q.domain LIKE ? ESCAPE '\\'
+            WHERE q.timestamp >= ? AND q.timestamp <= ? AND q.domain LIKE ? ESCAPE '\\'
             ORDER BY q.domain
             LIMIT ?
         """
         async with self._conn() as db:
-            async with db.execute(sql, [from_ts, f"%{_escape_like(query)}%", limit]) as cur:
+            async with db.execute(sql, [from_ts, anchor, f"%{_escape_like(query)}%", limit]) as cur:
                 return [row[0] for row in await cur.fetchall()]
 
     async def fetch_domain_stats(
         self,
         hours: int = 24,
+        end_ts: float | None = None,
         category: str | None = None,
         company: str | None = None,
         client_ip: str | None = None,
@@ -530,9 +534,10 @@ class LocalDatabase:
         Return per-domain query counts for the given time window, optionally
         filtered to a single tracker category, company, or client device.
         """
-        from_ts = time.time() - hours * 3600
-        conditions = ["q.timestamp >= ?"]
-        params: list[Any] = [from_ts]
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
 
         if client_ip is not None:
             conditions.append("q.client_ip = ?")
@@ -600,6 +605,7 @@ class LocalDatabase:
     async def fetch_client_stats(
         self,
         hours: int = 24,
+        end_ts: float | None = None,
         category: str | None = None,
         company: str | None = None,
     ) -> dict[str, Any]:
@@ -608,9 +614,10 @@ class LocalDatabase:
         optionally filtered to a single category or company.
         Joins client_names to include user-defined friendly names.
         """
-        from_ts = time.time() - hours * 3600
-        conditions = ["q.timestamp >= ?"]
-        params: list[Any] = [from_ts]
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
 
         if category is not None:
             conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
@@ -662,22 +669,27 @@ class LocalDatabase:
     async def fetch_timeline_stats(
         self,
         hours: int = 24,
+        end_ts: float | None = None,
     ) -> dict[str, Any]:
         """
         Return query counts bucketed over time for the given window.
-        Bucket size adapts to the window: 1 hour for 24h, 6 hours for 7d.
+        Bucket size adapts to the window length.
         """
-        now = time.time()
-        from_ts = now - hours * 3600
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
 
-        # Choose bucket size in seconds
+        # Choose bucket size in seconds based on window length
         if hours <= 24:
             bucket_seconds = 3600       # 1 hour
-        else:
+        elif hours <= 168:
             bucket_seconds = 6 * 3600   # 6 hours
+        elif hours <= 720:
+            bucket_seconds = 24 * 3600  # 1 day
+        else:
+            bucket_seconds = 72 * 3600  # 3 days
 
-        conditions = ["q.timestamp >= ?"]
-        params: list[Any] = [from_ts]
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
 
         await self._apply_exclusions(conditions, params)
 
@@ -726,21 +738,26 @@ class LocalDatabase:
     async def fetch_client_timeline_stats(
         self,
         hours: int = 24,
+        end_ts: float | None = None,
     ) -> dict[str, Any]:
         """
         Return per-client query counts bucketed over time.
         Same bucketing as fetch_timeline_stats but grouped by client_ip.
         """
-        now = time.time()
-        from_ts = now - hours * 3600
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
 
         if hours <= 24:
             bucket_seconds = 3600
-        else:
+        elif hours <= 168:
             bucket_seconds = 6 * 3600
+        elif hours <= 720:
+            bucket_seconds = 24 * 3600
+        else:
+            bucket_seconds = 72 * 3600
 
-        conditions = ["q.timestamp >= ?"]
-        params: list[Any] = [from_ts]
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
 
         await self._apply_exclusions(conditions, params)
 
@@ -961,4 +978,16 @@ class LocalDatabase:
             "last_query_id": row[0] if row else 0,
             "last_synced_at": row[1] if row else None,
             "stored_queries": count_row[0] if count_row else 0,
+        }
+
+    async def get_data_range(self) -> dict[str, Any]:
+        """Return the timestamp of the oldest and newest stored query."""
+        async with self._conn() as db:
+            async with db.execute(
+                "SELECT MIN(timestamp), MAX(timestamp) FROM queries"
+            ) as cur:
+                row = await cur.fetchone()
+        return {
+            "oldest_ts": row[0] if row else None,
+            "newest_ts": row[1] if row else None,
         }

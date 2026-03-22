@@ -115,11 +115,8 @@ async function fetchStats() {
   loading.value = true
   error.value = null
   try {
-    const params = new URLSearchParams({
-      hours: String(windowStore.hours),
-      client_ip: props.clientIp,
-    })
-    const res = await fetch(`/api/stats/trackers?${params}`)
+    const qs = windowStore.queryParams({ client_ip: props.clientIp })
+    const res = await fetch(`/api/stats/trackers?${qs}`)
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
   } catch {
@@ -161,7 +158,7 @@ watch(() => windowStore.refreshKey, fetchStats)
 
     <!-- Subtitle -->
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      {{ windowStore.hours <= 24 ? '24h' : '7d' }} window
+      {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }} window
       <template v-if="stats"> — {{ stats.tracker_queries.toLocaleString() }} tracker queries</template>
     </p>
 

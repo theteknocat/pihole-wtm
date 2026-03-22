@@ -2,25 +2,18 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Skeleton from 'primevue/skeleton'
-import SelectButton from 'primevue/selectbutton'
 import TimelineChart from '@/components/timeline/TimelineChart.vue'
 import DeviceTimelineChart from '@/components/timeline/DeviceTimelineChart.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { useWindowStore } from '@/stores/window'
-import { useScrolled } from '@/composables/useScrolled'
 import { apiFetch } from '@/utils/api'
 import type { TimelineStats, ClientTimelineStats } from '@/types/api'
 
 const windowStore = useWindowStore()
-const scrolled = useScrolled()
 
-const windowOptions = [
-  { label: '24h', value: 24 },
-  { label: '7d', value: 168 },
-]
-const selectedWindow = computed({
-  get: () => windowOptions.find(o => o.value === windowStore.hours) ?? windowOptions[0],
-  set: (v) => { windowStore.hours = v.value },
-})
+const periodLabel = computed(() =>
+  windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h`
+)
 
 const timeline = ref<TimelineStats | null>(null)
 const clientTimeline = ref<ClientTimelineStats | null>(null)
@@ -31,9 +24,10 @@ async function fetchTimeline() {
   loading.value = true
   error.value = null
   try {
+    const qs = windowStore.queryParams()
     const [timelineRes, clientRes] = await Promise.all([
-      apiFetch(`/api/stats/timeline?hours=${windowStore.hours}`),
-      apiFetch(`/api/stats/timeline/clients?hours=${windowStore.hours}`),
+      apiFetch(`/api/stats/timeline?${qs}`),
+      apiFetch(`/api/stats/timeline/clients?${qs}`),
     ])
     if (!timelineRes.ok || !clientRes.ok) throw new Error('Server error')
     timeline.value = await timelineRes.json()
@@ -60,32 +54,29 @@ const blockRate = computed(() => {
   return ((totalBlocked.value / totalQueries.value) * 100).toFixed(1)
 })
 
+/** Human-readable bucket label based on the bucket size returned by the backend */
+const bucketLabel = computed(() => {
+  if (!timeline.value) return ''
+  const secs = timeline.value.bucket_seconds
+  if (secs <= 3600) return 'Hourly'
+  if (secs <= 6 * 3600) return '6-hour'
+  if (secs <= 24 * 3600) return 'Daily'
+  return `${Math.round(secs / 86400)}-day`
+})
+
 onMounted(fetchTimeline)
 watch(() => windowStore.hours, fetchTimeline)
+watch(() => windowStore.endTs, fetchTimeline)
 watch(() => windowStore.refreshKey, fetchTimeline)
 </script>
 
 <template>
   <div class="p-6 space-y-6">
 
-    <!-- Header row -->
-    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
-      <div>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Query Timeline</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Tracker query volume over the last {{ selectedWindow.label }}
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <SelectButton
-          v-model="selectedWindow"
-          :options="windowOptions"
-          option-label="label"
-          :allow-empty="false"
-          :size="scrolled ? 'small' : undefined"
-        />
-      </div>
-    </div>
+    <PageHeader
+      title="Query Timeline"
+      :subtitle="`Tracker query volume — ${periodLabel} window`"
+    />
 
     <!-- Auto-refresh error (shown over existing data) -->
     <div v-if="error && timeline" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
@@ -150,7 +141,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
       <Card>
         <template #title>Query Volume</template>
         <template #subtitle>
-          {{ selectedWindow.value === 24 ? 'Hourly' : '6-hour' }} buckets — {{ selectedWindow.label }}
+          {{ bucketLabel }} buckets — {{ periodLabel }}
         </template>
         <template #content>
           <p v-if="timeline.buckets.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No query data for this time window</p>
@@ -166,7 +157,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
       <Card v-if="clientTimeline && clientTimeline.clients.length > 0">
         <template #title>Device Activity</template>
         <template #subtitle>
-          Query volume by device — {{ selectedWindow.label }}
+          Query volume by device — {{ periodLabel }}
         </template>
         <template #content>
           <DeviceTimelineChart

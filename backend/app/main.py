@@ -71,6 +71,7 @@ app.include_router(auth_router)
 @app.get("/api/health", dependencies=[Depends(require_session)])
 async def health() -> dict[str, Any]:
     sync_status = await db.get_sync_status()
+    data_range = await db.get_data_range()
     source_statuses = [
         {
             "name": source.source_name,
@@ -87,6 +88,7 @@ async def health() -> dict[str, Any]:
         "sync_active": sync_manager.sync_task is not None,
         "sync_source": sync_manager.sync_source.value if sync_manager.sync_source else None,
         **sync_status,
+        **data_range,
     }
 
 
@@ -134,29 +136,33 @@ _EXCLUSION_KEYS = ("excluded_categories", "excluded_companies", "excluded_domain
 
 @app.get("/api/stats/trackers", dependencies=[Depends(require_session)])
 async def stats_trackers(
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
     client_ip: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_tracker_stats(hours=hours, client_ip=client_ip)
+    return await db.fetch_tracker_stats(hours=hours, end_ts=end_ts, client_ip=client_ip)
 
 
 @app.get("/api/stats/timeline", dependencies=[Depends(require_session)])
 async def stats_timeline(
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_timeline_stats(hours=hours)
+    return await db.fetch_timeline_stats(hours=hours, end_ts=end_ts)
 
 
 @app.get("/api/stats/timeline/clients", dependencies=[Depends(require_session)])
 async def stats_timeline_clients(
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_client_timeline_stats(hours=hours)
+    return await db.fetch_client_timeline_stats(hours=hours, end_ts=end_ts)
 
 
 @app.get("/api/stats/domains", dependencies=[Depends(require_session)])
 async def stats_domains(
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
     client_ip: str | None = Query(default=None),
@@ -164,7 +170,7 @@ async def stats_domains(
     domain_exact: bool = Query(default=False),
 ) -> dict[str, Any]:
     return await db.fetch_domain_stats(
-        hours=hours, category=category, company=company,
+        hours=hours, end_ts=end_ts, category=category, company=company,
         client_ip=client_ip, domain=domain, domain_exact=domain_exact,
     )
 
@@ -172,18 +178,20 @@ async def stats_domains(
 @app.get("/api/domains/search", dependencies=[Depends(require_session)])
 async def search_domains(
     q: str = Query(min_length=2),
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
 ) -> list[str]:
-    return await db.search_domains(query=q, hours=hours)
+    return await db.search_domains(query=q, hours=hours, end_ts=end_ts)
 
 
 @app.get("/api/stats/clients", dependencies=[Depends(require_session)])
 async def stats_clients(
-    hours: int = Query(default=24, ge=1, le=168),
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_client_stats(hours=hours, category=category, company=company)
+    return await db.fetch_client_stats(hours=hours, end_ts=end_ts, category=category, company=company)
 
 
 @app.get("/api/settings/options", dependencies=[Depends(require_session)])

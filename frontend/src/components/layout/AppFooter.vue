@@ -1,67 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useWindowStore } from '@/stores/window'
-import { apiFetch } from '@/utils/api'
+import { useHealth } from '@/composables/useHealth'
 
-const windowStore = useWindowStore()
-
-interface SourceStatus {
-  name: string
-  label: string
-  loaded: boolean
-  domain_count: number
-}
-
-interface HealthData {
-  status: string
-  pihole_api_url: string | null
-  version: string
-  sources: SourceStatus[]
-  last_synced_at: number | null
-  stored_queries: number
-  sync_active: boolean
-  sync_source: 'env' | 'session' | null
-}
-
-const health = ref<HealthData | null>(null)
-const error = ref(false)
-
-async function fetchStatus() {
-  try {
-    const res = await apiFetch('/api/health')
-    if (!res.ok) throw new Error()
-    health.value = await res.json()
-    error.value = false
-    updateSyncAgo()
-  } catch {
-    error.value = true
-  }
-}
-
-// Reactive sync time display — ticks every 5s so "Xs ago" stays current
-const syncAgo = ref('never')
-let tickTimer: ReturnType<typeof setInterval> | null = null
-
-function updateSyncAgo() {
-  const ts = health.value?.last_synced_at
-  if (!ts) { syncAgo.value = 'never'; return }
-  const ago = Math.round((Date.now() / 1000) - ts)
-  if (ago < 60) syncAgo.value = `${ago}s ago`
-  else if (ago < 3600) syncAgo.value = `${Math.floor(ago / 60)}m ago`
-  else syncAgo.value = `${Math.floor(ago / 3600)}h ago`
-}
-
-// Refresh on shared auto-refresh tick (30s) and on-demand triggers (e.g. data reset)
-watch(() => windowStore.refreshKey, fetchStatus)
-
-onMounted(() => {
-  fetchStatus()
-  tickTimer = setInterval(updateSyncAgo, 5_000)
-})
-
-onUnmounted(() => {
-  if (tickTimer) clearInterval(tickTimer)
-})
+const { health, error, syncAgo } = useHealth()
 </script>
 
 <template>

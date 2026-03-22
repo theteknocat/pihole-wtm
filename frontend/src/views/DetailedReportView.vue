@@ -21,8 +21,8 @@ import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { useWindowStore } from '@/stores/window'
-import { useScrolled } from '@/composables/useScrolled'
 import { formatCategory } from '@/utils/format'
 import { apiFetch } from '@/utils/api'
 import type { DomainStats, ClientStats, ClientStat } from '@/types/api'
@@ -30,17 +30,6 @@ import type { DomainStats, ClientStats, ClientStat } from '@/types/api'
 const route = useRoute()
 const router = useRouter()
 const windowStore = useWindowStore()
-const scrolled = useScrolled()
-
-// Time window toggle
-const windowOptions = [
-  { label: '24h', value: 24 },
-  { label: '7d', value: 168 },
-]
-const selectedWindow = computed({
-  get: () => windowOptions.find(o => o.value === windowStore.hours) ?? windowOptions[0],
-  set: (v) => { windowStore.hours = v.value },
-})
 
 // Group-by toggle — persisted in store
 const groupByOptions = [
@@ -119,8 +108,8 @@ async function searchDomains(event: { query: string }) {
     return
   }
   try {
-    const params = new URLSearchParams({ q: event.query, hours: String(windowStore.hours) })
-    const res = await apiFetch(`/api/domains/search?${params}`)
+    const qs = windowStore.queryParams({ q: event.query })
+    const res = await apiFetch(`/api/domains/search?${qs}`)
     if (res.ok) domainSuggestions.value = await res.json()
   } catch {
     domainSuggestions.value = []
@@ -158,22 +147,22 @@ async function fetchData() {
   error.value = null
   try {
     if (windowStore.reportGroupBy === 'client') {
-      const params = new URLSearchParams({ hours: String(windowStore.hours) })
-      if (selectedCategory.value) params.set('category', selectedCategory.value)
-      if (selectedCompany.value) params.set('company', selectedCompany.value)
-      const res = await apiFetch(`/api/stats/clients?${params}`, { signal: controller.signal })
+      const qs = windowStore.queryParams({
+        category: selectedCategory.value,
+        company: selectedCompany.value,
+      })
+      const res = await apiFetch(`/api/stats/clients?${qs}`, { signal: controller.signal })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       clientData.value = await res.json()
     } else {
-      const params = new URLSearchParams({ hours: String(windowStore.hours) })
-      if (selectedCategory.value) params.set('category', selectedCategory.value)
-      if (selectedCompany.value) params.set('company', selectedCompany.value)
-      if (selectedClientIp.value) params.set('client_ip', selectedClientIp.value)
-      if (appliedDomain.value) {
-        params.set('domain', appliedDomain.value)
-        if (domainExact.value) params.set('domain_exact', 'true')
-      }
-      const res = await apiFetch(`/api/stats/domains?${params}`, { signal: controller.signal })
+      const qs = windowStore.queryParams({
+        category: selectedCategory.value,
+        company: selectedCompany.value,
+        client_ip: selectedClientIp.value,
+        domain: appliedDomain.value,
+        domain_exact: appliedDomain.value && domainExact.value ? true : undefined,
+      })
+      const res = await apiFetch(`/api/stats/domains?${qs}`, { signal: controller.signal })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       domainData.value = await res.json()
     }
@@ -211,6 +200,7 @@ onMounted(() => {
 })
 
 watch(() => windowStore.hours, fetchData)
+watch(() => windowStore.endTs, fetchData)
 watch(() => windowStore.refreshKey, () => {
   if (!editingClient.value) {
     fetchOptions()
@@ -247,34 +237,20 @@ watch(() => route.query, (q) => {
 <template>
   <div class="p-6 space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
-      <div>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          {{ windowStore.reportGroupBy === 'client' ? 'Device Report' : 'Domain Report' }}
-        </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          {{ windowStore.reportGroupBy === 'client' ? 'Devices' : 'Domains' }}
-          grouped by query count
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
+    <PageHeader
+      :title="windowStore.reportGroupBy === 'client' ? 'Device Report' : 'Domain Report'"
+      :subtitle="`${windowStore.reportGroupBy === 'client' ? 'Devices' : 'Domains'} grouped by query count`"
+    >
+      <template #default="{ compact }">
         <SelectButton
           v-model="selectedGroupBy"
           :options="groupByOptions"
           option-label="label"
           :allow-empty="false"
-          :size="scrolled ? 'small' : undefined"
+          :size="compact ? 'small' : undefined"
         />
-        <SelectButton
-          v-model="selectedWindow"
-          :options="windowOptions"
-          option-label="label"
-          :allow-empty="false"
-          :size="scrolled ? 'small' : undefined"
-        />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Filters -->
     <div class="flex items-start gap-3 flex-wrap">

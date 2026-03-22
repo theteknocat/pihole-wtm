@@ -3,29 +3,21 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Skeleton from 'primevue/skeleton'
-import SelectButton from 'primevue/selectbutton'
 import ToggleButton from 'primevue/togglebutton'
 import CategoryBarChart from '@/components/dashboard/CategoryBarChart.vue'
 import CompanyBarChart from '@/components/dashboard/CompanyBarChart.vue'
 import TopCompaniesTable from '@/components/dashboard/TopCompaniesTable.vue'
 import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { useWindowStore } from '@/stores/window'
-import { useScrolled } from '@/composables/useScrolled'
 import { apiFetch } from '@/utils/api'
 import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
 
 const router = useRouter()
 const windowStore = useWindowStore()
-const scrolled = useScrolled()
-
-const windowOptions = [
-  { label: '24h', value: 24 },
-  { label: '7d', value: 168 },
-]
-const selectedWindow = computed({
-  get: () => windowOptions.find(o => o.value === windowStore.hours) ?? windowOptions[0],
-  set: (v) => { windowStore.hours = v.value },
-})
+const periodLabel = computed(() =>
+  windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h`
+)
 const trackerOnly = ref(true)
 
 const stats = ref<TrackerStats | null>(null)
@@ -81,7 +73,7 @@ async function fetchStats() {
   error.value = null
   try {
     const [statsRes, blockedRes, allowedRes] = await Promise.all([
-      apiFetch(`/api/stats/trackers?hours=${windowStore.hours}`),
+      apiFetch(`/api/stats/trackers?${windowStore.queryParams()}`),
       apiFetch(recentQueryUrl('blocked')),
       apiFetch(recentQueryUrl('allowed')),
     ])
@@ -106,6 +98,7 @@ function drillCompany(company: string) {
 
 onMounted(fetchStats)
 watch(() => windowStore.hours, fetchStats)
+watch(() => windowStore.endTs, fetchStats)
 watch(() => windowStore.refreshKey, fetchStats)
 watch(trackerOnly, fetchRecentQueries)
 </script>
@@ -113,24 +106,10 @@ watch(trackerOnly, fetchRecentQueries)
 <template>
   <div class="p-6 space-y-6">
 
-    <!-- Header row -->
-    <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
-      <div>
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Tracker intelligence for the last {{ selectedWindow.label }}
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <SelectButton
-          v-model="selectedWindow"
-          :options="windowOptions"
-          option-label="label"
-          :allow-empty="false"
-          :size="scrolled ? 'small' : undefined"
-        />
-      </div>
-    </div>
+    <PageHeader
+      title="Dashboard"
+      :subtitle="`Tracker intelligence — ${periodLabel} window`"
+    />
 
     <!-- Auto-refresh error (shown over existing data) -->
     <div v-if="error && stats" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
@@ -157,7 +136,7 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Tracker Categories</template>
-        <template #subtitle>By query count — {{ selectedWindow.label }}</template>
+        <template #subtitle>By query count — {{ periodLabel }}</template>
         <template #content>
           <p v-if="stats!.by_category.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CategoryBarChart
@@ -171,7 +150,7 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Companies</template>
-        <template #subtitle>By query count — {{ selectedWindow.label }}</template>
+        <template #subtitle>By query count — {{ periodLabel }}</template>
         <template #content>
           <p v-if="allCompanies.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CompanyBarChart
@@ -185,7 +164,7 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Blocked Companies</template>
-        <template #subtitle>{{ selectedWindow.label }}</template>
+        <template #subtitle>{{ periodLabel }}</template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="blocked" @select-company="drillCompany" />
         </template>
@@ -193,7 +172,7 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Allowed Companies</template>
-        <template #subtitle>{{ selectedWindow.label }}</template>
+        <template #subtitle>{{ periodLabel }}</template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="allowed" @select-company="drillCompany" />
         </template>
