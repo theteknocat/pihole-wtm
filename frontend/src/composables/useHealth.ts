@@ -49,6 +49,13 @@ async function fetchHealth() {
   try {
     const res = await apiFetch('/api/health')
     if (!res.ok) throw new Error()
+    // The oldest and newest available timestamps are included with
+    // the health data response for simplicity. While not part of
+    // health data, this is an existing request that returns info
+    // from the queries table already (the total queries) so its
+    // easy to also include the date range. Otherwise we'd need
+    // a whole other little helper just to fetch that and stuff it
+    // into the window store, which is just extra code and overhead.
     const { oldest_ts, newest_ts, ...healthData } = await res.json()
     health.value = healthData
     error.value = false
