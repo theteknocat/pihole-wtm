@@ -98,7 +98,7 @@ const rangeLabel = computed(() => {
           :class="{ 'pointer-events-none': windowStore.availablePeriods.length <= 1 }"
           :tabindex="windowStore.availablePeriods.length <= 1 ? -1 : 0"
         >
-          <i class="pi pi-history" />
+          <i class="pi pi-history text-xs" />
           <span class="whitespace-nowrap"><strong>{{ selectedPeriod.label }}</strong>: {{ rangeLabel }}</span>
           <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs" />
         </Button>
