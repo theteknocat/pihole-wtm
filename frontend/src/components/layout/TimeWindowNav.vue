@@ -69,19 +69,6 @@ const rangeLabel = computed(() => {
 
 <template>
   <div class="flex items-center gap-2">
-    <!-- Period dropdown -->
-    <div>
-      <Button
-        :label="selectedPeriod.label"
-        icon="pi pi-history"
-        severity="secondary"
-        @click="periodMenu?.toggle($event)"
-        :size="props.compact ? 'small' : undefined"
-        :disabled="windowStore.availablePeriods.length <= 1"
-      />
-      <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
-    </div>
-
     <!-- Time navigation -->
     <div class="flex items-center gap-1">
       <Button
@@ -127,6 +114,19 @@ const rangeLabel = computed(() => {
         @click="windowStore.goLatest()"
         v-tooltip.top="'Latest data'"
       />
+    </div>
+
+    <!-- Period selection -->
+    <div>
+      <Button
+        :label="selectedPeriod.label"
+        icon="pi pi-history"
+        severity="secondary"
+        @click="periodMenu?.toggle($event)"
+        :size="props.compact ? 'small' : undefined"
+        :disabled="windowStore.availablePeriods.length <= 1"
+      />
+      <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
     </div>
   </div>
 </template>
