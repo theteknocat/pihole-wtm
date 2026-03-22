@@ -10,7 +10,6 @@ import json
 import logging
 import time
 from collections import defaultdict
-from contextlib import asynccontextmanager
 from typing import Any
 
 import aiosqlite
@@ -151,16 +150,10 @@ class LocalDatabase:
         self._path = path or str(DATA_DIR / "pihole_wtm.db")
         self._db: aiosqlite.Connection | None = None
 
-    @asynccontextmanager
-    async def _conn(self):
-        """Yield the persistent database connection."""
-        if self._db is None:
-            raise RuntimeError("Database not initialised — call init() first")
-        yield self._db
-
     async def init(self) -> None:
         """Open the persistent connection, apply migrations, and seed sync_state."""
         self._db = await aiosqlite.connect(self._path)
+        self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA foreign_keys=ON")
         await self._db.execute("PRAGMA journal_mode=WAL")
         await _apply_migrations(self._db)
@@ -182,18 +175,16 @@ class LocalDatabase:
     # -------------------------------------------------------------------------
 
     async def get_last_query_id(self) -> int:
-        async with self._conn() as db:
-            async with db.execute("SELECT last_query_id FROM sync_state WHERE id = 1") as cur:
-                row = await cur.fetchone()
-                return row[0] if row else 0
+        async with self._db.execute("SELECT last_query_id FROM sync_state WHERE id = 1") as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
 
     async def update_sync_state(self, last_query_id: int) -> None:
-        async with self._conn() as db:
-            await db.execute(
-                "UPDATE sync_state SET last_query_id = ?, last_synced_at = ? WHERE id = 1",
-                (last_query_id, time.time()),
-            )
-            await db.commit()
+        await self._db.execute(
+            "UPDATE sync_state SET last_query_id = ?, last_synced_at = ? WHERE id = 1",
+            (last_query_id, time.time()),
+        )
+        await self._db.commit()
 
     # -------------------------------------------------------------------------
     # Domain / enrichment
@@ -201,12 +192,11 @@ class LocalDatabase:
 
     async def upsert_domains(self, domains: list[str]) -> None:
         """Ensure a domain row exists for each domain (no-op if already present)."""
-        async with self._conn() as db:
-            await db.executemany(
-                "INSERT OR IGNORE INTO domains (domain) VALUES (?)",
-                [(d,) for d in domains],
-            )
-            await db.commit()
+        await self._db.executemany(
+            "INSERT OR IGNORE INTO domains (domain) VALUES (?)",
+            [(d,) for d in domains],
+        )
+        await self._db.commit()
 
     async def batch_update_domain_enrichment(
         self,
@@ -225,25 +215,23 @@ class LocalDatabase:
             )
             for u in updates
         ]
-        async with self._conn() as db:
-            await db.executemany(
-                """UPDATE domains
-                   SET tracker_name = ?, category = ?, company_name = ?,
-                       company_country = ?, enrichment_source = ?,
-                       enriched_at = ?, needs_reenrichment = 0
-                   WHERE domain = ?""",
-                rows,
-            )
-            await db.commit()
+        await self._db.executemany(
+            """UPDATE domains
+               SET tracker_name = ?, category = ?, company_name = ?,
+                   company_country = ?, enrichment_source = ?,
+                   enriched_at = ?, needs_reenrichment = 0
+               WHERE domain = ?""",
+            rows,
+        )
+        await self._db.commit()
 
     async def get_unenriched_domains(self) -> list[str]:
         """Return domains that have been stored but not yet enriched."""
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT domain FROM domains WHERE enriched_at IS NULL OR needs_reenrichment = 1"
-            ) as cur:
-                rows = await cur.fetchall()
-                return [r[0] for r in rows]
+        async with self._db.execute(
+            "SELECT domain FROM domains WHERE enriched_at IS NULL OR needs_reenrichment = 1"
+        ) as cur:
+            rows = await cur.fetchall()
+            return [r[0] for r in rows]
 
     async def flag_heuristic_uncategorized_for_reenrichment(self) -> int:
         """
@@ -252,13 +240,12 @@ class LocalDatabase:
         applied to domains that were previously enriched without a category.
         Returns the number of domains flagged.
         """
-        async with self._conn() as db:
-            cursor = await db.execute(
-                """UPDATE domains SET needs_reenrichment = 1
-                   WHERE enrichment_source = 'heuristic' AND category IS NULL"""
-            )
-            await db.commit()
-            return cursor.rowcount
+        cursor = await self._db.execute(
+            """UPDATE domains SET needs_reenrichment = 1
+               WHERE enrichment_source = 'heuristic' AND category IS NULL"""
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     async def flag_for_reenrichment(self) -> int:
         """
@@ -266,23 +253,20 @@ class LocalDatabase:
         The sync service will re-process them on the next cycle.
         Returns the number of domains flagged.
         """
-        async with self._conn() as db:
-            cursor = await db.execute(
-                """UPDATE domains SET needs_reenrichment = 1
-                   WHERE enrichment_source IN ('heuristic', 'rdap_failed')"""
-            )
-            await db.commit()
-            return cursor.rowcount
+        cursor = await self._db.execute(
+            """UPDATE domains SET needs_reenrichment = 1
+               WHERE enrichment_source IN ('heuristic', 'rdap_failed')"""
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     async def get_heuristic_domains(self) -> list[dict[str, Any]]:
         """Return domains enriched only via the eTLD+1 heuristic — candidates for RDAP upgrade."""
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(
-                "SELECT domain, tracker_name, category, company_name FROM domains WHERE enrichment_source = 'heuristic'"
-            ) as cur:
-                rows = await cur.fetchall()
-                return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"], "company_name": r["company_name"]} for r in rows]
+        async with self._db.execute(
+            "SELECT domain, tracker_name, category, company_name FROM domains WHERE enrichment_source = 'heuristic'"
+        ) as cur:
+            rows = await cur.fetchall()
+            return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"], "company_name": r["company_name"]} for r in rows]
 
     # -------------------------------------------------------------------------
     # Query insertion
@@ -290,17 +274,16 @@ class LocalDatabase:
 
     async def insert_queries(self, rows: list[dict[str, Any]]) -> None:
         """Insert new query rows. Skips any that already exist (by Pi-hole ID)."""
-        async with self._conn() as db:
-            await db.executemany(
-                """INSERT OR IGNORE INTO queries
-                   (id, timestamp, domain, client_ip, status,
-                    query_type, reply_type, reply_time, upstream, list_id)
-                   VALUES
-                   (:id, :timestamp, :domain, :client_ip, :status,
-                    :query_type, :reply_type, :reply_time, :upstream, :list_id)""",
-                rows,
-            )
-            await db.commit()
+        await self._db.executemany(
+            """INSERT OR IGNORE INTO queries
+               (id, timestamp, domain, client_ip, status,
+                query_type, reply_type, reply_time, upstream, list_id)
+               VALUES
+               (:id, :timestamp, :domain, :client_ip, :status,
+                :query_type, :reply_type, :reply_time, :upstream, :list_id)""",
+            rows,
+        )
+        await self._db.commit()
 
     # -------------------------------------------------------------------------
     # API query methods
@@ -349,10 +332,8 @@ class LocalDatabase:
             LIMIT ?
         """
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         results = []
         next_cursor = None
@@ -438,10 +419,8 @@ class LocalDatabase:
             ORDER BY query_count DESC
         """
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         # Aggregate into the nested category → company → domains structure
         # category_data: {category: {company: {total, blocked, allowed, domains: {domain: count}}}}
@@ -516,9 +495,8 @@ class LocalDatabase:
             ORDER BY q.domain
             LIMIT ?
         """
-        async with self._conn() as db:
-            async with db.execute(sql, [from_ts, anchor, f"%{_escape_like(query)}%", limit]) as cur:
-                return [row[0] for row in await cur.fetchall()]
+        async with self._db.execute(sql, [from_ts, anchor, f"%{_escape_like(query)}%", limit]) as cur:
+            return [row[0] for row in await cur.fetchall()]
 
     async def fetch_domain_stats(
         self,
@@ -577,10 +555,8 @@ class LocalDatabase:
             ORDER BY query_count DESC
         """
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         return {
             "window_hours": hours,
@@ -645,10 +621,8 @@ class LocalDatabase:
             ORDER BY query_count DESC
         """
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         return {
             "window_hours": hours,
@@ -709,10 +683,8 @@ class LocalDatabase:
         """
         params = [from_ts, bucket_seconds] + params
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         # Build a complete series including empty buckets.
         # +1 to include the current partial bucket (e.g. 25 hourly buckets
@@ -778,10 +750,8 @@ class LocalDatabase:
         """
         params = [from_ts, bucket_seconds] + params
 
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(sql, params) as cur:
-                rows = await cur.fetchall()
+        async with self._db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
 
         # Build per-client bucket maps
         num_buckets = hours * 3600 // bucket_seconds + 1
@@ -826,30 +796,28 @@ class LocalDatabase:
         Returns (queries_deleted, domains_deleted).
         """
         cutoff = time.time() - retention_days * 86400
-        async with self._conn() as db:
-            cursor = await db.execute(
-                "DELETE FROM queries WHERE timestamp < ?", (cutoff,)
-            )
-            queries_deleted = cursor.rowcount
+        cursor = await self._db.execute(
+            "DELETE FROM queries WHERE timestamp < ?", (cutoff,)
+        )
+        queries_deleted = cursor.rowcount
 
-            cursor = await db.execute(
-                """DELETE FROM domains
-                   WHERE domain NOT IN (SELECT DISTINCT domain FROM queries)"""
-            )
-            domains_deleted = cursor.rowcount
+        cursor = await self._db.execute(
+            """DELETE FROM domains
+               WHERE domain NOT IN (SELECT DISTINCT domain FROM queries)"""
+        )
+        domains_deleted = cursor.rowcount
 
-            await db.commit()
+        await self._db.commit()
         return queries_deleted, domains_deleted
 
     async def reset(self) -> None:
         """Delete all synced queries and domains, and reset the sync cursor to zero."""
-        async with self._conn() as db:
-            await db.execute("DELETE FROM queries")
-            await db.execute("DELETE FROM domains")
-            await db.execute(
-                "UPDATE sync_state SET last_query_id = 0, last_synced_at = NULL WHERE id = 1"
-            )
-            await db.commit()
+        await self._db.execute("DELETE FROM queries")
+        await self._db.execute("DELETE FROM domains")
+        await self._db.execute(
+            "UPDATE sync_state SET last_query_id = 0, last_synced_at = NULL WHERE id = 1"
+        )
+        await self._db.commit()
         logger.info("Database reset: all queries and domains deleted, sync cursor zeroed")
 
     # -------------------------------------------------------------------------
@@ -858,59 +826,52 @@ class LocalDatabase:
 
     async def get_config(self, key: str) -> str | None:
         """Get a single config value by key."""
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT value FROM user_config WHERE key = ?", (key,)
-            ) as cur:
-                row = await cur.fetchone()
-                return row[0] if row else None
+        async with self._db.execute(
+            "SELECT value FROM user_config WHERE key = ?", (key,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
 
     async def get_all_config(self) -> dict[str, str]:
         """Return all config key-value pairs."""
-        async with self._conn() as db:
-            async with db.execute("SELECT key, value FROM user_config") as cur:
-                rows = await cur.fetchall()
-                return {r[0]: r[1] for r in rows}
+        async with self._db.execute("SELECT key, value FROM user_config") as cur:
+            rows = await cur.fetchall()
+            return {r[0]: r[1] for r in rows}
 
     async def set_config(self, key: str, value: str) -> None:
         """Set a config value (upsert)."""
-        async with self._conn() as db:
-            await db.execute(
-                "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
-                (key, value),
-            )
-            await db.commit()
+        await self._db.execute(
+            "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        await self._db.commit()
 
     async def set_config_bulk(self, items: dict[str, str]) -> None:
         """Set multiple config values in a single transaction."""
-        async with self._conn() as db:
-            await db.executemany(
-                "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
-                list(items.items()),
-            )
-            await db.commit()
+        await self._db.executemany(
+            "INSERT OR REPLACE INTO user_config (key, value) VALUES (?, ?)",
+            list(items.items()),
+        )
+        await self._db.commit()
 
     async def delete_config(self, key: str) -> None:
         """Remove a config key."""
-        async with self._conn() as db:
-            await db.execute("DELETE FROM user_config WHERE key = ?", (key,))
-            await db.commit()
+        await self._db.execute("DELETE FROM user_config WHERE key = ?", (key,))
+        await self._db.commit()
 
     async def get_available_categories(self) -> list[str]:
         """Return distinct category values from enriched domains."""
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT DISTINCT category FROM domains WHERE category IS NOT NULL ORDER BY category"
-            ) as cur:
-                return [r[0] for r in await cur.fetchall()]
+        async with self._db.execute(
+            "SELECT DISTINCT category FROM domains WHERE category IS NOT NULL ORDER BY category"
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
 
     async def get_available_companies(self) -> list[str]:
         """Return distinct company names from enriched domains."""
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT DISTINCT company_name FROM domains WHERE company_name IS NOT NULL ORDER BY company_name"
-            ) as cur:
-                return [r[0] for r in await cur.fetchall()]
+        async with self._db.execute(
+            "SELECT DISTINCT company_name FROM domains WHERE company_name IS NOT NULL ORDER BY company_name"
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
 
     # -------------------------------------------------------------------------
     # Client names
@@ -918,61 +879,55 @@ class LocalDatabase:
 
     async def get_client_names(self) -> dict[str, str]:
         """Return all client IP → name mappings."""
-        async with self._conn() as db:
-            async with db.execute("SELECT client_ip, name FROM client_names ORDER BY name") as cur:
-                return {r[0]: r[1] for r in await cur.fetchall()}
+        async with self._db.execute("SELECT client_ip, name FROM client_names ORDER BY name") as cur:
+            return {r[0]: r[1] for r in await cur.fetchall()}
 
     async def get_clients(self) -> list[dict[str, Any]]:
         """Return all distinct client IPs with query counts and any assigned names."""
-        async with self._conn() as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute("""
-                SELECT q.client_ip, cn.name AS client_name, COUNT(*) AS query_count
-                FROM queries q
-                LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
-                GROUP BY q.client_ip
-                ORDER BY query_count DESC
-            """) as cur:
-                return [
-                    {"client_ip": r["client_ip"], "client_name": r["client_name"], "query_count": r["query_count"]}
-                    for r in await cur.fetchall()
-                ]
+        async with self._db.execute("""
+            SELECT q.client_ip, cn.name AS client_name, COUNT(*) AS query_count
+            FROM queries q
+            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            GROUP BY q.client_ip
+            ORDER BY query_count DESC
+        """) as cur:
+            return [
+                {"client_ip": r["client_ip"], "client_name": r["client_name"], "query_count": r["query_count"]}
+                for r in await cur.fetchall()
+            ]
 
     async def set_client_name(self, client_ip: str, name: str) -> None:
         """Set or update a client name for an IP."""
-        async with self._conn() as db:
-            await db.execute(
-                "INSERT OR REPLACE INTO client_names (client_ip, name) VALUES (?, ?)",
-                (client_ip, name),
-            )
-            await db.commit()
+        await self._db.execute(
+            "INSERT OR REPLACE INTO client_names (client_ip, name) VALUES (?, ?)",
+            (client_ip, name),
+        )
+        await self._db.commit()
 
     async def delete_client_name(self, client_ip: str) -> None:
         """Remove a client name mapping."""
-        async with self._conn() as db:
-            await db.execute("DELETE FROM client_names WHERE client_ip = ?", (client_ip,))
-            await db.commit()
+        await self._db.execute("DELETE FROM client_names WHERE client_ip = ?", (client_ip,))
+        await self._db.commit()
 
     # -------------------------------------------------------------------------
     # Sync status
     # -------------------------------------------------------------------------
 
     async def get_sync_status(self) -> dict[str, Any]:
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT last_query_id, last_synced_at FROM sync_state WHERE id = 1"
-            ) as cur:
-                row = await cur.fetchone()
+        async with self._db.execute(
+            "SELECT last_query_id, last_synced_at FROM sync_state WHERE id = 1"
+        ) as cur:
+            row = await cur.fetchone()
 
-            # Count queries with exclusions applied
-            conditions: list[str] = []
-            params: list[Any] = []
-            await self._apply_exclusions(conditions, params)
+        # Count queries with exclusions applied
+        conditions: list[str] = []
+        params: list[Any] = []
+        await self._apply_exclusions(conditions, params)
 
-            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-            sql = f"SELECT COUNT(*) FROM queries q JOIN domains d ON q.domain = d.domain {where}"
-            async with db.execute(sql, params) as cur:
-                count_row = await cur.fetchone()
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        sql = f"SELECT COUNT(*) FROM queries q JOIN domains d ON q.domain = d.domain {where}"
+        async with self._db.execute(sql, params) as cur:
+            count_row = await cur.fetchone()
 
         return {
             "last_query_id": row[0] if row else 0,
@@ -982,11 +937,10 @@ class LocalDatabase:
 
     async def get_data_range(self) -> dict[str, Any]:
         """Return the timestamp of the oldest and newest stored query."""
-        async with self._conn() as db:
-            async with db.execute(
-                "SELECT MIN(timestamp), MAX(timestamp) FROM queries"
-            ) as cur:
-                row = await cur.fetchone()
+        async with self._db.execute(
+            "SELECT MIN(timestamp), MAX(timestamp) FROM queries"
+        ) as cur:
+            row = await cur.fetchone()
         return {
             "oldest_ts": row[0] if row else None,
             "newest_ts": row[1] if row else None,
