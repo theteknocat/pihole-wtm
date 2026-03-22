@@ -11,10 +11,6 @@ import type { TimelineStats, ClientTimelineStats } from '@/types/api'
 
 const windowStore = useWindowStore()
 
-const periodLabel = computed(() =>
-  windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h`
-)
-
 const timeline = ref<TimelineStats | null>(null)
 const clientTimeline = ref<ClientTimelineStats | null>(null)
 const loading = ref(true)
@@ -75,7 +71,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 
     <PageHeader
       title="Query Timeline"
-      :subtitle="`Tracker query volume — ${periodLabel} window`"
+      :subtitle="`Query volume over time`"
     />
 
     <!-- Auto-refresh error (shown over existing data) -->
@@ -139,10 +135,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 
       <!-- Chart -->
       <Card>
-        <template #title>Query Volume</template>
-        <template #subtitle>
-          {{ bucketLabel }} buckets — {{ periodLabel }}
-        </template>
+        <template #title>{{ bucketLabel }} Volume</template>
         <template #content>
           <p v-if="timeline.buckets.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No query data for this time window</p>
           <TimelineChart
@@ -155,10 +148,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 
       <!-- Device activity chart -->
       <Card v-if="clientTimeline && clientTimeline.clients.length > 0">
-        <template #title>Device Activity</template>
-        <template #subtitle>
-          Query volume by device — {{ periodLabel }}
-        </template>
+        <template #title>Device Volume</template>
         <template #content>
           <DeviceTimelineChart
             :clients="clientTimeline.clients"
