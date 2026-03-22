@@ -1,27 +1,20 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import Button from 'primevue/button'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { useDark, useToggle } from '@vueuse/core'
+import { RouterLink, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
+import NavLinks from './components/layout/NavLinks.vue'
+import UtilityButtons from './components/layout/UtilityButtons.vue'
 import SettingsSidebar from './components/layout/SettingsSidebar.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
-const { isAuthenticated, checking, logout } = useAuth()
+const { isAuthenticated, checking } = useAuth()
 const route = useRoute()
-const router = useRouter()
 const settingsOpen = ref(false)
 const mobileNavOpen = ref(false)
 
 // Close mobile nav when route changes
 watch(() => route.path, () => { mobileNavOpen.value = false })
-
-async function handleLogout() {
-  await logout()
-  router.push('/login')
-}
 </script>
 
 <template>
@@ -38,10 +31,7 @@ async function handleLogout() {
         >pihole-wtm</RouterLink>
         <!-- Desktop nav -->
         <nav class="hidden md:flex items-center gap-1">
-          <RouterLink to="/dashboard" class="nav-link"><i class="pi pi-gauge text-xs" />Dashboard</RouterLink>
-          <RouterLink to="/timeline" class="nav-link"><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
-          <RouterLink to="/domains-report" class="nav-link"><i class="pi pi-globe text-xs" />Domains</RouterLink>
-          <RouterLink to="/devices-report" class="nav-link"><i class="pi pi-mobile text-xs" />Devices</RouterLink>
+          <NavLinks />
         </nav>
       </div>
       <div class="flex items-center gap-1">
@@ -57,9 +47,7 @@ async function handleLogout() {
         />
         <!-- Desktop utility buttons -->
         <div class="hidden md:flex items-center gap-1">
-          <Button :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" severity="secondary" text rounded @click="toggleDark()" aria-label="Toggle dark mode" />
-          <Button icon="pi pi-cog" severity="secondary" text rounded aria-label="Settings" @click="settingsOpen = true" />
-          <Button icon="pi pi-sign-out" severity="secondary" text rounded aria-label="Sign out" @click="handleLogout()" />
+          <UtilityButtons @open-settings="settingsOpen = true" />
         </div>
       </div>
     </header>
@@ -74,14 +62,9 @@ async function handleLogout() {
       >
         <div class="py-2 flex flex-col gap-1">
           <div class="flex justify-center gap-1 mb-1">
-            <Button :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" severity="secondary" text rounded @click="toggleDark()" aria-label="Toggle dark mode" />
-            <Button icon="pi pi-cog" severity="secondary" text rounded aria-label="Settings" @click="settingsOpen = true" />
-            <Button icon="pi pi-sign-out" severity="secondary" text rounded aria-label="Sign out" @click="handleLogout()" />
+            <UtilityButtons @open-settings="settingsOpen = true" />
           </div>
-          <RouterLink to="/dashboard" class="nav-link"><i class="pi pi-gauge text-xs" />Dashboard</RouterLink>
-          <RouterLink to="/timeline" class="nav-link"><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
-          <RouterLink to="/domains-report" class="nav-link"><i class="pi pi-globe text-xs" />Domains</RouterLink>
-          <RouterLink to="/devices-report" class="nav-link"><i class="pi pi-mobile text-xs" />Devices</RouterLink>
+          <NavLinks />
         </div>
       </nav>
     </div>
