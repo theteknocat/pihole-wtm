@@ -10,9 +10,7 @@
  * All state lives in the window store — this component is purely a control.
  */
 import { computed, ref } from 'vue'
-import Select from 'primevue/select'
 import Button from 'primevue/button'
-import SplitButton from 'primevue/splitbutton';
 import Menu from 'primevue/menu';
 import { useWindowStore } from '@/stores/window'
 
