@@ -22,10 +22,6 @@ export const useWindowStore = defineStore('window', () => {
   const oldestTs = ref<number | null>(null)
   const newestTs = ref<number | null>(null)
 
-  const stored = localStorage.getItem('reportGroupBy')
-  const reportGroupBy = ref<'domain' | 'client'>(
-    stored === 'client' ? 'client' : 'domain'
-  )
   let intervalId: ReturnType<typeof setInterval> | null = null
 
   /** Whether the user is viewing a historical (non-live) window */
@@ -107,8 +103,6 @@ export const useWindowStore = defineStore('window', () => {
     newestTs.value = newest
   }
 
-  watch(reportGroupBy, (v) => localStorage.setItem('reportGroupBy', v))
-
   // Start immediately — runs for the lifetime of the app
   startAutoRefresh()
 
@@ -126,7 +120,7 @@ export const useWindowStore = defineStore('window', () => {
   }
 
   return {
-    hours, refreshKey, endTs, reportGroupBy,
+    hours, refreshKey, endTs,
     oldestTs, newestTs,
     isHistorical, effectiveEndTs, fromTs,
     availablePeriods, canGoPrev, canGoNext,

@@ -101,9 +101,8 @@ const chartOptions = computed(() => ({
     } else {
       query.company = item.key
     }
-    windowStore.reportGroupBy = 'domain'
     visible.value = false
-    router.push({ path: '/detailed-report', query })
+    router.push({ path: '/domains-report', query })
   },
   onHover: (event: { native: MouseEvent | null }, elements: unknown[]) => {
     if (event.native?.target)
