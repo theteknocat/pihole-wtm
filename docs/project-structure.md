@@ -56,26 +56,32 @@ pihole-wtm/
 │   └── src/
 │       ├── main.ts                    # createApp, router, pinia, PrimeVue
 │       ├── router.ts                  # Route definitions, beforeEach auth guard, getRouter()
-│       ├── App.vue                    # Root: header (logo, nav, dark mode, settings, sign-out) + RouterView
-│       ├── style.css                  # CSS layer ordering, dark mode base styles
+│       ├── App.vue                    # Root: header (logo, nav, hamburger menu, settings) + RouterView
+│       ├── style.css                  # CSS layer ordering, dark mode base, utility classes (.nav-link, .text-blocked, etc.)
 │       │
 │       ├── stores/                    # Pinia stores
-│       │   └── window.ts              # Shared time window, refreshKey, reportGroupBy (localStorage-persisted)
+│       │   └── window.ts              # Shared time window (periodsBack-based navigation), refreshKey (localStorage-persisted)
 │       │
 │       ├── views/                     # Top-level route components
 │       │   ├── LoginView.vue          # Authentication: Pi-hole URL + password, reachability check
 │       │   ├── DashboardView.vue      # Tracker charts, company tables, recent queries
 │       │   ├── TimelineView.vue       # Query volume timeline with summary stats
-│       │   └── DetailedReportView.vue # Domain/device breakdown with filters; togglable grouping
+│       │   ├── DomainsReportView.vue  # Per-domain breakdown with category/company/domain search filters
+│       │   └── DevicesReportView.vue  # Per-device breakdown with category/company filters, name editing
 │       │
 │       ├── composables/
 │       │   ├── useAuth.ts             # Module-level reactive auth state, login/logout/checkSession
+│       │   ├── useReportData.ts       # Shared fetch/filter logic for domain and device report views
 │       │   ├── useScrolled.ts         # Reactive scroll-position tracker for sticky header compaction
 │       │   └── useTrackerBarChart.ts  # Shared bar chart config (datasets, tooltips, scales)
 │       │
 │       ├── components/
 │       │   ├── layout/
-│       │   │   ├── AppFooter.vue           # Fixed footer: backend/Pi-hole/source status, sync info
+│       │   │   ├── AppFooter.vue           # Fixed footer: status popover, sync info, version
+│       │   │   ├── NavLinks.vue            # Shared nav links (used in desktop nav and hamburger menu)
+│       │   │   ├── UtilityButtons.vue      # Dark mode toggle, settings trigger, sign-out button
+│       │   │   ├── PageHeader.vue          # Responsive page header with icon, title, and TimeWindowNav
+│       │   │   ├── TimeWindowNav.vue       # Time period selector (Button + Menu) with prev/next navigation
 │       │   │   ├── SettingsSidebar.vue     # Slide-in settings panel with accordion-style sections
 │       │   │   ├── settings/
 │       │   │   │   ├── DisplaySection.vue      # Exclusion config: categories, companies, domains (autocomplete chips)

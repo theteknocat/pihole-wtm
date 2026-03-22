@@ -81,9 +81,9 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 ### Frontend (Vue 3 + Vite)
 
-**Vue Router** manages views: Login (authentication), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), and Detailed Report (per-domain or per-device breakdown with drill-down from chart bars and company table rows). A `beforeEach` navigation guard checks session status and redirects unauthenticated users to `/login`. The app header (visible only when authenticated) includes a navigation bar with Dashboard, Timeline, and Detailed Report links, with active-state highlighting and icons, plus a sign-out button.
+**Vue Router** manages views: Login (authentication), Dashboard (tracker charts and summary tables), Timeline (query volume over time as a line/area chart), Domains Report (per-domain breakdown with category/company/domain search filters), and Devices Report (per-device breakdown with name editing and per-device tracker charts). A `beforeEach` navigation guard checks session status and redirects unauthenticated users to `/login`. The app header includes a responsive navigation bar (inline on desktop, hamburger menu on mobile) with view links, dark mode toggle, settings trigger, and sign-out button.
 
-**Pinia stores** hold shared session state. The `window` store tracks the active time window (24h/7d), a `refreshKey` counter used to signal cross-component data refreshes, and a `reportGroupBy` selection (`'domain'` or `'client'`) persisted to localStorage so the Detailed Report remembers whether you were viewing domains or devices.
+**Pinia stores** hold shared session state. The `window` store tracks the active time period, a relative `periodsBack` counter for time window navigation (derived from `newestTs` so windows shift automatically with new data), and a `refreshKey` counter used to signal cross-component data refreshes.
 
 **PrimeVue** (Aura theme) provides the component library — cards, tables, buttons, and the Chart component which wraps Chart.js for bar charts.
 
