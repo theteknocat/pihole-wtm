@@ -9,9 +9,11 @@
  *
  * All state lives in the window store — this component is purely a control.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
+import SplitButton from 'primevue/splitbutton';
+import Menu from 'primevue/menu';
 import { useWindowStore } from '@/stores/window'
 
 const props = defineProps<{
@@ -19,12 +21,22 @@ const props = defineProps<{
 }>()
 
 const windowStore = useWindowStore()
+const periodMenu = ref<InstanceType<typeof Menu>>()
 
 const selectedPeriod = computed({
   get: () => windowStore.availablePeriods.find(o => o.value === windowStore.hours)
     ?? windowStore.availablePeriods[0],
   set: (v) => { windowStore.hours = v.value },
 })
+
+const periodItems = computed(() =>
+  windowStore.availablePeriods
+  .filter(p => p.value != selectedPeriod.value.value)
+  .map(p => ({
+    label: p.label,
+    command: () => { selectedPeriod.value = p },
+  }))
+)
 
 /** Format a unix timestamp as a short readable date/time */
 function formatTs(ts: number): string {
@@ -60,12 +72,17 @@ const rangeLabel = computed(() => {
 <template>
   <div class="flex items-center gap-2">
     <!-- Period dropdown -->
-    <Select
-      v-model="selectedPeriod"
-      :options="windowStore.availablePeriods"
-      option-label="label"
-      :class="props.compact ? 'w-20' : 'w-24'"
-    />
+    <div>
+      <Button
+        :label="selectedPeriod.label"
+        icon="pi pi-history"
+        severity="secondary"
+        @click="periodMenu?.toggle($event)"
+        :size="props.compact ? 'small' : undefined"
+        :disabled="windowStore.availablePeriods.length <= 1"
+      />
+      <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
+    </div>
 
     <!-- Prev / Next navigation -->
     <div class="flex items-center gap-1">
