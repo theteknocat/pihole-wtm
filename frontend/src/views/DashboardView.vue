@@ -109,7 +109,7 @@ watch(trackerOnly, fetchRecentQueries)
     />
 
     <!-- Auto-refresh error (shown over existing data) -->
-    <div v-if="error && stats" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
+    <div v-if="error && stats" class="error-banner">{{ error }}</div>
 
     <!-- Loading skeletons -->
     <div v-if="loading && !stats" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -134,7 +134,7 @@ watch(trackerOnly, fetchRecentQueries)
       <Card>
         <template #title>Top Categories</template>
         <template #content>
-          <p v-if="stats!.by_category.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
+          <p v-if="stats!.by_category.length === 0" class="empty-state">No tracker data for this time window</p>
           <CategoryBarChart
             v-else
             :data="stats!.by_category"
@@ -147,7 +147,7 @@ watch(trackerOnly, fetchRecentQueries)
       <Card>
         <template #title>Top Companies</template>
         <template #content>
-          <p v-if="allCompanies.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
+          <p v-if="allCompanies.length === 0" class="empty-state">No tracker data for this time window</p>
           <CompanyBarChart
             v-else
             :data="allCompanies"

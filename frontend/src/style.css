@@ -32,6 +32,79 @@
 @layer tailwind-utilities {
   @tailwind utilities;
 
+  /* --- Navigation links --- */
+
+  .nav-link {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors
+      text-gray-500 dark:text-gray-400
+      hover:text-gray-900 dark:hover:text-gray-100
+      hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+
+  .nav-link.router-link-exact-active {
+    @apply bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium;
+  }
+
+  /* --- Status colors --- */
+
+  .text-blocked {
+    @apply text-red-500 dark:text-red-400 font-medium;
+  }
+
+  .text-allowed {
+    @apply text-green-600 dark:text-green-400 font-medium;
+  }
+
+  /* --- Common text --- */
+
+  .text-muted {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+
+  .text-muted-inverse {
+    @apply text-gray-400 dark:text-gray-500;
+  }
+
+  /* --- Divider for footer etc --- */
+
+  .text-divider {
+    @apply text-gray-300 dark:text-gray-600;
+  }
+
+  /* --- Table styling --- */
+
+  .table-header-row {
+    @apply border-b border-gray-200 dark:border-gray-700;
+  }
+
+  .table-header-cell {
+    @apply text-left py-2 pr-4 font-medium text-muted;
+  }
+
+  .table-row {
+    @apply border-b border-gray-100 dark:border-gray-800 last:border-0;
+  }
+
+  .table-row-clickable {
+    @apply table-row cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors;
+  }
+
+  .table-empty {
+    @apply py-4 text-center text-muted-inverse;
+  }
+
+  /* --- Empty / error states --- */
+
+  .empty-state {
+    @apply py-8 text-center text-muted-inverse;
+  }
+
+  .error-banner {
+    @apply text-sm text-red-500 text-right -mb-4;
+  }
+
+  /* --- Sticky header --- */
+
   .sticky-header {
     @apply sticky top-0 z-10 -mx-6 -mt-6 px-6 py-4 transition-all duration-200;
   }

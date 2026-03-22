@@ -6,7 +6,7 @@ const { health, error, syncAgo } = useHealth()
 
 <template>
   <footer
-    class="shrink-0 border-t border-gray-200 dark:border-gray-800 px-4 py-1.5 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 font-mono"
+    class="shrink-0 border-t border-gray-200 dark:border-gray-800 px-4 py-1.5 flex items-center gap-4 text-xs text-muted font-mono"
   >
     <template v-if="error">
       <span class="text-red-400 flex items-center gap-1">
@@ -17,7 +17,7 @@ const { health, error, syncAgo } = useHealth()
       <!-- Version -->
       <span>v{{ health.version }}</span>
 
-      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span class="text-divider">|</span>
 
       <!-- Pi-hole status -->
       <span class="flex items-center gap-2">
@@ -29,11 +29,11 @@ const { health, error, syncAgo } = useHealth()
         Pi-hole
       </span>
 
-      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span class="text-divider">|</span>
 
       <!-- Sources -->
       <template v-for="(source, i) in health.sources" :key="source.name">
-        <span v-if="i > 0" class="text-gray-300 dark:text-gray-600">|</span>
+        <span v-if="i > 0" class="text-divider">|</span>
         <span
           class="flex items-center gap-2"
           :title="source.loaded ? `${source.domain_count.toLocaleString()} domains` : 'Not loaded'"
@@ -47,7 +47,7 @@ const { health, error, syncAgo } = useHealth()
       </span>
       </template>
 
-      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span class="text-divider">|</span>
 
       <!-- Sync status -->
       <span class="flex items-center gap-2">
@@ -62,7 +62,7 @@ const { health, error, syncAgo } = useHealth()
         </span>
       </span>
 
-      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span class="text-divider">|</span>
 
       <!-- Stored queries -->
       <span class="flex items-center gap-2">

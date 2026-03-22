@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from 'primevue/button'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { useAuth } from './composables/useAuth'
 import SettingsSidebar from './components/layout/SettingsSidebar.vue'
@@ -11,7 +11,6 @@ const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const { isAuthenticated, checking, logout } = useAuth()
 const router = useRouter()
-const route = useRoute()
 const settingsOpen = ref(false)
 
 async function handleLogout() {
@@ -33,34 +32,10 @@ async function handleLogout() {
           class="font-semibold tracking-tight text-gray-900 dark:text-gray-100 no-underline hover:opacity-75 transition-opacity"
         >pihole-wtm</RouterLink>
         <nav class="flex items-center gap-1">
-          <RouterLink
-            to="/dashboard"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/dashboard'
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          ><i class="pi pi-gauge text-xs" />Dashboard</RouterLink>
-          <RouterLink
-            to="/timeline"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/timeline'
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          ><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
-          <RouterLink
-            to="/domains-report"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/domains-report'
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          ><i class="pi pi-globe text-xs" />Domains</RouterLink>
-          <RouterLink
-            to="/devices-report"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm no-underline transition-colors"
-            :class="route.path === '/devices-report'
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'"
-          ><i class="pi pi-mobile text-xs" />Devices</RouterLink>
+          <RouterLink to="/dashboard" class="nav-link"><i class="pi pi-gauge text-xs" />Dashboard</RouterLink>
+          <RouterLink to="/timeline" class="nav-link"><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
+          <RouterLink to="/domains-report" class="nav-link"><i class="pi pi-globe text-xs" />Domains</RouterLink>
+          <RouterLink to="/devices-report" class="nav-link"><i class="pi pi-mobile text-xs" />Devices</RouterLink>
         </nav>
       </div>
       <div class="flex items-center gap-1">

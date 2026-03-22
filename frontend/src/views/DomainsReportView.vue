@@ -124,7 +124,7 @@ const domainData = computed(() => data.value as DomainStats | null)
     </div>
 
     <!-- Refresh error -->
-    <div v-if="error && domainData" class="text-sm text-red-500 text-right -mb-4">{{ error }}</div>
+    <div v-if="error && domainData" class="error-banner">{{ error }}</div>
 
     <!-- Loading skeleton -->
     <Card v-if="loading && !domainData">
@@ -159,7 +159,7 @@ const domainData = computed(() => data.value as DomainStats | null)
           class="text-sm"
         >
           <template #empty>
-            <p class="py-8 text-center text-gray-400 dark:text-gray-500">
+            <p class="empty-state">
               {{ hasFilters ? 'No domains match your filters' : 'No domain data for this time window' }}
             </p>
           </template>
@@ -177,14 +177,14 @@ const domainData = computed(() => data.value as DomainStats | null)
           <Column field="query_count" header="Total" sortable style="text-align: right" />
           <Column field="blocked_count" header="Blocked" sortable>
             <template #body="{ data: row }">
-              <span class="text-red-500 dark:text-red-400 font-medium">
+              <span class="text-blocked">
                 {{ row.blocked_count.toLocaleString() }}
               </span>
             </template>
           </Column>
           <Column field="allowed_count" header="Allowed" sortable>
             <template #body="{ data: row }">
-              <span class="text-green-600 dark:text-green-400 font-medium">
+              <span class="text-allowed">
                 {{ row.allowed_count.toLocaleString() }}
               </span>
             </template>
