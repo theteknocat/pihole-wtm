@@ -10,7 +10,7 @@ import TimeWindowNav from '@/components/layout/TimeWindowNav.vue'
 
 defineProps<{
   title: string
-  subtitle: string
+  subtitle?: string
 }>()
 
 const scrolled = useScrolled()
