@@ -15,9 +15,6 @@ import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
 
 const router = useRouter()
 const windowStore = useWindowStore()
-const periodLabel = computed(() =>
-  windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h`
-)
 const trackerOnly = ref(true)
 
 const stats = ref<TrackerStats | null>(null)
@@ -108,7 +105,6 @@ watch(trackerOnly, fetchRecentQueries)
 
     <PageHeader
       title="Dashboard"
-      :subtitle="`Tracker intelligence — ${periodLabel} window`"
     />
 
     <!-- Auto-refresh error (shown over existing data) -->
@@ -135,8 +131,7 @@ watch(trackerOnly, fetchRecentQueries)
     <div v-if="stats" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
       <Card>
-        <template #title>Tracker Categories</template>
-        <template #subtitle>By query count — {{ periodLabel }}</template>
+        <template #title>Top Categories</template>
         <template #content>
           <p v-if="stats!.by_category.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CategoryBarChart
@@ -150,7 +145,6 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Companies</template>
-        <template #subtitle>By query count — {{ periodLabel }}</template>
         <template #content>
           <p v-if="allCompanies.length === 0" class="py-8 text-center text-gray-400 dark:text-gray-500">No tracker data for this time window</p>
           <CompanyBarChart
@@ -164,7 +158,6 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Blocked Companies</template>
-        <template #subtitle>{{ periodLabel }}</template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="blocked" @select-company="drillCompany" />
         </template>
@@ -172,7 +165,6 @@ watch(trackerOnly, fetchRecentQueries)
 
       <Card>
         <template #title>Top Allowed Companies</template>
-        <template #subtitle>{{ periodLabel }}</template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="allowed" @select-company="drillCompany" />
         </template>
@@ -181,7 +173,7 @@ watch(trackerOnly, fetchRecentQueries)
       <!-- Recent queries section — spans full width for the toggle header -->
       <div class="xl:col-span-2 flex items-center justify-between">
         <div>
-          <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Recent Query Activity</h2>
+          <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Recent Domain Activity</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {{ trackerOnly ? 'Showing known tracker domains only' : 'Showing all queries' }}
           </p>
