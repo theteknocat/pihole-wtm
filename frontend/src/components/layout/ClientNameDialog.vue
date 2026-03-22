@@ -70,7 +70,7 @@ function onKeydown(e: KeyboardEvent) {
     modal
     :draggable="false"
     :closable="true"
-    :style="{ width: '24rem' }"
+    :style="{ width: 'min(24rem, 90vw)' }"
     @hide="onHide"
   >
     <div class="space-y-4">

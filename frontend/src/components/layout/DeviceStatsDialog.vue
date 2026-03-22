@@ -144,7 +144,7 @@ watch(() => windowStore.refreshKey, fetchStats)
     @hide="onHide"
   >
     <template #header>
-      <div class="flex items-center justify-between w-full pr-2">
+      <div class="flex flex-col items-start gap-2 w-full pr-2 md:flex-row md:items-center md:justify-between">
         <span class="font-semibold text-lg">{{ clientName ?? clientIp }} — Tracker Breakdown</span>
         <SelectButton
           v-model="selectedMode"

@@ -85,7 +85,7 @@ async function handleLogin() {
       <p class="text-gray-500 dark:text-gray-400 text-lg mt-2">Pi-hole enriched with tracker intelligence</p>
     </div>
 
-    <Card class="w-96" :pt="{ root: { class: 'border border-gray-200 dark:border-transparent' } }">
+    <Card class="w-full max-w-96" :pt="{ root: { class: 'border border-gray-200 dark:border-transparent' } }">
       <template #content>
         <form class="space-y-4" @submit.prevent="handleLogin">
           <!-- Pi-hole URL field — shown when no URL is configured -->

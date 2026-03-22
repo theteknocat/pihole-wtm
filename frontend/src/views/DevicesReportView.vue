@@ -42,7 +42,7 @@ function onClientSaved(client: ClientStat, newName: string | null) {
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
+  <div class="p-4 md:p-6 space-y-6">
     <PageHeader
       icon="pi pi-mobile"
       title="Devices Report"
@@ -56,7 +56,7 @@ function onClientSaved(client: ClientStat, newName: string | null) {
         placeholder="All categories"
         filter
         showClear
-        class="w-64"
+        class="w-full md:w-64"
       >
         <template #value="{ value }">
           {{ value ? formatCategory(value) : 'All categories' }}
@@ -72,7 +72,7 @@ function onClientSaved(client: ClientStat, newName: string | null) {
         placeholder="All companies"
         filter
         showClear
-        class="w-64"
+        class="w-full md:w-64"
       />
 
       <Button

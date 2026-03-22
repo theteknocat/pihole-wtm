@@ -32,7 +32,7 @@ const domainData = computed(() => data.value as DomainStats | null)
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
+  <div class="p-4 md:p-6 space-y-6">
     <PageHeader
       icon="pi pi-globe"
       title="Domains Report"
@@ -46,7 +46,7 @@ const domainData = computed(() => data.value as DomainStats | null)
         placeholder="All categories"
         filter
         showClear
-        class="w-64"
+        class="w-full md:w-64"
       >
         <template #value="{ value }">
           {{ value ? formatCategory(value) : 'All categories' }}
@@ -62,7 +62,7 @@ const domainData = computed(() => data.value as DomainStats | null)
         placeholder="All companies"
         filter
         showClear
-        class="w-64"
+        class="w-full md:w-64"
       />
 
       <Select
@@ -73,7 +73,7 @@ const domainData = computed(() => data.value as DomainStats | null)
         placeholder="All devices"
         filter
         showClear
-        class="w-64"
+        class="w-full md:w-64"
       >
         <template #value="{ value }">
           {{ value ? (clientOptions.find(c => c.client_ip === value)?.client_name ?? value) : 'All devices' }}
@@ -88,7 +88,7 @@ const domainData = computed(() => data.value as DomainStats | null)
 
       <!-- Domain search -->
       <div class="flex flex-col gap-1">
-        <InputGroup class="w-64">
+        <InputGroup class="w-full md:w-64">
           <AutoComplete
             v-model="domainInput"
             :suggestions="domainSuggestions"

@@ -67,7 +67,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
+  <div class="p-4 md:p-6 space-y-6">
 
     <PageHeader
       icon="pi pi-chart-line"
