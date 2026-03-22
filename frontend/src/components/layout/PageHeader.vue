@@ -18,16 +18,14 @@ const scrolled = useScrolled()
 </script>
 
 <template>
-  <div class="flex items-center justify-between sticky-header" :class="{ scrolled }">
-    <div>
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+  <div class="flex flex-col items-center gap-2 md:flex-row md:justify-between sticky-header" :class="{ scrolled }">
+    <div class="text-center md:text-left">
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-center md:justify-start gap-2">
         <i v-if="icon" :class="[icon, scrolled ? 'text-sm' : '']" />
         {{ title }}
       </h1>
-      <p v-if="subtitle" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ subtitle }}</p>
+      <p v-if="subtitle" class="text-sm text-muted mt-0.5">{{ subtitle }}</p>
     </div>
-    <div class="flex items-center gap-2">
-      <TimeWindowNav :compact="scrolled" />
-    </div>
+    <TimeWindowNav :compact="scrolled" />
   </div>
 </template>

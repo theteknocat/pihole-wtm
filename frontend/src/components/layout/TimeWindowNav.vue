@@ -89,7 +89,7 @@ const rangeLabel = computed(() => {
         @click="windowStore.goPrev()"
         v-tooltip.top="'Previous period'"
       />
-      <div class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[10rem] text-center">
+      <div class="text-xs text-muted text-center">
         <Button
           severity="secondary"
           text
@@ -98,8 +98,7 @@ const rangeLabel = computed(() => {
           :class="{ 'pointer-events-none': windowStore.availablePeriods.length <= 1 }"
           :tabindex="windowStore.availablePeriods.length <= 1 ? -1 : 0"
         >
-          <i class="pi pi-history text-xs" />
-          <span class="whitespace-nowrap"><strong>{{ selectedPeriod.label }}</strong>: {{ rangeLabel }}</span>
+          <span><i class="pi pi-history text-xs" /> <strong>{{ selectedPeriod.label }}</strong>: {{ rangeLabel }}</span>
           <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs" />
         </Button>
         <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
