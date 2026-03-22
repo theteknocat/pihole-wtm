@@ -84,7 +84,7 @@ async function flushIfNeeded() {
       class="absolute top-0 right-0 h-full bg-white dark:bg-stone-900 border-l border-gray-200 dark:border-gray-800 shadow-xl flex flex-col transition-all duration-200 ease-out"
       :class="[
         visible ? 'translate-x-0' : 'translate-x-full',
-        activeSection ? 'w-[28rem] sm:w-[32rem]' : 'w-72',
+        activeSection ? 'w-[28rem] sm:w-[32rem] max-w-full' : 'w-72 max-w-full',
       ]"
     >
       <!-- Header -->
