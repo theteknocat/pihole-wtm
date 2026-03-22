@@ -71,7 +71,6 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 
     <PageHeader
       title="Query Timeline"
-      :subtitle="`Query volume over time`"
     />
 
     <!-- Auto-refresh error (shown over existing data) -->
