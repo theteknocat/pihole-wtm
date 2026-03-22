@@ -55,30 +55,12 @@ async function handleLogout() {
           aria-label="Toggle navigation"
           @click="mobileNavOpen = !mobileNavOpen"
         />
-        <Button
-          :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
-          severity="secondary"
-          text
-          rounded
-          @click="toggleDark()"
-          aria-label="Toggle dark mode"
-        />
-        <Button
-          icon="pi pi-cog"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Settings"
-          @click="settingsOpen = true"
-        />
-        <Button
-          icon="pi pi-sign-out"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Sign out"
-          @click="handleLogout()"
-        />
+        <!-- Desktop utility buttons -->
+        <div class="hidden md:flex items-center gap-1">
+          <Button :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" severity="secondary" text rounded @click="toggleDark()" aria-label="Toggle dark mode" />
+          <Button icon="pi pi-cog" severity="secondary" text rounded aria-label="Settings" @click="settingsOpen = true" />
+          <Button icon="pi pi-sign-out" severity="secondary" text rounded aria-label="Sign out" @click="handleLogout()" />
+        </div>
       </div>
     </header>
     <!-- Mobile nav dropdown -->
@@ -90,7 +72,12 @@ async function handleLogout() {
       <nav class="overflow-hidden px-6 flex flex-col gap-1"
         :class="mobileNavOpen ? 'border-b border-gray-200 dark:border-gray-800' : ''"
       >
-        <div class="py-2">
+        <div class="py-2 flex flex-col gap-1">
+          <div class="flex justify-center gap-1 mb-1">
+            <Button :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" severity="secondary" text rounded @click="toggleDark()" aria-label="Toggle dark mode" />
+            <Button icon="pi pi-cog" severity="secondary" text rounded aria-label="Settings" @click="settingsOpen = true" />
+            <Button icon="pi pi-sign-out" severity="secondary" text rounded aria-label="Sign out" @click="handleLogout()" />
+          </div>
           <RouterLink to="/dashboard" class="nav-link"><i class="pi pi-gauge text-xs" />Dashboard</RouterLink>
           <RouterLink to="/timeline" class="nav-link"><i class="pi pi-chart-line text-xs" />Timeline</RouterLink>
           <RouterLink to="/domains-report" class="nav-link"><i class="pi pi-globe text-xs" />Domains</RouterLink>
