@@ -322,7 +322,6 @@ class LocalDatabase:
             SELECT q.id, q.timestamp, q.domain, q.client_ip,
                    cn.name AS client_name,
                    q.status, q.query_type, q.reply_type, q.reply_time,
-                   q.upstream, q.list_id,
                    d.tracker_name, d.category, d.company_name, d.company_country
             FROM queries q
             LEFT JOIN domains d ON q.domain = d.domain
@@ -350,8 +349,6 @@ class LocalDatabase:
                 "query_type": row["query_type"],
                 "reply_type": row["reply_type"],
                 "reply_time": row["reply_time"],
-                "upstream": row["upstream"],
-                "list_id": row["list_id"],
                 "tracker_name": row["tracker_name"],
                 "category": row["category"],
                 "company_name": row["company_name"],

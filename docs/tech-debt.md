@@ -4,33 +4,11 @@ Minor items identified during code review that are worth addressing before relea
 
 ---
 
-## Backend
-
-### `api_client.py` — `test_connection` bypasses the auth lock
-
-`test_connection()` calls `_authenticate()` directly instead of going through `_get()`, so it doesn't acquire `_auth_lock`. This means a concurrent call to `test_connection()` and a regular request could both trigger authentication simultaneously.
-
-Low risk in practice (the test endpoint is rarely called), but should be fixed when the auth layer is refactored as part of the planned per-session `PiholeApiClient` work.
-
-### `api_client.py` — `self._sid` type after auth lock may cause mypy warnings
-
-`self._sid` is typed as `str | None` but is used as `str` immediately after the auth lock block. Mypy strict mode may flag this since it can't infer that `_authenticate()` guarantees a non-None value. Fix with an assertion or local variable after the lock.
-
-### `types/api.ts` — missing fields on `EnrichedQuery`
-
-`upstream` and `list_id` are returned by the API but not yet typed on the frontend `EnrichedQuery` interface.
-
----
-
 ## Frontend
 
 ### `RecentQueriesTable` — `type` prop unused in template
 
 The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual differentiation. Either colour-code the rows/cells based on type (e.g. a coloured left border or status badge) or remove the prop if it turns out to not be needed.
-
-### Anchor focus styles
-
-Global `a` tag styling in `style.css` doesn't include `:focus-visible` for keyboard navigation. Add a focus ring style matching the hover underline.
 
 ## Tooling
 

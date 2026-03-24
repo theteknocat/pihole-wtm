@@ -81,6 +81,8 @@ class PiholeApiClient:
                 if self._sid is None:  # re-check after acquiring lock
                     await self._authenticate()
 
+        assert self._sid is not None  # guaranteed by _authenticate()
+
         try:
             response = await self._client.get(
                 f"{self._base_url}{path}",
@@ -170,7 +172,6 @@ class PiholeApiClient:
 
     async def test_connection(self) -> dict[str, Any]:
         """Test connectivity and authentication, returning version info on success."""
-        await self._authenticate()
         data = await self._get("/api/info/version")
         return {
             "connected": True,
