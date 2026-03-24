@@ -3,7 +3,6 @@ import type { EnrichedQuery } from '@/types/api'
 
 defineProps<{
   queries: EnrichedQuery[]
-  type: 'allowed' | 'blocked'
 }>()
 
 function formatTime(ts: number): string {

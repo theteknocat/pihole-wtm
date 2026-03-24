@@ -195,7 +195,7 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentBlocked" type="blocked" />
+          <RecentQueriesTable v-else :queries="recentBlocked" />
         </template>
       </Card>
 
@@ -205,7 +205,7 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentAllowed" type="allowed" />
+          <RecentQueriesTable v-else :queries="recentAllowed" />
         </template>
       </Card>
 

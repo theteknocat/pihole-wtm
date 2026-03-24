@@ -4,12 +4,6 @@ Minor items identified during code review that are worth addressing before relea
 
 ---
 
-## Frontend
-
-### `RecentQueriesTable` — `type` prop unused in template
-
-The `type: 'allowed' | 'blocked'` prop is declared but not used for any visual differentiation. Either colour-code the rows/cells based on type (e.g. a coloured left border or status badge) or remove the prop if it turns out to not be needed.
-
 ## Tooling
 
 ### Add ruff `B` and `S` rules to CI enforcement
