@@ -49,10 +49,12 @@ export const useWindowStore = defineStore('window', () => {
       return PERIOD_OPTIONS.slice(0, 2)
     }
     const dataSpanHours = (newestTs.value - oldestTs.value) / 3600
-    return PERIOD_OPTIONS.filter(opt => {
+    const filtered = PERIOD_OPTIONS.filter(opt => {
       // Show a period if data covers at least 25% of it
       return dataSpanHours >= opt.value * 0.25
     })
+    // Always include at least the smallest period
+    return filtered.length > 0 ? filtered : [PERIOD_OPTIONS[0]]
   })
 
   /** Whether navigating back is possible (there's older data to see) */
