@@ -158,14 +158,14 @@ watch(trackerOnly, fetchRecentQueries)
       </Card>
 
       <Card>
-        <template #title>Top Blocked Companies</template>
+        <template #title><span class="flex items-center justify-between w-full">Top Blocked Companies <i class="pi pi-shield text-red-500 text-base" /></span></template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="blocked" @select-company="drillCompany" />
         </template>
       </Card>
 
       <Card>
-        <template #title>Top Allowed Companies</template>
+        <template #title><span class="flex items-center justify-between w-full">Top Allowed Companies <i class="pi pi-globe text-green-500 text-base" /></span></template>
         <template #content>
           <TopCompaniesTable :data="allCompanies" type="allowed" @select-company="drillCompany" />
         </template>
@@ -190,7 +190,7 @@ watch(trackerOnly, fetchRecentQueries)
       </div>
 
       <Card>
-        <template #title>Recent Blocked</template>
+        <template #title><span class="flex items-center justify-between w-full">Recent Blocked <i class="pi pi-shield text-red-500 text-base" /></span></template>
         <template #content>
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
@@ -200,7 +200,7 @@ watch(trackerOnly, fetchRecentQueries)
       </Card>
 
       <Card>
-        <template #title>Recent Allowed</template>
+        <template #title><span class="flex items-center justify-between w-full">Recent Allowed <i class="pi pi-globe text-green-500 text-base" /></span></template>
         <template #content>
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
