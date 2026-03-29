@@ -39,5 +39,5 @@ hooks:
     - exec: "mkdir -p /var/www/html/backend/data"
     - exec: "python3 -m venv /var/www/html/backend/.venv"
     - exec: "/var/www/html/backend/.venv/bin/pip install uv --quiet"
-    - exec: "cd /var/www/html/backend && .venv/bin/uv pip install -e . --quiet"
+    - exec: "cd /var/www/html/backend && .venv/bin/uv pip install -e '.[dev]' --quiet"
     - exec: "cd /var/www/html/frontend && npm install --silent"
