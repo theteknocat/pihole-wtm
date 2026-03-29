@@ -529,7 +529,7 @@ class LocalDatabase:
                 conditions.append("q.domain = ?")
                 params.append(domain)
             else:
-                conditions.append("q.domain LIKE ? ESCAPE '\\\\'")
+                conditions.append("q.domain LIKE ? ESCAPE '\\'")
                 params.append(f"%{_escape_like(domain)}%")
 
         await self._apply_exclusions(conditions, params)
