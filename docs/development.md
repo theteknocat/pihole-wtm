@@ -71,13 +71,13 @@ https://pihole-wtm.ddev.site:8443/docs
 ### Running backend tests
 
 ```bash
-ddev exec -d /var/www/html/backend pytest
+ddev exec -d /var/www/html/backend .venv/bin/pytest
 ```
 
 With coverage:
 
 ```bash
-ddev exec -d /var/www/html/backend pytest --cov=app --cov-report=term-missing
+ddev exec -d /var/www/html/backend .venv/bin/pytest --cov=app --cov-report=term-missing
 ```
 
 ### Running frontend tests
@@ -91,13 +91,13 @@ ddev exec -d /var/www/html/frontend npm run test
 Backend (ruff):
 
 ```bash
-ddev exec -d /var/www/html/backend ruff check app tests
+ddev exec -d /var/www/html/backend .venv/bin/ruff check app tests
 ```
 
 Backend type checking (mypy):
 
 ```bash
-ddev exec -d /var/www/html/backend mypy app
+ddev exec -d /var/www/html/backend .venv/bin/mypy app
 ```
 
 Frontend (ESLint + vue-tsc):
