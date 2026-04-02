@@ -2,11 +2,16 @@
 import { ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { RouterLink, useRoute } from 'vue-router'
+import { useDark } from '@vueuse/core'
 import { useAuth } from './composables/useAuth'
 import NavLinks from './components/layout/NavLinks.vue'
 import UtilityButtons from './components/layout/UtilityButtons.vue'
 import SettingsSidebar from './components/layout/SettingsSidebar.vue'
 import AppFooter from './components/layout/AppFooter.vue'
+
+// Initialise dark mode at the app root so the .dark class is applied on every
+// page load — including the login page, before UtilityButtons is mounted.
+useDark()
 
 const { isAuthenticated, checking } = useAuth()
 const route = useRoute()
