@@ -12,7 +12,7 @@ debug/diagnostic endpoints.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from app.models.tracker import TrackerInfo
 
@@ -69,7 +69,9 @@ class TrackerSource(Protocol):
         """Re-download/reload source data if stale. No-op if fresh."""
         ...
 
-    async def health_check(self) -> dict:
+    UPDATE_INTERVAL_HOURS: int
+
+    async def health_check(self) -> dict[str, Any]:
         """Return source status for the health endpoint."""
         ...
 

@@ -81,14 +81,15 @@ class PiholeApiClient:
                 if self._sid is None:  # re-check after acquiring lock
                     await self._authenticate()
 
-        if self._sid is None:
+        sid = self._sid
+        if sid is None:
             raise PiholeAuthError("Authentication completed but session ID was not set")
 
         try:
             response = await self._client.get(
                 f"{self._base_url}{path}",
                 params=params,
-                headers={"X-FTL-SID": self._sid},
+                headers={"X-FTL-SID": sid},
             )
         except httpx.HTTPError as e:
             raise PiholeConnectionError(f"Pi-hole request failed: {e}") from e
@@ -100,11 +101,12 @@ class PiholeApiClient:
             async with self._auth_lock:
                 if self._sid is None:
                     await self._authenticate()
+            retry_sid = self._sid or ""
             try:
                 response = await self._client.get(
                     f"{self._base_url}{path}",
                     params=params,
-                    headers={"X-FTL-SID": self._sid},
+                    headers={"X-FTL-SID": retry_sid},
                 )
             except httpx.HTTPError as e:
                 raise PiholeConnectionError(f"Pi-hole request failed: {e}") from e

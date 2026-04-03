@@ -10,6 +10,7 @@ with an ID greater than the highest one we've already stored.
 import asyncio
 import logging
 import time
+from typing import Any
 
 from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
@@ -24,14 +25,14 @@ logger = logging.getLogger(__name__)
 
 def _enrichment_dict(
     domain: str,
-    source: str,
+    source: str | None,
     info: TrackerInfo | None = None,
     *,
     tracker_name: str | None = None,
     category: str | None = None,
     company_name: str | None = None,
     company_country: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build an enrichment update dict. Uses TrackerInfo fields if provided, otherwise kwargs."""
     return {
         "domain": domain,
@@ -93,7 +94,7 @@ async def _process_batch(
     # calendar.google.com) to match their parent company's tracker entry and be
     # incorrectly stored as ad-network traffic.
     to_store: list[RawQuery] = []
-    allowed_enrichment: dict[int, tuple[TrackerInfo, str]] = {}
+    allowed_enrichment: dict[int, tuple[TrackerInfo, str | None]] = {}
 
     for q in raw_queries:
         if q.status in BLOCKED_STATUSES:
@@ -123,7 +124,7 @@ async def _process_batch(
 
     # Deduplicate by domain — a domain may appear in both blocked and allowed
     # queries within the same batch. Use a dict so last write wins.
-    enrichment_by_domain: dict[str, dict] = {}
+    enrichment_by_domain: dict[str, dict[str, Any]] = {}
     for q, (result, source_name) in zip(blocked, blocked_results, strict=True):
         if result is not None:
             enrichment_by_domain[q.domain] = _enrichment_dict(q.domain, source_name, result)

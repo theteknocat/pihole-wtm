@@ -1,7 +1,8 @@
 import json
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
@@ -25,7 +26,7 @@ db: LocalDatabase
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global sources, db
 
     sources = get_tracker_sources()
@@ -312,4 +313,4 @@ async def debug_pihole(path: str) -> dict[str, Any]:
     """Proxy a raw authenticated GET request to the Pi-hole API for exploration."""
     if sync_manager.pihole is None:
         raise HTTPException(status_code=503, detail="Sync service not running")
-    return await sync_manager.pihole._get(f"/{path.lstrip('/')}")  # noqa: SLF001
+    return cast(dict[str, Any], await sync_manager.pihole._get(f"/{path.lstrip('/')}"))  # noqa: SLF001

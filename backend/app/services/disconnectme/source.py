@@ -87,7 +87,7 @@ class DisconnectSource:
 
     # -- Health ---------------------------------------------------------------
 
-    async def health_check(self) -> dict:
+    async def health_check(self) -> dict[str, Any]:
         return {
             "loaded": self.is_loaded,
             "domain_count": len(self._lookup),

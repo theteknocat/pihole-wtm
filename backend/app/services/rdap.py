@@ -11,6 +11,7 @@ subdomains of the same registered domain only trigger one RDAP request.
 """
 
 import logging
+from typing import Any
 
 import httpx
 from cachetools import LRUCache
@@ -18,7 +19,7 @@ from cachetools import LRUCache
 logger = logging.getLogger(__name__)
 
 # Cache: registered_domain → company name (or None if not found / privacy-protected)
-_cache: LRUCache = LRUCache(maxsize=5000)
+_cache: LRUCache[str, str | None] = LRUCache(maxsize=5000)
 
 # RDAP entity roles that are never the domain owner.
 _SKIP_ROLES = {"registrar", "technical", "abuse", "noc", "billing"}
@@ -67,9 +68,9 @@ def _registered_domain(domain: str) -> str:
     return ".".join(parts[-2:]) if len(parts) >= 2 else domain
 
 
-def _flatten_entities(entities: list[dict]) -> list[dict]:
+def _flatten_entities(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Recursively collect all entities, including nested ones."""
-    result: list[dict] = []
+    result: list[dict[str, Any]] = []
     for entity in entities:
         result.append(entity)
         nested = entity.get("entities")
@@ -78,7 +79,7 @@ def _flatten_entities(entities: list[dict]) -> list[dict]:
     return result
 
 
-def _extract_org(data: dict) -> str | None:
+def _extract_org(data: dict[str, Any]) -> str | None:
     """
     Parse a registrant organization name from an RDAP response.
     Tries the registrant entity first, then any other entity with vCard data.

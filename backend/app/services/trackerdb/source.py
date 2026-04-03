@@ -91,7 +91,7 @@ class TrackerDBSource:
 
     def __init__(self) -> None:
         self._path = DATA_DIR / "trackerdb.db"
-        self._cache: LRUCache = LRUCache(maxsize=_CACHE_SIZE)
+        self._cache: LRUCache[str, TrackerInfo | None] = LRUCache(maxsize=_CACHE_SIZE)
         self._db: aiosqlite.Connection | None = None  # persistent read connection
         self._refreshing = False  # True while the DB file is being re-downloaded
         self._lookup_failed = False  # Set on first lookup error; cleared on next successful refresh
@@ -175,7 +175,7 @@ class TrackerDBSource:
 
     # -- Health ---------------------------------------------------------------
 
-    async def health_check(self) -> dict:
+    async def health_check(self) -> dict[str, Any]:
         loaded = self._path.exists()
         categories = await self.get_categories() if loaded else []
         domain_count = sum(c["domain_count"] for c in categories)

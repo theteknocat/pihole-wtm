@@ -33,7 +33,7 @@ class SyncSource(Enum):
 
 
 pihole: PiholeApiClient | None = None
-sync_task: asyncio.Task | None = None
+sync_task: asyncio.Task[None] | None = None
 sync_source: SyncSource | None = None
 _wake_event: asyncio.Event = asyncio.Event()
 
