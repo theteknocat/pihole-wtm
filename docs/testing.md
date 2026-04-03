@@ -137,12 +137,12 @@ Checklist for Phase 3 testing. Backend test infrastructure (pytest, pytest-async
 
 ### Workflow: `ci.yml` (on push and PR)
 
-- [ ] **Backend lint**: `ruff check backend/` (includes B and S rules)
-- [ ] **Backend type check**: `mypy backend/`
-- [ ] **Backend tests**: `pytest --cov` with coverage threshold
-- [ ] **Frontend lint**: `eslint frontend/src/`
-- [ ] **Frontend type check**: `vue-tsc --noEmit`
-- [ ] **Frontend tests**: `vitest run`
+- [x] **Backend lint**: `ruff check .` (includes B and S rules)
+- [x] **Backend type check**: `mypy app/`
+- [x] **Backend tests**: `pytest`
+- [x] **Frontend lint**: `eslint src/`
+- [x] **Frontend type check**: `vue-tsc --noEmit`
+- [x] **Frontend tests**: `vitest run`
 
 ### Workflow: `release.yml` (on tag, future)
 
