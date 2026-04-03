@@ -5,7 +5,7 @@
  * Opens pre-filled with any existing name. The user can set/update the name, or
  * clear it to remove the mapping. Uses PrimeVue Dialog + InputText.
  */
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
