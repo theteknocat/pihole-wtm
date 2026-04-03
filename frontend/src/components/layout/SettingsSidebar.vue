@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import Button from 'primevue/button'
+import SelectButton from 'primevue/selectbutton'
+import { useColorMode } from '@vueuse/core'
 
 import DisplaySection from './settings/DisplaySection.vue'
 import SyncSection from './settings/SyncSection.vue'
@@ -8,6 +10,15 @@ import DataSourcesSection from './settings/DataSourcesSection.vue'
 import DataManagementSection from './settings/DataManagementSection.vue'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
+
+// Colour mode — mode.store is the raw stored preference ('light' | 'dark' | 'auto')
+const mode = useColorMode()
+const colorModeStore = mode.store
+const appearanceOptions = [
+  { label: 'Light', value: 'light', icon: 'pi pi-sun' },
+  { label: 'Dark', value: 'dark', icon: 'pi pi-moon' },
+  { label: 'System', value: 'auto', icon: 'pi pi-desktop' },
+]
 
 // Slide-in animation
 const visible = ref(false)
@@ -23,7 +34,7 @@ async function close() {
 const activeSection = ref<string | null>(null)
 
 const sections = [
-  { id: 'display', label: 'Display', icon: 'pi-eye', component: DisplaySection },
+  { id: 'display', label: 'Filters', icon: 'pi-filter', component: DisplaySection },
   { id: 'sync', label: 'Sync', icon: 'pi-sync', component: SyncSection },
   { id: 'data-sources', label: 'Data Sources', icon: 'pi-database', component: DataSourcesSection },
   { id: 'data-management', label: 'Data Management', icon: 'pi-server', component: DataManagementSection },
@@ -94,10 +105,10 @@ async function flushIfNeeded() {
       </div>
 
       <!-- Content -->
-      <div class="flex-1 min-h-0 flex flex-col" :class="activeSection ? 'overflow-hidden' : 'overflow-auto'">
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
 
         <!-- Menu mode: show all sections -->
-        <div v-if="!activeSection" class="p-2 space-y-1">
+        <div v-if="!activeSection" class="flex-1 min-h-0 flex flex-col overflow-auto p-2 gap-1">
           <button
             v-for="section in sections"
             :key="section.id"
@@ -108,6 +119,29 @@ async function flushIfNeeded() {
             <span class="flex-1">{{ section.label }}</span>
             <i class="pi pi-chevron-right text-xs text-gray-400 dark:text-gray-500" />
           </button>
+
+          <!-- Appearance — pinned to bottom -->
+          <div class="mt-auto pt-2 border-t border-gray-200 dark:border-gray-800">
+            <SelectButton
+              size="small"
+              v-model="colorModeStore"
+              :options="appearanceOptions"
+              option-label="label"
+              option-value="value"
+              :pt="{
+                root: { class: 'flex w-full' },
+                pcToggleButton: {
+                  root: { class: 'flex-1' },
+                  content: { class: 'w-full justify-center' },
+                },
+              }"
+            >
+              <template #option="{ option }">
+                <i :class="['pi text-xs', option.icon]" />
+                <span class="hidden sm:inline">{{ option.label }}</span>
+              </template>
+            </SelectButton>
+          </div>
         </div>
 
         <!-- Expanded mode: show active section -->
