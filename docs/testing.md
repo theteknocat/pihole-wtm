@@ -102,34 +102,34 @@ Checklist for Phase 3 testing. Backend test infrastructure (pytest, pytest-async
 
 ### Setup
 
-- [ ] Install vitest, @vue/test-utils, jsdom
-- [ ] Create `vitest.config.ts` with Vue plugin and path aliases
-- [ ] Confirm test runner works with a trivial test
+- [x] Install vitest, @vue/test-utils, jsdom
+- [x] Create `vitest.config.ts` with Vue plugin and path aliases
+- [x] Confirm test runner works with a trivial test
 
 ### Window Store
 
-- [ ] Default state (hours=24, periodsBack=0, isHistorical=false)
-- [ ] `availablePeriods` — filters by data span, always includes at least one
-- [ ] `goPrev()` / `goNext()` — increments/decrements periodsBack
-- [ ] `goOldest()` — calculates max periods from data range
-- [ ] `goLatest()` — resets to 0
-- [ ] `canGoPrev` / `canGoNext` — boundary conditions
-- [ ] `effectiveEndTs` / `fromTs` — derived from newestTs and periodsBack
-- [ ] `endTs` — null when live, computed when historical
-- [ ] `queryParams()` — builds correct query string with and without end_ts
-- [ ] Changing `hours` resets `periodsBack` to 0
-- [ ] `setDataRange()` updates oldestTs/newestTs
+- [x] Default state (hours=24, periodsBack=0, isHistorical=false)
+- [x] `availablePeriods` — filters by data span, always includes at least one
+- [x] `goPrev()` / `goNext()` — increments/decrements periodsBack
+- [x] `goOldest()` — calculates max periods from data range
+- [x] `goLatest()` — resets to 0
+- [x] `canGoPrev` / `canGoNext` — boundary conditions
+- [x] `effectiveEndTs` / `fromTs` — derived from newestTs and periodsBack
+- [x] `endTs` — null when live, computed when historical
+- [x] `queryParams()` — builds correct query string with and without end_ts
+- [x] Changing `hours` resets `periodsBack` to 0
+- [x] `setDataRange()` updates oldestTs/newestTs
 
 ### Composables
 
-- [ ] **useAuth** — `checkSession()` sets auth state, `login()` success/failure, `logout()` clears state
-- [ ] **useHealth** — `fetchHealth()` updates health ref and window store data range, error handling
-- [ ] **useReportData** — filter application, URL param sync, `clearFilters()`, mode switching (domain/client)
+- [x] **useAuth** — `checkSession()` sets auth state, `login()` success/failure, `logout()` clears state
+- [x] **useHealth** — `fetchHealth()` updates health ref and window store data range, error handling
+- [x] **useReportData** — filter application, URL param sync, `resetFilters()`, mode switching (domain/client)
 
 ### Utilities
 
-- [ ] `formatCategory()` — slug to title case ("ad_fraud" → "Ad Fraud", null → "Uncategorized")
-- [ ] `apiFetch()` — 401 triggers redirect to /login, normal responses pass through
+- [x] `formatCategory()` — slug to title case ("ad_fraud" → "Ad Fraud", null → "Uncategorized")
+- [x] `apiFetch()` — 401 triggers redirect to /login, normal responses pass through
 
 ---
 
