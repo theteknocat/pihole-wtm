@@ -8,93 +8,93 @@ Checklist for Phase 3 testing. Backend test infrastructure (pytest, pytest-async
 
 ### Setup
 
-- [ ] Confirm `tests/` directory structure: `tests/conftest.py`, `tests/test_*.py`
-- [ ] Create shared fixtures: async test client, in-memory SQLite database, mock Pi-hole responses
+- [x] Confirm `tests/` directory structure: `tests/conftest.py`, `tests/test_*.py`
+- [x] Create shared fixtures: async test client, in-memory SQLite database, mock Pi-hole responses
 
 ### API Endpoints
 
-- [ ] `GET /api/health` — returns sync status, source health, data range
-- [ ] `GET /api/pihole/test` — Pi-hole connectivity check
-- [ ] `GET /api/pihole/summary` — summary stats passthrough
-- [ ] `GET /api/queries` — pagination (cursor, limit), status_type filter, tracker_only filter
-- [ ] `GET /api/stats/trackers` — time window params, client_ip filter
-- [ ] `GET /api/stats/timeline` — bucketed counts, hours/end_ts params
-- [ ] `GET /api/stats/timeline/clients` — per-client timeline buckets
-- [ ] `GET /api/stats/domains` — category, company, client_ip, domain, domain_exact filters
-- [ ] `GET /api/domains/search` — autocomplete search
-- [ ] `GET /api/stats/clients` — per-client aggregation with category/company filters
-- [ ] `GET /api/settings/options` — available categories and companies
-- [ ] `GET /api/settings` — returns all user config
-- [ ] `PUT /api/settings/{key}` — validation (int ranges, JSON arrays)
-- [ ] `GET /api/clients` — client list with names
-- [ ] `PUT /api/clients/{client_ip}` — set friendly name
-- [ ] `DELETE /api/clients/{client_ip}` — remove name mapping
-- [ ] `POST /api/admin/reenrich` — flags domains for re-enrichment
-- [ ] `POST /api/admin/reset` — clears data and resets sync
+- [x] `GET /api/health` — returns sync status, source health, data range
+- [x] `GET /api/pihole/test` — Pi-hole connectivity check
+- [x] `GET /api/pihole/summary` — summary stats passthrough
+- [x] `GET /api/queries` — pagination (cursor, limit), status_type filter, tracker_only filter
+- [x] `GET /api/stats/trackers` — time window params, client_ip filter
+- [x] `GET /api/stats/timeline` — bucketed counts, hours/end_ts params
+- [x] `GET /api/stats/timeline/clients` — per-client timeline buckets
+- [x] `GET /api/stats/domains` — category, company, client_ip, domain, domain_exact filters
+- [x] `GET /api/domains/search` — autocomplete search
+- [x] `GET /api/stats/clients` — per-client aggregation with category/company filters
+- [x] `GET /api/settings/options` — available categories and companies
+- [x] `GET /api/settings` — returns all user config
+- [x] `PUT /api/settings/{key}` — validation (int ranges, JSON arrays)
+- [x] `GET /api/clients` — client list with names
+- [x] `PUT /api/clients/{client_ip}` — set friendly name
+- [x] `DELETE /api/clients/{client_ip}` — remove name mapping
+- [x] `POST /api/admin/reenrich` — flags domains for re-enrichment
+- [x] `POST /api/admin/reset` — clears data and resets sync
 
 ### Auth Routes
 
-- [ ] `GET /api/auth/status` — unauthenticated and authenticated responses
-- [ ] `GET /api/auth/check-url` — reachable and unreachable Pi-hole URLs
-- [ ] `POST /api/auth/login` — successful login, wrong password, unreachable Pi-hole
-- [ ] `POST /api/auth/logout` — clears session
-- [ ] Session middleware — missing cookie, expired session, valid session
+- [x] `GET /api/auth/status` — unauthenticated and authenticated responses
+- [x] `GET /api/auth/check-url` — reachable and unreachable Pi-hole URLs
+- [x] `POST /api/auth/login` — successful login, wrong password, unreachable Pi-hole
+- [x] `POST /api/auth/logout` — clears session
+- [x] Session middleware — missing cookie, expired session, valid session
 
 ### Database Service
 
-- [ ] Schema creation and migrations
-- [ ] Query storage (insert, deduplication via `INSERT OR IGNORE`)
-- [ ] Query fetch with filters (status_type, tracker_only, cursor pagination)
-- [ ] Tracker stats aggregation (by_category with companies)
-- [ ] Timeline bucketing (hourly for 24h, 6-hourly for 7d)
-- [ ] Domain stats with filters
-- [ ] Client stats aggregation
-- [ ] Domain search (prefix match)
-- [ ] Settings get/set (int config, JSON exclusion lists)
-- [ ] Client name CRUD
-- [ ] Data retention purge (orphaned domains cleanup)
-- [ ] Domain enrichment tracking (`needs_reenrichment` flag)
+- [x] Schema creation and migrations
+- [x] Query storage (insert, deduplication via `INSERT OR IGNORE`)
+- [x] Query fetch with filters (status_type, tracker_only, cursor pagination)
+- [x] Tracker stats aggregation (by_category with companies)
+- [x] Timeline bucketing (hourly for 24h, 6-hourly for 7d)
+- [x] Domain stats with filters
+- [x] Client stats aggregation
+- [x] Domain search (prefix match)
+- [x] Settings get/set (int config, JSON exclusion lists)
+- [x] Client name CRUD
+- [x] Data retention purge (orphaned domains cleanup)
+- [x] Domain enrichment tracking (`needs_reenrichment` flag)
 
 ### Pi-hole API Client
 
-- [ ] `_authenticate()` — successful auth, failed auth (bad password), connection error
-- [ ] `_get()` — successful request, 401 re-authentication, connection error
-- [ ] Double-checked locking — concurrent requests only authenticate once
-- [ ] `get_summary()` — response parsing
-- [ ] `get_queries()` — pagination, cursor handling, field mapping
-- [ ] `test_connection()` — delegates through `_get()`
-- [ ] `close()` — session cleanup
+- [x] `_authenticate()` — successful auth, failed auth (bad password), connection error
+- [x] `_get()` — successful request, 401 re-authentication, connection error
+- [x] Double-checked locking — concurrent requests only authenticate once
+- [x] `get_summary()` — response parsing
+- [x] `get_queries()` — pagination, cursor handling, field mapping
+- [x] `test_connection()` — delegates through `_get()`
+- [x] `close()` — session cleanup
 
 ### Sync Service
 
-- [ ] `_enrich_from_sources()` — priority ordering, fallback chain
-- [ ] `_gate_from_sources()` — exact-match filtering (allowed vs blocked)
-- [ ] `_process_batch()` — stores queries, enriches new domains
-- [ ] Batch processing with no new data (empty response)
+- [x] `_enrich_from_sources()` — priority ordering, fallback chain
+- [x] `_gate_from_sources()` — exact-match filtering (allowed vs blocked)
+- [x] `_process_batch()` — stores queries, enriches new domains
+- [x] Batch processing with no new data (empty response)
 
 ### Tracker Sources
 
-- [ ] **TrackerDB** — `lookup_exact()` hit and miss, `enrich()` subdomain fallback, LRU cache behaviour, health check
-- [ ] **Disconnect.me** — `lookup_exact()` hit and miss, JSON loading, refresh-when-stale
-- [ ] Source registration via `get_tracker_sources()`
+- [x] **TrackerDB** — `lookup_exact()` hit and miss, `enrich()` subdomain fallback, LRU cache behaviour, health check
+- [x] **Disconnect.me** — `lookup_exact()` hit and miss, JSON loading, refresh-when-stale
+- [x] Source registration via `get_tracker_sources()`
 
 ### Heuristic Enrichment
 
-- [ ] `extract_category()` — keyword matching (e.g. "analytics.example.com" → analytics)
-- [ ] `extract_company_name()` — eTLD+1 extraction
-- [ ] Edge cases: short domains, no match, ambiguous keywords
+- [x] `extract_category()` — keyword matching (e.g. "analytics.example.com" → analytics)
+- [x] `extract_company_name()` — eTLD+1 extraction
+- [x] Edge cases: short domains, no match, ambiguous keywords
 
 ### RDAP
 
-- [ ] `lookup_company()` — successful lookup, privacy proxy detection
-- [ ] LRU cache behaviour
-- [ ] Network error handling
+- [x] `lookup_company()` — successful lookup, privacy proxy detection
+- [x] LRU cache behaviour
+- [x] Network error handling
 
 ### Session Store
 
-- [ ] `create()` / `get()` / `delete()` / `clear()`
-- [ ] Idle timeout expiry
-- [ ] `get_active()` — returns None for expired sessions
+- [x] `create()` / `get()` / `delete()` / `clear()`
+- [x] Idle timeout expiry
+- [x] `get_active()` — returns None for expired sessions
 
 ---
 
