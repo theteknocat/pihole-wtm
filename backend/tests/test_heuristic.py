@@ -2,7 +2,6 @@ import pytest
 
 from app.services.heuristic import extract_category, extract_company_name
 
-
 # ---------------------------------------------------------------------------
 # extract_company_name()
 # ---------------------------------------------------------------------------

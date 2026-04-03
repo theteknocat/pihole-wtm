@@ -81,7 +81,8 @@ class PiholeApiClient:
                 if self._sid is None:  # re-check after acquiring lock
                     await self._authenticate()
 
-        assert self._sid is not None  # guaranteed by _authenticate()
+        if self._sid is None:
+            raise PiholeAuthError("Authentication completed but session ID was not set")
 
         try:
             response = await self._client.get(
@@ -111,7 +112,9 @@ class PiholeApiClient:
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            raise PiholeAuthError(f"Pi-hole API returned {response.status_code} — check credentials") from e
+            raise PiholeAuthError(
+                f"Pi-hole API returned {response.status_code} — check credentials"
+            ) from e
 
         return response.json()
 

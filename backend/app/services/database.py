@@ -263,10 +263,19 @@ class LocalDatabase:
     async def get_heuristic_domains(self) -> list[dict[str, Any]]:
         """Return domains enriched only via the eTLD+1 heuristic — candidates for RDAP upgrade."""
         async with self._db.execute(
-            "SELECT domain, tracker_name, category, company_name FROM domains WHERE enrichment_source = 'heuristic'"
+            "SELECT domain, tracker_name, category, company_name"
+            " FROM domains WHERE enrichment_source = 'heuristic'"
         ) as cur:
             rows = await cur.fetchall()
-            return [{"domain": r["domain"], "tracker_name": r["tracker_name"], "category": r["category"], "company_name": r["company_name"]} for r in rows]
+            return [
+                {
+                    "domain": r["domain"],
+                    "tracker_name": r["tracker_name"],
+                    "category": r["category"],
+                    "company_name": r["company_name"],
+                }
+                for r in rows
+            ]
 
     # -------------------------------------------------------------------------
     # Query insertion
@@ -476,12 +485,16 @@ class LocalDatabase:
             "window_hours": hours,
             "total_queries": total_queries,
             "tracker_queries": tracker_total,
-            "tracker_percent": round(tracker_total / total_queries * 100, 1) if total_queries else 0.0,
+            "tracker_percent": round(tracker_total / total_queries * 100, 1)
+            if total_queries
+            else 0.0,
             "truncated": False,
             "by_category": by_category,
         }
 
-    async def search_domains(self, query: str, hours: int = 24, end_ts: float | None = None, limit: int = 20) -> list[str]:
+    async def search_domains(
+        self, query: str, hours: int = 24, end_ts: float | None = None, limit: int = 20
+    ) -> list[str]:
         """Return domain names matching the query substring within the time window."""
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
@@ -492,7 +505,9 @@ class LocalDatabase:
             ORDER BY q.domain
             LIMIT ?
         """
-        async with self._db.execute(sql, [from_ts, anchor, f"%{_escape_like(query)}%", limit]) as cur:
+        async with self._db.execute(
+            sql, [from_ts, anchor, f"%{_escape_like(query)}%", limit]
+        ) as cur:
             return [row[0] for row in await cur.fetchall()]
 
     async def fetch_domain_stats(
@@ -866,7 +881,8 @@ class LocalDatabase:
     async def get_available_companies(self) -> list[str]:
         """Return distinct company names from enriched domains."""
         async with self._db.execute(
-            "SELECT DISTINCT company_name FROM domains WHERE company_name IS NOT NULL ORDER BY company_name"
+            "SELECT DISTINCT company_name FROM domains"
+            " WHERE company_name IS NOT NULL ORDER BY company_name"
         ) as cur:
             return [r[0] for r in await cur.fetchall()]
 
@@ -876,7 +892,9 @@ class LocalDatabase:
 
     async def get_client_names(self) -> dict[str, str]:
         """Return all client IP → name mappings."""
-        async with self._db.execute("SELECT client_ip, name FROM client_names ORDER BY name") as cur:
+        async with self._db.execute(
+            "SELECT client_ip, name FROM client_names ORDER BY name"
+        ) as cur:
             return {r[0]: r[1] for r in await cur.fetchall()}
 
     async def get_clients(self) -> list[dict[str, Any]]:
@@ -889,7 +907,8 @@ class LocalDatabase:
             ORDER BY query_count DESC
         """) as cur:
             return [
-                {"client_ip": r["client_ip"], "client_name": r["client_name"], "query_count": r["query_count"]}
+                {"client_ip": r["client_ip"], "client_name": r["client_name"],
+                 "query_count": r["query_count"]}
                 for r in await cur.fetchall()
             ]
 

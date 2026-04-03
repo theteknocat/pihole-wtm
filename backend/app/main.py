@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
+import app.services.sync_manager as sync_manager
+from app.log import setup_logging
 from app.routers.auth import router as auth_router
 from app.services.auth.middleware import require_session
 from app.services.auth.session_store import session_store
@@ -14,9 +16,6 @@ from app.services.pihole.api_client import (
     PiholeConnectionError,
 )
 from app.services.sources import TrackerSource, get_tracker_sources
-import app.services.sync_manager as sync_manager
-
-from app.log import setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -191,7 +190,9 @@ async def stats_clients(
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await db.fetch_client_stats(hours=hours, end_ts=end_ts, category=category, company=company)
+    return await db.fetch_client_stats(
+        hours=hours, end_ts=end_ts, category=category, company=company
+    )
 
 
 @app.get("/api/settings/options", dependencies=[Depends(require_session)])

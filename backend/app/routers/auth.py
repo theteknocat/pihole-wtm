@@ -153,8 +153,8 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
 
     # Start the sync service with the new session credentials
     # (no-op if already running from env vars)
+    from app.main import db, sources
     from app.services.sync_manager import start_sync_from_session
-    from app.main import sources, db
     await start_sync_from_session(session, sources, db)
 
     logger.info("User authenticated successfully for Pi-hole at %s", url)

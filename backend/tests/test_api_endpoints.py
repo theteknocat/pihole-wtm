@@ -12,13 +12,11 @@ are patched where endpoints depend on them.
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 import app.services.sync_manager as sync_manager_module
 from app.services.database import LocalDatabase
 from app.services.sync_manager import SyncSource
-
 
 # ---------------------------------------------------------------------------
 # Seed helpers (same pattern as test_database.py)

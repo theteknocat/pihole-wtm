@@ -12,12 +12,10 @@ External dependencies are mocked:
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from httpx import AsyncClient
 
 from app.services.auth.middleware import SESSION_COOKIE
 from app.services.auth.session_store import session_store
-from app.services.database import LocalDatabase
-from httpx import AsyncClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers

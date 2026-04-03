@@ -32,7 +32,7 @@ def _enrichment_dict(
     company_name: str | None = None,
     company_country: str | None = None,
 ) -> dict:
-    """Build an enrichment update dict. Uses TrackerInfo fields if provided, otherwise keyword args."""
+    """Build an enrichment update dict. Uses TrackerInfo fields if provided, otherwise kwargs."""
     return {
         "domain": domain,
         "tracker_name": info.tracker_name if info else tracker_name,
@@ -124,7 +124,7 @@ async def _process_batch(
     # Deduplicate by domain — a domain may appear in both blocked and allowed
     # queries within the same batch. Use a dict so last write wins.
     enrichment_by_domain: dict[str, dict] = {}
-    for q, (result, source_name) in zip(blocked, blocked_results):
+    for q, (result, source_name) in zip(blocked, blocked_results, strict=True):
         if result is not None:
             enrichment_by_domain[q.domain] = _enrichment_dict(q.domain, source_name, result)
 
@@ -267,11 +267,11 @@ async def _reenrich_missing(
     )
 
     updates = []
-    for domain, (result, source_name) in zip(unenriched, results):
+    for domain, (result, source_name) in zip(unenriched, results, strict=True):
         if result is not None:
             updates.append(_enrichment_dict(domain, source_name, result))
         else:
-            # eTLD+1 heuristic — company name from registered domain, category from subdomain keywords
+            # eTLD+1 heuristic — company name from registered domain, category from keywords
             company_name = extract_company_name(domain)
             category = extract_category(domain)
             if company_name or category:
@@ -281,7 +281,8 @@ async def _reenrich_missing(
 
     if updates:
         await db.batch_update_domain_enrichment(updates)
-        logger.info("Re-enriched %d domains (%d still unenriched)", len(updates), len(unenriched) - len(updates))
+        still_unenriched = len(unenriched) - len(updates)
+        logger.info("Re-enriched %d domains (%d still unenriched)", len(updates), still_unenriched)
 
 
 async def _rdap_reenrich(db: LocalDatabase) -> None:
@@ -312,7 +313,9 @@ async def _rdap_reenrich(db: LocalDatabase) -> None:
             # Mark as failed so we don't retry on every cycle
             await db.batch_update_domain_enrichment([_enrichment_dict(
                 row["domain"], "rdap_failed",
-                tracker_name=row["tracker_name"], category=row["category"], company_name=row["company_name"],
+                tracker_name=row["tracker_name"],
+                category=row["category"],
+                company_name=row["company_name"],
             )])
         await asyncio.sleep(0.5)  # be polite to RDAP services
 
@@ -397,7 +400,7 @@ async def run_sync_loop(
             # comes first. Clear the event so the next cycle sleeps normally.
             try:
                 await asyncio.wait_for(wake_event.wait(), timeout=interval)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
             wake_event.clear()
         else:

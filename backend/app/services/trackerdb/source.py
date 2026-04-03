@@ -8,6 +8,7 @@ for domain → tracker metadata, and exposes debug/diagnostic API routes.
 import logging
 import sqlite3
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -100,10 +101,8 @@ class TrackerDBSource:
     async def _open_db(self) -> None:
         """Open (or reopen) the persistent read connection to trackerdb.db."""
         if self._db is not None:
-            try:
+            with suppress(Exception):
                 await self._db.close()
-            except Exception:
-                pass
         if self._path.exists():
             self._db = await aiosqlite.connect(str(self._path))
             self._db.row_factory = aiosqlite.Row
@@ -111,10 +110,8 @@ class TrackerDBSource:
     async def _close_db(self) -> None:
         """Close the persistent connection (e.g. before replacing the file)."""
         if self._db is not None:
-            try:
+            with suppress(Exception):
                 await self._db.close()
-            except Exception:
-                pass
             self._db = None
 
     async def initialize(self) -> None:
@@ -223,7 +220,10 @@ class TrackerDBSource:
         try:
             async with self._db.execute(_CATEGORIES_SQL) as cursor:
                 rows = await cursor.fetchall()
-                return [{"category": row["name"], "domain_count": row["domain_count"]} for row in rows]
+                return [
+                    {"category": row["name"], "domain_count": row["domain_count"]}
+                    for row in rows
+                ]
         except Exception as e:
             logger.warning("TrackerDB categories query failed: %s", e)
             return []

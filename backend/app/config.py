@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     pihole_api_password: str = ""
 
     # Session
-    session_timeout_hours: int = 24  # Idle timeout — session expires after this many hours of inactivity
+    # Idle timeout — session expires after this many hours of inactivity
+    session_timeout_hours: int = 24
 
     # Logging
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"

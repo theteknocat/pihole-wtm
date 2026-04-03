@@ -12,13 +12,10 @@ Mock sources are plain objects implementing the TrackerSource protocol.
 
 import time
 
-import pytest
-
 from app.models.pihole import RawQuery
 from app.models.tracker import TrackerInfo
 from app.services.database import LocalDatabase
 from app.services.sync import _enrich_from_sources, _gate_from_sources, _process_batch
-
 
 # ---------------------------------------------------------------------------
 # Mock source helper

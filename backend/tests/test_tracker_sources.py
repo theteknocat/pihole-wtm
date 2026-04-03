@@ -19,7 +19,6 @@ from app.services.disconnectme.source import DisconnectSource
 from app.services.sources import get_tracker_sources
 from app.services.trackerdb.source import TrackerDBSource
 
-
 # ---------------------------------------------------------------------------
 # TrackerDB fixtures
 # ---------------------------------------------------------------------------
