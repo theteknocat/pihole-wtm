@@ -71,7 +71,11 @@ async def check_pihole_url(url: str | None = None) -> dict[str, Any]:
             res = await client.get(f"{target_url}/api/info/version")
             if res.status_code == 200:
                 version = (
-                    res.json().get("version", {}).get("core", {}).get("local", {}).get("version")
+                    res.json()
+                    .get("version", {})
+                    .get("core", {})
+                    .get("local", {})
+                    .get("version")
                 )
                 return {"reachable": True, "version": version}
             # 401 means Pi-hole is there but requires auth — still reachable
@@ -111,13 +115,17 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
 
     if res.status_code != 200:
         response.status_code = 502
-        return LoginResponse(status=f"Pi-hole returned HTTP {res.status_code}", pihole_url=url)
+        return LoginResponse(
+            status=f"Pi-hole returned HTTP {res.status_code}", pihole_url=url
+        )
 
     data = res.json()
     sid = data.get("session", {}).get("sid")
     if not sid:
         response.status_code = 401
-        return LoginResponse(status="Invalid password", pihole_url=url)
+        return LoginResponse(
+            status="Invalid password", pihole_url=url
+        )
 
     # Invalidate the Pi-hole session we just created for verification —
     # PiholeApiClient will create its own when the sync service starts
@@ -134,7 +142,6 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
     session = session_store.create(pihole_url=url, pihole_password=body.password)
 
     from app.config import settings
-
     response.set_cookie(
         key=SESSION_COOKIE,
         value=session.session_id,
@@ -148,7 +155,6 @@ async def login(body: LoginRequest, response: Response) -> LoginResponse:
     # (no-op if already running from env vars)
     from app.main import db, sources
     from app.services.sync_manager import start_sync_from_session
-
     await start_sync_from_session(session, sources, db)
 
     logger.info("User authenticated successfully for Pi-hole at %s", url)
@@ -164,7 +170,6 @@ async def logout(request: Request, response: Response) -> dict[str, str]:
 
     # Stop session-driven sync (no-op if sync is running from env vars)
     from app.services.sync_manager import stop_session_sync
-
     await stop_session_sync()
 
     response.delete_cookie(key=SESSION_COOKIE)
