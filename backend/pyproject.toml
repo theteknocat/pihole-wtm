@@ -38,9 +38,7 @@ select = ["E", "F", "I", "UP", "B", "S"]
 [tool.ruff.lint.per-file-ignores]
 # pytest uses assert statements by design; long descriptive test names and hardcoded
 # test credentials (S105) are intentional in test files
-"tests/**/*.py" = ["S101", "S105", "S106", "E501"]
-# Dynamic SQL uses f-strings for structure only; all user input goes through parameterised queries
-"app/services/database.py" = ["S608"]
+"**/tests/**/*.py" = ["S101", "S105", "S106", "E501"]
 
 [tool.mypy]
 python_version = "3.12"

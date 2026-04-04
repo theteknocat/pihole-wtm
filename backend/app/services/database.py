@@ -334,6 +334,9 @@ class LocalDatabase:
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         params.append(limit)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT q.id, q.timestamp, q.domain, q.client_ip,
                    cn.name AS client_name,
@@ -346,6 +349,7 @@ class LocalDatabase:
             ORDER BY q.id DESC
             LIMIT ?
         """
+        # ruff: enable[S608]
 
         async with self._conn.execute(sql, params) as cur:
             rows = list(await cur.fetchall())
@@ -416,6 +420,9 @@ class LocalDatabase:
 
         where = "WHERE " + " AND ".join(conditions)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT
                 COALESCE(d.category, 'Uncategorized')     AS category,
@@ -431,6 +438,7 @@ class LocalDatabase:
             GROUP BY d.category, d.company_name, q.domain
             ORDER BY query_count DESC
         """
+        # ruff: enable[S608]
 
         async with self._conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
@@ -558,6 +566,9 @@ class LocalDatabase:
 
         where = "WHERE " + " AND ".join(conditions)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT
                 q.domain,
@@ -573,6 +584,7 @@ class LocalDatabase:
             GROUP BY q.domain
             ORDER BY query_count DESC
         """
+        # ruff: enable[S608]
 
         async with self._conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
@@ -629,6 +641,9 @@ class LocalDatabase:
 
         where = "WHERE " + " AND ".join(conditions)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT
                 q.client_ip,
@@ -643,6 +658,7 @@ class LocalDatabase:
             GROUP BY q.client_ip
             ORDER BY query_count DESC
         """
+        # ruff: enable[S608]
 
         async with self._conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
@@ -692,6 +708,9 @@ class LocalDatabase:
 
         where = "WHERE " + " AND ".join(conditions)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT
                 CAST((q.timestamp - ?) / ? AS INTEGER) AS bucket,
@@ -704,6 +723,8 @@ class LocalDatabase:
             GROUP BY bucket
             ORDER BY bucket
         """
+        # ruff: enable[S608]
+
         params = [from_ts, bucket_seconds] + params
 
         async with self._conn.execute(sql, params) as cur:
@@ -758,6 +779,9 @@ class LocalDatabase:
 
         where = "WHERE " + " AND ".join(conditions)
 
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"""
             SELECT
                 q.client_ip,
@@ -771,6 +795,8 @@ class LocalDatabase:
             GROUP BY q.client_ip, bucket
             ORDER BY q.client_ip, bucket
         """
+        # ruff: enable[S608]
+
         params = [from_ts, bucket_seconds] + params
 
         async with self._conn.execute(sql, params) as cur:
@@ -952,7 +978,13 @@ class LocalDatabase:
         await self._apply_exclusions(conditions, params)
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
         sql = f"SELECT COUNT(*) FROM queries q JOIN domains d ON q.domain = d.domain {where}"
+        # ruff: enable[S608]
+
         async with self._conn.execute(sql, params) as cur:
             count_row = await cur.fetchone()
 
