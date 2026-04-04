@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/theteknocat/pihole-wtm/compare/v1.0.2...v1.1.0) (2026-04-04)
+
+
+### Features
+
+* dialog to show client stats for a given domain from the domains report ([a3a50e5](https://github.com/theteknocat/pihole-wtm/commit/a3a50e59f3eda48d5057001bdacb55174d439398))
+
 ## [1.0.2](https://github.com/theteknocat/pihole-wtm/compare/v1.0.1...v1.0.2) (2026-04-04)
 
 
