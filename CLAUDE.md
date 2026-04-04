@@ -4,16 +4,68 @@ Project-level instructions for Claude Code. These apply to every conversation in
 
 ---
 
+## Project Overview
+
+**Stack**: FastAPI (Python 3.12, aiosqlite/SQLite) + Vue 3 (TypeScript, PrimeVue, Pinia, Vite). Dev environment runs via ddev.
+
+**What it does**: Syncs Pi-hole DNS query history, enriches domains with tracker intelligence (Ghostery TrackerDB, Disconnect.me, RDAP), and serves a dashboard.
+
+---
+
+## Key File Locations
+
+| Concern                     | Path                               |
+| --------------------------- | ---------------------------------- |
+| All API routes              | `backend/app/main.py`              |
+| Database queries            | `backend/app/services/database.py` |
+| API TypeScript types        | `frontend/src/types/api.ts`        |
+| Report views                | `frontend/src/views/`              |
+| Dialogs / layout components | `frontend/src/components/layout/`  |
+| Shared composables          | `frontend/src/composables/`        |
+| Pinia stores                | `frontend/src/stores/`             |
+| Backend tests               | `backend/tests/`                   |
+| Frontend tests              | `frontend/src/tests/`              |
+
+---
+
+## Architecture Patterns
+
+**Adding a new stat/data type**: DB method in `database.py` → route in `main.py` → TS interface in `api.ts`.
+
+**Adding a new dialog**: follow the `DeviceStatsDialog` / `DomainClientsDialog` pattern — `visible = ref(true)`, emits `close` on hide, mounted with `v-if` in parent view.
+
+**Report filters**: `useReportData` composable owns filter state, URL query param sync, and data fetching for both domain and client report views.
+
+**Time window**: always use `useWindowStore().queryParams({...})` to build API query strings so the active time window is included.
+
+**Exclusions**: every new stats DB method must call `await this._apply_exclusions(conditions, params)` so user exclusion settings are respected.
+
+---
+
+## Dev Commands
+
+Full details in `docs/development.md`. All commands run via ddev; Python tools require the `.venv/bin/` prefix.
+
+```bash
+# Linting + type checking
+ddev exec -d /var/www/html/backend .venv/bin/ruff check app tests
+ddev exec -d /var/www/html/backend .venv/bin/mypy app
+ddev exec -d /var/www/html/frontend npm run lint
+ddev exec -d /var/www/html/frontend npm run type-check
+
+# Tests
+ddev exec -d /var/www/html/backend .venv/bin/pytest
+ddev exec -d /var/www/html/frontend npm run test
+```
+
+---
+
+## Commits
+
+Uses Conventional Commits. `feat:` → minor bump, `fix:` → patch bump, `chore:`/`refactor:`/`test:` → no changelog entry. Release Please batches all commits into one release PR — multiple `feat:` commits don't cause multiple version bumps.
+
+---
+
 ## Code Review Workflow
 
-After completing a significant chunk of work — such as finishing a new feature, a set of related endpoints, or a major refactor — suggest doing a code review of the files touched. Don't do this after every small edit; use judgement to identify natural milestones (e.g. "we've just built out the full query enrichment pipeline — good time for a review?").
-
-When doing a review:
-
-1. Read all relevant files thoroughly before forming opinions
-2. Categorise findings by severity:
-   - 🔴 Must Fix — correctness bugs, security issues, broken behaviour
-   - 🟡 Should Fix — code quality, typing, error handling, best practice
-   - 🟢 Minor — style, nice-to-haves, low-priority improvements
-3. Apply all 🔴 and 🟡 fixes immediately (with user approval)
-4. For 🟢 items: apply the ones that are clearly beneficial and low-risk; add the rest to [`docs/tech-debt.md`](docs/tech-debt.md) so they aren't lost
+After completing a significant feature or refactor, suggest a code review of the files touched. When reviewing: read files thoroughly first, flag findings by severity (🔴 Must Fix / 🟡 Should Fix / 🟢 Minor), and add any deferred 🟢 items to [`docs/tech-debt.md`](docs/tech-debt.md) so they aren't lost.
