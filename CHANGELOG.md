@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/theteknocat/pihole-wtm/compare/v1.0.0...v1.0.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* add 32-bit arm (arm7) to the list of build release platforms ([a84fafe](https://github.com/theteknocat/pihole-wtm/commit/a84fafe376534aa708b581a10a714f5d18c5dc83))
+
 ## [1.0.0](https://github.com/theteknocat/pihole-wtm/compare/v0.9.9...v1.0.0) (2026-04-04)
 
 
