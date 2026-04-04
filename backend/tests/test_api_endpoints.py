@@ -288,6 +288,20 @@ async def test_stats_clients_returns_shape(client: AsyncClient) -> None:
     assert "clients" in res.json()
 
 
+async def test_stats_clients_domain_filter(client: AsyncClient, db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "target.example.com", category="analytics", company_name="Acme")
+    await _domain(db, "other.example.com", category="advertising", company_name="Corp")
+    await _query(db, 1, "target.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "other.example.com",  now - 60, client_ip="192.168.1.2")
+
+    res = await client.get("/api/stats/clients", params={"domain": "target.example.com", "end_ts": now})
+    assert res.status_code == 200
+    client_ips = [c["client_ip"] for c in res.json()["clients"]]
+    assert "192.168.1.1" in client_ips
+    assert "192.168.1.2" not in client_ips
+
+
 # ---------------------------------------------------------------------------
 # GET /api/settings/options
 # ---------------------------------------------------------------------------

@@ -573,3 +573,34 @@ async def test_fetch_client_stats_includes_friendly_name(db: LocalDatabase) -> N
 
     result = await db.fetch_client_stats(hours=1, end_ts=now)
     assert result["clients"][0]["client_name"] == "My Laptop"
+
+
+async def test_fetch_client_stats_filter_by_domain(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "target.example.com", category="analytics", company_name="Acme")
+    await _domain(db, "other.example.com", category="advertising", company_name="Corp")
+    await _query(db, 1, "target.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "target.example.com", now - 60, client_ip="192.168.1.2")
+    await _query(db, 3, "other.example.com",  now - 60, client_ip="192.168.1.1")  # different domain
+
+    result = await db.fetch_client_stats(hours=1, end_ts=now, domain="target.example.com")
+    by_ip = {c["client_ip"]: c for c in result["clients"]}
+
+    # Both clients that queried the target domain appear
+    assert set(by_ip.keys()) == {"192.168.1.1", "192.168.1.2"}
+    # 192.168.1.1's count reflects only its query to target.example.com, not other.example.com
+    assert by_ip["192.168.1.1"]["query_count"] == 1
+
+
+async def test_fetch_client_stats_domain_filter_is_exact_match(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "target.com", category="analytics", company_name="Acme")
+    await _domain(db, "sub.target.com", category="analytics", company_name="Acme")
+    await _query(db, 1, "target.com",     now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "sub.target.com", now - 60, client_ip="192.168.1.2")
+
+    result = await db.fetch_client_stats(hours=1, end_ts=now, domain="target.com")
+    client_ips = {c["client_ip"] for c in result["clients"]}
+
+    assert "192.168.1.1" in client_ips
+    assert "192.168.1.2" not in client_ips  # sub.target.com must not match
