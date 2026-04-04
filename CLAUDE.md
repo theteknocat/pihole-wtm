@@ -72,6 +72,16 @@ Uses Conventional Commits. `feat:` → minor bump, `fix:` → patch bump, `chore
 
 ---
 
+## CI / CD Workflows
+
+**CI** (`.github/workflows/ci.yml`): runs on every push (except release-please branches) and on PRs. Runs backend (ruff, mypy, pytest) and frontend (eslint, vue-tsc, vitest) checks in parallel.
+
+**Release Please** (`.github/workflows/release-please.yml`): runs on every push to master. Opens/updates a release PR on every push, but only `feat:` and `fix:` commits appear in the changelog and affect the version bump. When the PR is merged, creates a GitHub release and publishes it automatically.
+
+**Release** (`.github/workflows/release.yml`): triggers on `release published` (i.e. automatically when the Release Please PR is merged) and on `workflow_dispatch`. Builds and pushes the multi-arch Docker image (`linux/amd64`, `linux/arm64`, `linux/arm/v7`) to GHCR. The frontend build stage runs pinned to `linux/amd64` to avoid QEMU hangs — the static output is platform-agnostic.
+
+---
+
 ## Code Review Workflow
 
 After completing a significant feature or refactor, suggest a code review of the files touched. When reviewing: read files thoroughly first, flag findings by severity (🔴 Must Fix / 🟡 Should Fix / 🟢 Minor), and add any deferred 🟢 items to [`docs/tech-debt.md`](docs/tech-debt.md) so they aren't lost.
