@@ -1,0 +1,10 @@
+#!/bin/bash
+if git diff HEAD HEAD~1 backend/pyproject.toml | grep -q "+version ="; then
+  if ddev describe --json-output 2>/dev/null | grep -q '"short_name":"web","status":"running"'; then
+    echo "Project version number changed in the most recent commit. Reinstalling Python package in ddev..."
+    ddev exec -d /var/www/html/backend .venv/bin/uv pip install -e '.[dev]' --quiet
+    echo "Done."
+  fi
+else
+  echo "No change to pyproject.toml in the last commit."
+fi
