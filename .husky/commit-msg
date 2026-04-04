@@ -1,4 +1,14 @@
 #!/bin/bash
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-./node_modules/.bin/commitlint --edit $1
+
+if ! ./node_modules/.bin/commitlint --edit $1; then
+  echo ""
+  echo "Expected format: type(scope)?: description"
+  echo "Examples:  feat: add dark mode"
+  echo "           fix(auth): handle expired sessions"
+  echo "           chore: update dependencies"
+  echo "           feat!: redesign API  (breaking change)"
+  echo "Types: feat fix chore docs style refactor perf test build ci revert"
+  exit 1
+fi
