@@ -122,7 +122,7 @@ This document describes the planned phased implementation of pihole-wtm. Phases 
 - [ ] All `docs/` pages complete and reviewed
 - [ ] Screenshots in README
 - [ ] API reference doc generated from FastAPI OpenAPI spec
-- [ ] `CONTRIBUTING.md` with code style guide, PR process, and development workflow
+- [x] `CONTRIBUTING.md` with code style guide, PR process, and development workflow
 - [ ] `CHANGELOG.md` initialised
 
 ### Phase 3 — UX Polish
