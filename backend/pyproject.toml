@@ -5,7 +5,7 @@ description = "Pi-hole dashboard enriched with WhoTracksMe/Ghostery tracker inte
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
+    "uvicorn>=0.30",
     "pydantic-settings>=2.0",
     "httpx>=0.27",
     "aiosqlite>=0.20",  # used for TrackerDB lookups and local query database
