@@ -4,7 +4,7 @@
  *
  * Filters: category, company, device, domain search (with exact match toggle).
  */
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -15,6 +15,7 @@ import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
 import { formatCategory } from '@/utils/format'
 import { useReportData, type ClientOption } from '@/composables/useReportData'
 import type { DomainStats } from '@/types/api'
@@ -29,6 +30,8 @@ const {
 } = useReportData('domain')
 
 const domainData = computed(() => data.value as DomainStats | null)
+
+const inspectingDomain = ref<string | null>(null)
 </script>
 
 <template>
@@ -165,7 +168,11 @@ const domainData = computed(() => data.value as DomainStats | null)
           </template>
           <Column field="domain" header="Domain" sortable style="min-width: 14rem">
             <template #body="{ data: row }">
-              <span class="font-mono text-xs">{{ row.domain }}</span>
+              <a
+                href="#domain-details"
+                class="font-mono text-xs"
+                @click.prevent="inspectingDomain = row.domain"
+              >{{ row.domain }}</a>
             </template>
           </Column>
           <Column field="category" header="Category" sortable>
@@ -197,5 +204,11 @@ const domainData = computed(() => data.value as DomainStats | null)
         </DataTable>
       </template>
     </Card>
+    <!-- Domain clients dialog -->
+    <DomainClientsDialog
+      v-if="inspectingDomain"
+      :domain="inspectingDomain"
+      @close="inspectingDomain = null"
+    />
   </div>
 </template>

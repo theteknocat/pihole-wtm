@@ -603,10 +603,11 @@ class LocalDatabase:
         end_ts: float | None = None,
         category: str | None = None,
         company: str | None = None,
+        domain: str | None = None,
     ) -> dict[str, Any]:
         """
         Return per-client query counts for the given time window,
-        optionally filtered to a single category or company.
+        optionally filtered to a single category, company, or domain.
         Joins client_names to include user-defined friendly names.
         """
         anchor = end_ts or time.time()
@@ -620,6 +621,9 @@ class LocalDatabase:
         if company is not None:
             conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
             params.append(company)
+        if domain is not None:
+            conditions.append("q.domain = ?")
+            params.append(domain)
 
         await self._apply_exclusions(conditions, params)
 

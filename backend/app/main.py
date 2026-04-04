@@ -191,9 +191,10 @@ async def stats_clients(
     end_ts: float | None = Query(default=None),
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
+    domain: str | None = Query(default=None),
 ) -> dict[str, Any]:
     return await db.fetch_client_stats(
-        hours=hours, end_ts=end_ts, category=category, company=company
+        hours=hours, end_ts=end_ts, category=category, company=company, domain=domain
     )
 
 
