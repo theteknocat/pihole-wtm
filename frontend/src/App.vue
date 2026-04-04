@@ -66,7 +66,7 @@ watch(() => route.path, () => { mobileNavOpen.value = false })
         :class="mobileNavOpen ? 'border-b border-gray-200 dark:border-gray-800' : ''"
       >
         <div class="py-2 flex flex-col gap-1">
-          <div class="flex justify-center gap-1 mb-1">
+          <div class="flex items-center justify-center gap-1 mb-1">
             <UtilityButtons @open-settings="settingsOpen = true" />
           </div>
           <NavLinks />
