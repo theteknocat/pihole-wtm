@@ -2,7 +2,7 @@
 
 A standalone dashboard that brings tracker intelligence to your Pi-hole.
 
-> **Status: Active Development** — The core MVP is functional. Pi-hole query syncing, multi-source tracker enrichment, and the dashboard are working. Production deployment (Docker, nginx) is not yet ready.
+> **Requires Pi-hole v6.** pihole-wtm connects to the Pi-hole v6 REST API and is not compatible with Pi-hole v5.
 
 ## What It Does
 
@@ -12,15 +12,16 @@ Enrichment draws from multiple sources: [Ghostery TrackerDB](https://github.com/
 
 The dashboard sits alongside your existing Pi-hole installation without modifying it. It syncs query data from the Pi-hole v6 API into a local database, enriches it, and serves all results from its own store — so the dashboard is fast and Pi-hole is never under load when you're browsing. Users can configure which tracker categories, companies, and individual domains to exclude from dashboard views.
 
-## What It Hopes to Become
+## Quick Start
 
-- A polished, self-hosted dashboard installable as a Docker container or directly on a Pi-hole host
-- ~~A breakdown of blocked queries by tracker category (advertising, analytics, fingerprinting, CDN, etc.)~~ ✓
-- ~~A company-level view — which organisations' trackers appear most often in your query log~~ ✓
-- ~~Deep-drill filtering: click a category to see the queries, click a company to see its domains~~ ✓
-- ~~Historical timelines showing how your tracker exposure changes over time~~ ✓
-- Multi-arch Docker images for Raspberry Pi and x86 hosts
-- A zero-configuration "just works" experience when run on the same machine as Pi-hole
+```bash
+curl -o docker-compose.yml https://raw.githubusercontent.com/theteknocat/pihole-wtm/master/docker-compose.yml
+docker compose up -d
+```
+
+Open `http://your-host` in your browser. Enter your Pi-hole URL and password on the login page.
+
+For full configuration options see the [Deployment Guide](docs/deployment.md).
 
 ## Tech Stack
 
@@ -30,12 +31,12 @@ The dashboard sits alongside your existing Pi-hole installation without modifyin
 | Frontend        | Vue 3 + Vite (TypeScript)                                                                                                                            |
 | Tracker data    | [Ghostery TrackerDB](https://github.com/ghostery/trackerdb) · [Disconnect.me](https://github.com/disconnectme/disconnect-tracking-protection) · RDAP |
 | Pi-hole data    | Pi-hole v6 HTTP API                                                                                                                                  |
+| Deployment      | Docker Compose · multi-arch (amd64 + arm64)                                                                                                          |
 | Dev environment | [ddev](https://ddev.com/)                                                                                                                            |
-| Production      | Docker Compose                                                                                                                                       |
 
 ## Documentation
 
-See the [`docs/`](docs/) directory for detailed planning documents:
+See the [`docs/`](docs/) directory for detailed documentation:
 
 - [Overview & Vision](docs/overview.md)
 - [Architecture](docs/architecture.md)

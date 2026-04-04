@@ -21,7 +21,7 @@ Use this when pihole-wtm and Pi-hole run in **separate Docker containers**, or w
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-org/pihole-wtm.git
+   git clone https://github.com/theteknocat/pihole-wtm.git
    cd pihole-wtm
    ```
 
@@ -73,7 +73,7 @@ Use this when you want to run pihole-wtm directly on the host without Docker.
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-org/pihole-wtm.git
+   git clone https://github.com/theteknocat/pihole-wtm.git
    cd pihole-wtm
    ```
 

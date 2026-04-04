@@ -2,6 +2,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as pkg_version
 from typing import Any, Literal, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -60,7 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="pihole-wtm",
     description="Pi-hole dashboard enriched with WhoTracksMe tracker intelligence",
-    version="0.1.0",
+    version=pkg_version("pihole-wtm"),
     lifespan=lifespan,
 )
 
@@ -83,7 +84,7 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "pihole_api_url": sync_manager.pihole._base_url if sync_manager.pihole else None,
-        "version": "0.1.0",
+        "version": pkg_version("pihole-wtm"),
         "sources": source_statuses,
         "sync_active": sync_manager.sync_task is not None,
         "sync_source": sync_manager.sync_source.value if sync_manager.sync_source else None,
