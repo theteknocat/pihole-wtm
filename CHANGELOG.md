@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/theteknocat/pihole-wtm/compare/v1.1.0...v1.1.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* always build frontend on native amd64 to avoid QEMU hang ([5bdcd93](https://github.com/theteknocat/pihole-wtm/commit/5bdcd93fbbb2c82e82260254f061e80198b366a9))
+
 ## [1.1.0](https://github.com/theteknocat/pihole-wtm/compare/v1.0.2...v1.1.0) (2026-04-04)
 
 
