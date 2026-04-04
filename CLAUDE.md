@@ -42,6 +42,12 @@ Project-level instructions for Claude Code. These apply to every conversation in
 
 ---
 
+## Python Linting Notes
+
+When suppressing a ruff rule across multiple lines (e.g. a multi-line f-string), use block-level comments — `# ruff: disable[RULE]` on the line before and `# ruff: enable[RULE]` after. Do not use `# noqa: RULE` on the opening line of a multi-line construct — it becomes part of the string content, not a comment.
+
+---
+
 ## Dev Commands
 
 Full details in `docs/development.md`. All commands run via ddev; Python tools require the `.venv/bin/` prefix.
