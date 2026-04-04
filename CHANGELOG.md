@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/theteknocat/pihole-wtm/compare/v1.0.1...v1.0.2) (2026-04-04)
+
+
+### Bug Fixes
+
+* drop uvicorn standard extras for arm/v7 compatibility ([36b8451](https://github.com/theteknocat/pihole-wtm/commit/36b84512ddca1517d17943694924e74da787d5e0))
+
 ## [1.0.1](https://github.com/theteknocat/pihole-wtm/compare/v1.0.0...v1.0.1) (2026-04-04)
 
 
