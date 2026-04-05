@@ -35,11 +35,16 @@ const countKey = computed(() => (props.type === 'blocked' ? 'blocked_count' : 'a
       <tr
         v-for="(company, i) in rows"
         :key="company.company_name"
-        class="table-row-clickable"
-        @click="emit('select-company', company.company_name)"
+        class="table-row"
       >
         <td class="py-2 pr-4 text-muted-inverse">{{ i + 1 }}</td>
-        <td class="py-2 pr-4 truncate max-w-0 w-full">{{ company.company_name }}</td>
+        <td class="py-2 pr-4 truncate max-w-0 w-full">
+          <a
+            href="#domain-company-details"
+            v-tooltip.top="'Domains by company'"
+            @click.prevent="emit('select-company', company.company_name)"
+          >{{ company.company_name }}</a>
+        </td>
         <td class="py-2 text-right tabular-nums">
           <span :class="type === 'blocked' ? 'text-blocked' : 'text-allowed'">
             {{ company[countKey].toLocaleString() }}

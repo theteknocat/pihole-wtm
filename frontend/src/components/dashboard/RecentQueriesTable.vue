@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { EnrichedQuery } from '@/types/api'
+import type { GroupedQuery } from '@/types/api'
+
+const emit = defineEmits<{ (e: 'inspect-domain', domain: string): void }>()
 
 defineProps<{
-  queries: EnrichedQuery[]
+  queries: GroupedQuery[]
 }>()
 
 function formatTime(ts: number): string {
@@ -17,21 +19,27 @@ function formatTime(ts: number): string {
     <thead>
       <tr class="table-header-row">
         <th class="table-header-cell">Time</th>
+        <th class="table-header-cell">Count</th>
         <th class="table-header-cell">Domain</th>
         <th class="table-header-cell !pr-0">Company</th>
       </tr>
     </thead>
     <tbody>
       <tr
-        v-for="q in queries"
-        :key="q.id"
+        v-for="(q, i) in queries"
+        :key="i"
         class="table-row"
       >
         <td class="py-2 pr-3 tabular-nums text-muted-inverse whitespace-nowrap">
           {{ formatTime(q.timestamp) }}
         </td>
-        <td class="py-2 pr-3 font-mono text-xs truncate" :title="q.domain">
-          {{ q.domain }}
+        <td class="py-2 pr-3 text-muted">{{  q.query_count  }}</td>
+        <td class="py-2 pr-3 truncate max-w-0 w-full" :title="q.domain">
+          <a
+            href="#domain-details"
+            v-tooltip.top="'Device breakdown'"
+            @click.prevent="emit('inspect-domain', q.domain)"
+          >{{ q.domain }}</a>
         </td>
         <td class="py-2 text-muted truncate">
           {{ q.company_name ?? '—' }}

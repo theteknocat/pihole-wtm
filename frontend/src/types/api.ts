@@ -107,3 +107,13 @@ export interface EnrichedQuery {
   company_name: string | null
   company_country: string | null
 }
+
+export interface GroupedQuery {
+  domain: string
+  timestamp: number
+  query_count: number
+  company_name: string | null
+  tracker_name: string | null
+  category: string | null
+  company_country: string | null
+}

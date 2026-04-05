@@ -122,7 +122,15 @@ async def queries(
     cursor: int | None = Query(default=None),
     status_type: Literal["allowed", "blocked"] | None = Query(default=None),
     tracker_only: bool = Query(default=False),
+    group_consecutive: bool = Query(default=False),
 ) -> dict[str, Any]:
+    if group_consecutive:
+        results = await db.fetch_queries_grouped(
+            limit=limit,
+            status_type=status_type,
+            tracker_only=tracker_only,
+        )
+        return {"queries": results}
     results, next_cursor = await db.fetch_queries(
         limit=limit,
         cursor=cursor,

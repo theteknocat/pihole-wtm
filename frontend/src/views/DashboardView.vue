@@ -11,18 +11,21 @@ import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useWindowStore } from '@/stores/window'
 import { apiFetch } from '@/utils/api'
-import type { TrackerStats, EnrichedQuery, CompanyStat } from '@/types/api'
+import type { TrackerStats, GroupedQuery, CompanyStat } from '@/types/api'
+import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
 
 const router = useRouter()
 const windowStore = useWindowStore()
 const trackerOnly = ref(true)
 
 const stats = ref<TrackerStats | null>(null)
-const recentBlocked = ref<EnrichedQuery[]>([])
-const recentAllowed = ref<EnrichedQuery[]>([])
+const recentBlocked = ref<GroupedQuery[]>([])
+const recentAllowed = ref<GroupedQuery[]>([])
 const loading = ref(true)
 const recentLoading = ref(false)
 const error = ref<string | null>(null)
+
+const inspectingDomain = ref<string | null>(null)
 
 const allCompanies = computed<CompanyStat[]>(() => {
   if (!stats.value) return []
@@ -43,7 +46,7 @@ const allCompanies = computed<CompanyStat[]>(() => {
 })
 
 function recentQueryUrl(statusType: 'blocked' | 'allowed') {
-  const params = new URLSearchParams({ status_type: statusType, limit: '10' })
+  const params = new URLSearchParams({ status_type: statusType, limit: '10', group_consecutive: 'true' })
   if (trackerOnly.value) params.set('tracker_only', 'true')
   return `/api/queries?${params}`
 }
@@ -195,7 +198,7 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentBlocked" />
+          <RecentQueriesTable v-else :queries="recentBlocked" @inspect-domain="inspectingDomain = $event" />
         </template>
       </Card>
 
@@ -205,10 +208,15 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentAllowed" />
+          <RecentQueriesTable v-else :queries="recentAllowed" @inspect-domain="inspectingDomain = $event" />
         </template>
       </Card>
 
     </div>
   </div>
+  <DomainClientsDialog
+    v-if="inspectingDomain"
+    :domain="inspectingDomain"
+    @close="inspectingDomain = null"
+  />
 </template>

@@ -380,6 +380,89 @@ class LocalDatabase:
 
         return results, next_cursor
 
+    async def fetch_queries_grouped(
+        self,
+        limit: int = 10,
+        status_type: str | None = None,
+        tracker_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch recent queries grouped by consecutive same-domain runs.
+        Fetches a pool of (limit * 5) raw rows and collapses consecutive
+        runs of the same domain into a single row with a query_count.
+        """
+        pool = limit * 5
+        conditions: list[str] = []
+        params: list[Any] = []
+
+        if status_type == "blocked":
+            conditions.append(f"q.status IN ({_BLOCKED_IN})")
+        elif status_type == "allowed":
+            conditions.append(f"q.status NOT IN ({_BLOCKED_IN})")
+
+        if tracker_only:
+            conditions.append("d.category IS NOT NULL")
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        # ruff: disable[S608]
+        sql = f"""
+            WITH base AS (
+                SELECT q.id, q.timestamp, q.domain,
+                    d.tracker_name, d.category, d.company_name, d.company_country
+                FROM queries q
+                LEFT JOIN domains d ON q.domain = d.domain
+                LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+                {where}
+                ORDER BY q.id DESC
+                LIMIT ?
+            ),
+            bounded AS (
+                SELECT *,
+                    CASE WHEN LAG(domain) OVER (ORDER BY id DESC)
+                        IS DISTINCT FROM domain THEN 1 ELSE 0 END AS is_boundary
+                FROM base
+            ),
+            islands AS (
+                SELECT *,
+                    SUM(is_boundary) OVER (
+                        ORDER BY id DESC ROWS UNBOUNDED PRECEDING
+                    ) AS island_id
+                FROM bounded
+            )
+            SELECT
+                domain,
+                MAX(timestamp)    AS timestamp,
+                COUNT(*)          AS query_count,
+                MAX(company_name) AS company_name,
+                MAX(tracker_name) AS tracker_name,
+                MAX(category)     AS category,
+                MAX(company_country) AS company_country
+            FROM islands
+            GROUP BY island_id
+            ORDER BY island_id ASC
+            LIMIT ?
+        """
+        # ruff: enable[S608]
+
+        params.extend([pool, limit])
+
+        async with self._conn.execute(sql, params) as cur:
+            rows = list(await cur.fetchall())
+
+        return [
+            {
+                "domain": row["domain"],
+                "timestamp": row["timestamp"],
+                "query_count": row["query_count"],
+                "company_name": row["company_name"],
+                "tracker_name": row["tracker_name"],
+                "category": row["category"],
+                "company_country": row["company_country"],
+            }
+            for row in rows
+        ]
+
     async def _apply_exclusions(
         self, conditions: list[str], params: list[Any],
     ) -> None:
@@ -636,8 +719,10 @@ class LocalDatabase:
         if domain is not None:
             conditions.append("q.domain = ?")
             params.append(domain)
-
-        await self._apply_exclusions(conditions, params)
+        else:
+            # Apply global exclusions ONLY when a domain is not
+            # specified.
+            await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
