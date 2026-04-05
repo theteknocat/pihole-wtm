@@ -44,14 +44,14 @@ watch(() => route.path, () => { mobileNavOpen.value = false })
         <Button
           :icon="mobileNavOpen ? 'pi pi-times' : 'pi pi-bars'"
           severity="secondary"
-          text
+          variant="outlined"
           rounded
           class="md:!hidden"
           aria-label="Toggle navigation"
           @click="mobileNavOpen = !mobileNavOpen"
         />
         <!-- Desktop utility buttons -->
-        <div class="hidden md:flex items-center gap-1">
+        <div class="hidden md:flex items-center gap-2">
           <UtilityButtons @open-settings="settingsOpen = true" />
         </div>
       </div>
@@ -66,7 +66,7 @@ watch(() => route.path, () => { mobileNavOpen.value = false })
         :class="mobileNavOpen ? 'border-b border-gray-200 dark:border-gray-800' : ''"
       >
         <div class="py-2 flex flex-col gap-1">
-          <div class="flex items-center justify-center gap-1 mb-1">
+          <div class="flex items-center justify-center gap-2 mb-1">
             <UtilityButtons @open-settings="settingsOpen = true" />
           </div>
           <NavLinks />

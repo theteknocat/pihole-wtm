@@ -170,7 +170,7 @@ const inspectingDomain = ref<string | null>(null)
             <template #body="{ data: row }">
               <a
                 href="#domain-details"
-                class="font-mono text-xs"
+                v-tooltip.top="'Device breakdown'"
                 @click.prevent="inspectingDomain = row.domain"
               >{{ row.domain }}</a>
             </template>

@@ -145,7 +145,7 @@ watch(() => windowStore.refreshKey, fetchStats)
   >
     <template #header>
       <div class="flex flex-col items-start gap-2 w-full pr-2 md:flex-row md:items-center md:justify-between">
-        <span class="font-semibold text-lg">{{ clientName ?? clientIp }} — Tracker Breakdown</span>
+        <span class="font-semibold text-lg"><i class="pi pi-mobile" /> {{ clientName ?? clientIp }} — Tracker Breakdown</span>
         <SelectButton
           v-model="selectedMode"
           :options="chartModeOptions"
@@ -157,7 +157,7 @@ watch(() => windowStore.refreshKey, fetchStats)
 
     <!-- Subtitle -->
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }} window
+      Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
       <template v-if="stats"> — {{ stats.tracker_queries.toLocaleString() }} tracker queries</template>
     </p>
 

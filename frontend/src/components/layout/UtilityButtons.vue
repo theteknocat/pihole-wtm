@@ -47,6 +47,24 @@ async function handleLogout() {
       <i :class="['pi text-[9px] text-gray-500', visualDark ? 'pi-moon' : 'pi-sun']" />
     </span>
   </button>
-  <Button icon="pi pi-cog" severity="secondary" text rounded aria-label="Settings" @click="emit('open-settings')" />
-  <Button icon="pi pi-sign-out" severity="secondary" text rounded aria-label="Sign out" @click="handleLogout()" />
+  <Button
+    icon="pi pi-cog"
+    severity="secondary"
+    variant="outlined"
+    rounded
+    size="small"
+    aria-label="Settings"
+    v-tooltip.bottom="'Settings'"
+    @click="emit('open-settings')"
+  />
+  <Button
+    icon="pi pi-sign-out"
+    severity="secondary"
+    variant="outlined"
+    rounded
+    size="small"
+    aria-label="Sign out"
+    v-tooltip.bottom="'Sign out'"
+    @click="handleLogout()"
+  />
 </template>

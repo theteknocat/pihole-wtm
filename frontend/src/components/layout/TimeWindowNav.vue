@@ -27,14 +27,21 @@ const selectedPeriod = computed({
   set: (v) => { windowStore.hours = v.value },
 })
 
-const periodItems = computed(() =>
-  windowStore.availablePeriods
-  .filter(p => p.value != selectedPeriod.value.value)
+const periodItems = computed(() => {
+  let items = windowStore.availablePeriods
   .map(p => ({
     label: p.label,
+    icon: p.icon || '',
+    is_active: p.value == selectedPeriod.value.value,
     command: () => { selectedPeriod.value = p },
   }))
-)
+  return [
+    {
+      label: 'Display Period',
+      items: items
+    }
+  ]
+})
 
 /** Format a unix timestamp as a short readable date/time */
 function formatTs(ts: number): string {
@@ -44,7 +51,7 @@ function formatTs(ts: number): string {
   // If same year, omit year
   const sameYear = d.getFullYear() === now.getFullYear()
   const opts: Intl.DateTimeFormatOptions = {
-    month: 'short',
+    month: windowStore.hours <= 24 ? 'short' : 'long',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
   }
@@ -71,57 +78,68 @@ const rangeLabel = computed(() => {
     <div class="flex items-center gap-1">
       <Button
         icon="pi pi-angle-double-left"
-        severity="secondary"
-        text
+        severity="contrast"
+        variant="outlined"
         rounded
         :size="props.compact ? 'small' : undefined"
         :disabled="!windowStore.canGoPrev"
         @click="windowStore.goOldest()"
-        v-tooltip.top="'Oldest data'"
+        v-tooltip.top="windowStore.canGoPrev ? 'Oldest data' : null"
       />
       <Button
         icon="pi pi-angle-left"
-        severity="secondary"
-        text
+        severity="contrast"
+        variant="outlined"
         rounded
         :size="props.compact ? 'small' : undefined"
         :disabled="!windowStore.canGoPrev"
         @click="windowStore.goPrev()"
-        v-tooltip.top="'Previous period'"
+        v-tooltip.top="windowStore.canGoPrev ? 'Previous period' : null"
       />
-      <div class="text-xs text-muted text-center">
+      <div class="dropnav-container">
         <Button
-          severity="secondary"
-          text
+          severity="contrast"
+          variant="outlined"
+          rounded
           @click="periodMenu?.toggle($event)"
-          size="small"
+          :size="props.compact ? 'small' : undefined"
           :class="{ 'pointer-events-none': windowStore.availablePeriods.length <= 1 }"
           :tabindex="windowStore.availablePeriods.length <= 1 ? -1 : 0"
         >
-          <span><i class="pi pi-history text-xs" /> <strong>{{ selectedPeriod.label }}</strong>: {{ rangeLabel }}</span>
+          <span>{{ rangeLabel }}</span>
           <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs" />
         </Button>
-        <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true" />
+        <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true">
+          <template #item="{ item, props }">
+              <a v-ripple class="flex items-center" :class="{'pointer-events-none italic': item.is_active}" v-bind="props.action">
+                  <span class="flex items-center gap-1" :class="{'text-muted': item.is_active}">
+                    <i :class="item.icon" />
+                    <span>{{ item.label }}</span>
+                  </span>
+                  <span v-if="item.is_active" class="ml-auto pi pi-check text-xs" />
+              </a>
+          </template>
+        </Menu>
       </div>
       <Button
         icon="pi pi-angle-right"
-        severity="secondary"
-        text
+        severity="contrast"
+        variant="outlined"
         rounded
         :size="props.compact ? 'small' : undefined"
         :disabled="!windowStore.canGoNext"
         @click="windowStore.goNext()"
-        v-tooltip.top="'Next period'"
+        v-tooltip.top="windowStore.canGoNext ? 'Next period' : null"
       />
       <Button
         icon="pi pi-angle-double-right"
-        severity="secondary"
-        text
+        severity="contrast"
+        variant="outlined"
         rounded
         :size="props.compact ? 'small' : undefined"
         :disabled="!windowStore.canGoNext"
         @click="windowStore.goLatest()"
-        v-tooltip.top="'Latest data'"
+        v-tooltip.top="windowStore.canGoNext ? 'Latest data' : null"
       />
     </div>
   </div>

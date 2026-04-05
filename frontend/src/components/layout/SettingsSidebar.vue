@@ -34,8 +34,8 @@ async function close() {
 const activeSection = ref<string | null>(null)
 
 const sections = [
-  { id: 'display', label: 'Filters', icon: 'pi-filter', component: DisplaySection },
-  { id: 'sync', label: 'Sync', icon: 'pi-sync', component: SyncSection },
+  { id: 'display', label: 'Global Filters', icon: 'pi-filter', component: DisplaySection },
+  { id: 'sync', label: 'Sync Settings', icon: 'pi-sync', component: SyncSection },
   { id: 'data-sources', label: 'Data Sources', icon: 'pi-database', component: DataSourcesSection },
   { id: 'data-management', label: 'Data Management', icon: 'pi-server', component: DataManagementSection },
 ]

@@ -131,18 +131,19 @@ function onClientSaved(client: ClientStat, newName: string | null) {
               <div class="flex items-center gap-2">
                 <Button
                   icon="pi pi-pencil"
-                  severity="secondary"
-                  text
+                  severity="contrast"
+                  variant="text"
                   rounded
                   size="small"
-                  class="!w-6 !h-6"
-                  title="Edit device name"
+                  class="!p-2"
                   aria-label="Edit device name"
+                  v-tooltip.top="'Edit device name'"
                   @click="editingClient = row"
                 />
                 <span class="block">
                   <a
                     href="#client-details"
+                    v-tooltip.top="'Tracker breakdown'"
                     @click.prevent="inspectingClient = row"
                   >{{ row.client_name ?? row.client_ip }}</a>
                   <span v-if="row.client_name" class="text-xs block text-gray-400 font-mono">{{ row.client_ip }}</span>

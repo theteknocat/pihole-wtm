@@ -5,10 +5,26 @@ const AUTO_REFRESH_SECONDS = 30
 
 /** Period options offered in the UI. Values are in hours. */
 export const PERIOD_OPTIONS = [
-  { label: '24h', value: 24 },
-  { label: '7d', value: 168 },
-  { label: '30d', value: 720 },
-  { label: '90d', value: 2160 },
+  {
+    label: '24 hours',
+    icon: 'pi pi-clock',
+    value: 24,
+  },
+  {
+    label: '7 days',
+    icon: 'pi pi-calendar',
+    value: 168,
+  },
+  {
+    label: '30 days',
+    icon: 'pi pi-calendar',
+    value: 720,
+  },
+  {
+    label: '90 days',
+    icon: 'pi pi-calendar',
+    value: 2160,
+  },
 ] as const
 
 export const useWindowStore = defineStore('window', () => {

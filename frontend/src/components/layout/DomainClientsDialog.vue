@@ -76,12 +76,12 @@ watch(() => windowStore.refreshKey, fetchStats)
     @hide="onHide"
   >
     <template #header>
-      <span class="font-semibold text-lg font-mono">{{ domain }}</span>
+      <span class="font-semibold text-lg"><i class="pi pi-globe" /> {{ domain }} — Device Breakdown</span>
     </template>
 
     <!-- Subtitle -->
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }} window
+      Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
       — device breakdown
     </p>
 
