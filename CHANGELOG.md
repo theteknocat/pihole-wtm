@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/theteknocat/pihole-wtm/compare/v1.1.1...v1.2.0) (2026-04-05)
+
+
+### Features
+
+* enhanced recent query tables ([f306e9d](https://github.com/theteknocat/pihole-wtm/commit/f306e9d2ec299e6815fabf517aa21f99c0410aea))
+
+
+### Bug Fixes
+
+* vertically centre utility buttons on mobile ([20c33cb](https://github.com/theteknocat/pihole-wtm/commit/20c33cb138ef7904f706b78a0905d0bd1571ce4f))
+
 ## [1.1.1](https://github.com/theteknocat/pihole-wtm/compare/v1.1.0...v1.1.1) (2026-04-04)
 
 
