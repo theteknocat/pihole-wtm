@@ -215,7 +215,7 @@ async function reenrichDomain(domain: string) {
                   />
                   <i
                     v-else-if="row.rdap_pending"
-                    class="pi pi-circle text-xs text-amber-600"
+                    class="pi pi-circle text-sm text-amber-600 px-2"
                     v-tooltip.top="'RDAP/WHOIS enrichment pending'"
                   />
                 </span>
