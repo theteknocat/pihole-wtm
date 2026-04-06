@@ -453,6 +453,26 @@ async def test_admin_reenrich_returns_flagged_count(client: AsyncClient, db: Loc
     assert body["flagged"] == 1  # only heuristic domain
 
 
+async def test_admin_reenrich_domain_flags_single_domain(client: AsyncClient, db: LocalDatabase) -> None:
+    await _domain(db, "a.com", enrichment_source="rdap_failed")
+    await _domain(db, "b.com", enrichment_source="rdap_failed")
+
+    res = await client.post("/api/admin/reenrich/a.com")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "ok"
+    assert body["flagged"] == 1
+
+    unenriched = await db.get_unenriched_domains()
+    assert "a.com" in unenriched
+    assert "b.com" not in unenriched
+
+
+async def test_admin_reenrich_domain_returns_404_for_unknown(client: AsyncClient, db: LocalDatabase) -> None:
+    res = await client.post("/api/admin/reenrich/nonexistent.com")
+    assert res.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # POST /api/admin/reset
 # ---------------------------------------------------------------------------

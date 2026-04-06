@@ -158,6 +158,23 @@ async def test_flag_for_reenrichment_marks_heuristic_and_rdap_failed(db: LocalDa
     assert "c.com" not in unenriched
 
 
+async def test_flag_for_reenrichment_single_domain_flags_only_that_domain(db: LocalDatabase) -> None:
+    await _domain(db, "a.com", enrichment_source="rdap_failed")
+    await _domain(db, "b.com", enrichment_source="rdap_failed")
+
+    count = await db.flag_for_reenrichment("a.com")
+
+    assert count == 1
+    unenriched = await db.get_unenriched_domains()
+    assert "a.com" in unenriched
+    assert "b.com" not in unenriched
+
+
+async def test_flag_for_reenrichment_single_domain_returns_zero_for_missing(db: LocalDatabase) -> None:
+    count = await db.flag_for_reenrichment("nonexistent.com")
+    assert count == 0
+
+
 async def test_flag_heuristic_uncategorized_for_reenrichment(db: LocalDatabase) -> None:
     await _domain(db, "a.com", category=None, enrichment_source="heuristic")   # should flag
     await _domain(db, "b.com", category="analytics", enrichment_source="heuristic")  # has category, skip
@@ -545,6 +562,35 @@ async def test_fetch_domain_stats_domain_substring_match(db: LocalDatabase) -> N
 
     result = await db.fetch_domain_stats(hours=1, end_ts=now, domain="analytics")
     assert len(result["domains"]) == 2
+
+
+async def test_fetch_domain_stats_can_reenrich_flags(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "failed.com", enrichment_source="rdap_failed", needs_reenrichment=0)
+    await _query(db, 1, "failed.com", now - 60)
+
+    result = await db.fetch_domain_stats(hours=1, end_ts=now)
+    row = result["domains"][0]
+    assert row["can_reenrich"] is True
+    assert row["rdap_pending"] is False
+
+
+async def test_fetch_domain_stats_rdap_pending_flags(db: LocalDatabase) -> None:
+    now = time.time()
+    # heuristic domain — pending first enrichment
+    await _domain(db, "heuristic.com", enrichment_source="heuristic")
+    await _query(db, 1, "heuristic.com", now - 60)
+    # rdap_failed already queued (needs_reenrichment=1)
+    await _domain(db, "queued.com", enrichment_source="rdap_failed", needs_reenrichment=1)
+    await _query(db, 2, "queued.com", now - 60)
+
+    result = await db.fetch_domain_stats(hours=1, end_ts=now)
+    by_domain = {r["domain"]: r for r in result["domains"]}
+
+    assert by_domain["heuristic.com"]["rdap_pending"] is True
+    assert by_domain["heuristic.com"]["can_reenrich"] is False
+    assert by_domain["queued.com"]["rdap_pending"] is True
+    assert by_domain["queued.com"]["can_reenrich"] is False
 
 
 # ---------------------------------------------------------------------------

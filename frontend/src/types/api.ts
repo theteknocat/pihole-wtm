@@ -37,6 +37,8 @@ export interface DomainStat {
   blocked_count: number
   allowed_count: number
   block_rate: number
+  can_reenrich: boolean
+  rdap_pending: boolean
 }
 
 export interface DomainStats {

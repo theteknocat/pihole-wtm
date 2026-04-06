@@ -291,9 +291,12 @@ async def delete_client(client_ip: str) -> dict[str, str]:
 
 
 @app.post("/api/admin/reenrich", dependencies=[Depends(require_session)])
-async def admin_reenrich() -> dict[str, Any]:
-    """Flag heuristic and rdap_failed domains for re-enrichment."""
-    count = await db.flag_for_reenrichment()
+@app.post("/api/admin/reenrich/{domain}", dependencies=[Depends(require_session)])
+async def admin_reenrich(domain: str | None = None) -> dict[str, Any]:
+    """Flag heuristic/rdap_failed domains for re-enrichment. Omit domain to flag all."""
+    count = await db.flag_for_reenrichment(domain)
+    if domain is not None and count == 0:
+        raise HTTPException(status_code=404, detail="Domain not found")
     return {"status": "ok", "flagged": count}
 
 

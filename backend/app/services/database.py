@@ -254,16 +254,28 @@ class LocalDatabase:
         await self._conn.commit()
         return cursor.rowcount
 
-    async def flag_for_reenrichment(self) -> int:
+    async def flag_for_reenrichment(self, domain: str | None = None) -> int:
         """
-        Mark all heuristic-enriched and rdap_failed domains for re-enrichment.
+        Mark one or all heuristic-enriched and rdap_failed domains for re-enrichment.
         The sync service will re-process them on the next cycle.
         Returns the number of domains flagged.
         """
-        cursor = await self._conn.execute(
-            """UPDATE domains SET needs_reenrichment = 1
-               WHERE enrichment_source IN ('heuristic', 'rdap_failed')"""
-        )
+        params: list[Any] = []
+        if domain is not None:
+            where = "domain = ?"
+            params.append(domain)
+        else:
+            where = "enrichment_source IN ('heuristic', 'rdap_failed')"
+
+        # ruff: disable[S608]
+        sql = f"""
+            UPDATE domains SET needs_reenrichment = 1
+               WHERE {where}
+        """
+        # ruff: enable[S608]
+
+        cursor = await self._conn.execute(sql, params)
+
         await self._conn.commit()
         return cursor.rowcount
 
@@ -658,6 +670,8 @@ class LocalDatabase:
                 COALESCE(d.category, 'Uncategorized')   AS category,
                 COALESCE(d.company_name, 'Unknown')     AS company_name,
                 d.tracker_name,
+                d.enrichment_source,
+                d.needs_reenrichment,
                 COUNT(*)                                AS query_count,
                 SUM(CASE WHEN q.status IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS blocked_count,
                 SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed_count
@@ -682,6 +696,10 @@ class LocalDatabase:
                     "category": row["category"],
                     "company_name": row["company_name"],
                     "tracker_name": row["tracker_name"],
+                    "can_reenrich": row["needs_reenrichment"] == 0 and
+                    row["enrichment_source"] == "rdap_failed",
+                    "rdap_pending": row["needs_reenrichment"] == 1 or
+                    row["enrichment_source"] == "heuristic",
                     "query_count": row["query_count"],
                     "blocked_count": row["blocked_count"],
                     "allowed_count": row["allowed_count"],

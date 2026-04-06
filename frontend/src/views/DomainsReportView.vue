@@ -18,6 +18,7 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
 import { formatCategory } from '@/utils/format'
 import { useReportData, type ClientOption } from '@/composables/useReportData'
+import { apiFetch } from '@/utils/api'
 import type { DomainStats } from '@/types/api'
 
 const {
@@ -32,6 +33,19 @@ const {
 const domainData = computed(() => data.value as DomainStats | null)
 
 const inspectingDomain = ref<string | null>(null)
+
+// Track per-domain button state: undefined = idle, 'loading', 'queued'
+const domainReenrichState = ref<Record<string, 'loading' | 'queued'>>({})
+
+async function reenrichDomain(domain: string) {
+  domainReenrichState.value[domain] = 'loading'
+  try {
+    await apiFetch(`/api/admin/reenrich/${encodeURIComponent(domain)}`, { method: 'POST' })
+    domainReenrichState.value[domain] = 'queued'
+  } catch {
+    delete domainReenrichState.value[domain]  // resets to idle, lets user retry
+  }
+}
 </script>
 
 <template>
@@ -180,7 +194,34 @@ const inspectingDomain = ref<string | null>(null)
               {{ formatCategory(row.category) }}
             </template>
           </Column>
-          <Column field="company_name" header="Company" sortable />
+          <Column field="company_name" header="Company" sortable>
+            <template #body="{ data: row }">
+              <div class="flex items-center justify-between gap-1">
+                <span>{{ row.company_name }}</span>
+                <span>
+                  <Button
+                    v-if="row.can_reenrich"
+                    :icon="domainReenrichState[row.domain] === 'queued' ? 'pi pi-check' : 'pi pi-refresh'"
+                    :loading="domainReenrichState[row.domain] === 'loading'"
+                    :disabled="domainReenrichState[row.domain] !== undefined"
+                    size="small"
+                    text
+                    rounded
+                    v-tooltip.top="domainReenrichState[row.domain] === 'queued'
+                      ? 'Queued for re-enrichment'
+                      : 'Retry RDAP/WHOIS enrichment'"
+                    aria-label="Retry enrichment"
+                    @click="reenrichDomain(row.domain)"
+                  />
+                  <i
+                    v-else-if="row.rdap_pending"
+                    class="pi pi-circle text-xs text-amber-600"
+                    v-tooltip.top="'RDAP/WHOIS enrichment pending'"
+                  />
+                </span>
+              </div>
+            </template>
+          </Column>
           <Column field="query_count" header="Total" sortable style="text-align: right" />
           <Column field="blocked_count" header="Blocked" sortable>
             <template #body="{ data: row }">
