@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+## Description: Test RDAP/WHOIS enrichment for a domain with full debug logging
+## Usage: rdap <domain>
+## Example: "ddev rdap example.com"
+
+cd /var/www/html/backend
+.venv/bin/python scripts/rdap_test.py "$@"

@@ -80,7 +80,7 @@ def _flatten_entities(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
-def _extract_org(data: dict[str, Any]) -> str | None:
+def _extract_org(data: dict[str, Any], domain: str = "") -> str | None:
     """
     Parse a registrant organization name from an RDAP response.
     Tries the registrant entity first, then any other entity with vCard data.
@@ -94,6 +94,13 @@ def _extract_org(data: dict[str, Any]) -> str | None:
         e for e in all_entities
         if not _SKIP_ROLES.intersection(e.get("roles", []))
     ]
+    logger.debug(
+        "RDAP _extract_org %s: %d total entities, %d candidates (roles: %s)",
+        domain,
+        len(all_entities),
+        len(candidates),
+        [e.get("roles") for e in candidates],
+    )
 
     # Prefer registrant role
     ordered = sorted(candidates, key=lambda e: ("registrant" not in e.get("roles", [])))
@@ -108,6 +115,7 @@ def _extract_org(data: dict[str, Any]) -> str | None:
                 if isinstance(value, str) and len(value) >= 2 and not _is_privacy_proxy(value):
                     return value
 
+    logger.debug("RDAP _extract_org %s: no usable org found", domain)
     return None
 
 
@@ -121,14 +129,19 @@ async def _whois_fallback(domain: str) -> str | None:
     """
     try:
         import asyncwhois  # optional dependency; imported lazily to avoid hard failure
-        result = await asyncio.wait_for(asyncwhois.aio_whois(domain), timeout=5.0)
-        parsed = result.parser_output
+        _, parsed = await asyncio.wait_for(asyncwhois.aio_whois(domain), timeout=5.0)
         for key in ("registrant_organization", "registrant_name"):
             value = parsed.get(key)
+            logger.debug(
+                "WHOIS fallback %s: %s=%r privacy=%s",
+                domain, key, value,
+                _is_privacy_proxy(value) if isinstance(value, str) else "n/a",
+            )
             if isinstance(value, str) and len(value) >= 2 and not _is_privacy_proxy(value):
                 return value
+        logger.debug("WHOIS fallback %s: no usable registrant found", domain)
     except Exception as e:
-        logger.debug("WHOIS fallback failed for %s: %s", domain, e)
+        logger.error("WHOIS fallback failed for %s: %s", domain, e)
     return None
 
 
@@ -144,8 +157,10 @@ async def lookup_company(domain: str) -> str | None:
     same registered domain are free after the first lookup.
     """
     reg = _registered_domain(domain)
+    logger.debug("lookup_company %s → registered domain %s", domain, reg)
 
     if reg in _cache:
+        logger.debug("lookup_company %s: cache hit → %r", reg, _cache[reg])
         return _cache[reg]
 
     company: str | None = None
@@ -156,13 +171,17 @@ async def lookup_company(domain: str) -> str | None:
                 f"https://rdap.org/domain/{reg}",
                 headers={"Accept": "application/rdap+json"},
             )
+        logger.debug("RDAP lookup %s: HTTP %d", reg, response.status_code)
         if response.status_code == 200:
-            company = _extract_org(response.json())
+            company = _extract_org(response.json(), domain=reg)
+        else:
+            logger.debug("RDAP lookup %s: non-200, skipping extraction", reg)
     except Exception as e:
-        logger.debug("RDAP lookup failed for %s: %s", reg, e)
+        logger.error("RDAP lookup failed for %s: %s", reg, e)
 
     if company is None:
         company = await _whois_fallback(reg)
 
+    logger.debug("lookup_company %s: final result → %r", reg, company)
     _cache[reg] = company
     return company
