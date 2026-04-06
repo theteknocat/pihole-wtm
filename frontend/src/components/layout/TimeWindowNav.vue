@@ -111,7 +111,7 @@ const rangeLabel = computed(() => {
         </Button>
         <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true">
           <template #item="{ item, props }">
-              <a v-ripple class="flex items-center" :class="{'pointer-events-none italic': item.is_active}" v-bind="props.action">
+              <a class="flex items-center" :class="{'pointer-events-none italic': item.is_active}" v-bind="props.action">
                   <span class="flex items-center gap-1" :class="{'text-muted': item.is_active}">
                     <i :class="item.icon" />
                     <span>{{ item.label }}</span>
