@@ -44,7 +44,8 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 │  │  1. TrackerDB (primary, in-memory cached)    │                │
 │  │  2. Disconnect.me (secondary, in-memory)     │                │
 │  │  3. eTLD+1 heuristic (company + category)    │                │
-│  │  4. RDAP (background upgrade, periodic)      │                │
+│  │  4. RDAP + WHOIS fallback (background,       │                │
+│  │     periodic)                                │                │
 │  └──────────────────────────────────────────────┘                │
 └──────────┬───────────────────────────────────────────────────────┘
            │ periodic sync (~60s)
@@ -99,7 +100,7 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
 
 **eTLD+1 heuristic** — a lightweight fallback for domains not matched by TrackerDB or Disconnect.me. Extracts a company name from the registered domain label and infers a tracker category from well-known subdomain keywords (e.g. `telemetry.*` → "telemetry", `analytics.*` → "analytics"). Less reliable than a curated database but meaningfully better than showing nothing.
 
-**RDAP** — Registration Data Access Protocol lookups provide registrant organisation names for domains enriched only via the heuristic. Lookups run as a periodic background upgrade pass (every ~10 sync cycles), with a 0.5s delay per domain to stay within rate limits. Results are cached in-memory per registered domain. The parser flattens nested RDAP entities (registrant inside registrar), skips non-owner roles (registrar, technical, abuse, etc.), and filters out WHOIS privacy proxy names. Domains where RDAP returns no usable name are marked `rdap_failed` to prevent repeated retries. Existing heuristic-derived category and company name are preserved when RDAP upgrades a domain.
+**RDAP + WHOIS** — provide registrant organisation names for domains enriched only via the heuristic. RDAP (via `rdap.org`) is tried first because it returns structured JSON with a consistent schema; if it returns no usable registrant, a WHOIS fallback is attempted via `asyncwhois`. Both paths filter out privacy proxy names (e.g. "Domains By Proxy") and skip non-owner roles (registrar, technical, abuse, etc.). Results are cached in-memory per registered domain. Lookups run as a periodic background upgrade pass (every ~10 sync cycles), with a 0.5s delay per domain to stay within rate limits. Domains where neither source yields a usable name are marked `rdap_failed` to prevent repeated retries. Existing heuristic-derived category and company name are preserved when a lookup upgrades a domain.
 
 ## Data Flow
 
@@ -132,9 +133,10 @@ pihole-wtm is a two-tier web application: a Python/FastAPI backend that syncs, s
    Write category, company_name, tracker_name, enrichment_source to domains table
 
    A separate periodic background pass (every ~10 sync cycles) upgrades heuristic-enriched
-   domains with registrant names from RDAP, one domain at a time with a 0.5s delay.
-   Domains where RDAP returns no usable name are marked `rdap_failed` so they are not
-   retried on subsequent cycles.
+   domains with registrant names from RDAP (structured JSON, tried first) with a WHOIS
+   fallback if RDAP returns no registrant data. One domain at a time with a 0.5s delay.
+   Domains where neither source yields a usable name are marked `rdap_failed` so they
+   are not retried on subsequent cycles.
 
 6. Insert filtered queries into queries table
 

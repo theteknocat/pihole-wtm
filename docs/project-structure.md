@@ -34,7 +34,7 @@ pihole-wtm/
 │           ├── sync.py                # Background sync coroutine + enrichment orchestration
 │           ├── sync_manager.py        # Sync service lifecycle (start/stop), dual-mode (env var / session)
 │           ├── heuristic.py           # eTLD+1 company name + subdomain keyword category
-│           ├── rdap.py                # RDAP company name lookup (async, LRU cached)
+│           ├── rdap.py                # RDAP + WHOIS company name lookup (async, LRU cached)
 │           ├── auth/
 │           │   ├── session_store.py   # In-memory session store (Session dataclass + SessionStore)
 │           │   ├── config_store.py    # Pi-hole URL resolver (env var only)

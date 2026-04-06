@@ -10,6 +10,7 @@ does not accept subdomain queries. Results are cached in-memory so multiple
 subdomains of the same registered domain only trigger one RDAP request.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -110,10 +111,34 @@ def _extract_org(data: dict[str, Any]) -> str | None:
     return None
 
 
+async def _whois_fallback(domain: str) -> str | None:
+    """
+    Attempt to extract a registrant name from WHOIS when RDAP returns nothing.
+
+    Tries registrant_organization first (cleaner, usually the company name),
+    then registrant_name as a fallback. Privacy-proxy values are filtered out
+    using the same _is_privacy_proxy() check as the RDAP path.
+    """
+    try:
+        import asyncwhois  # optional dependency; imported lazily to avoid hard failure
+        result = await asyncio.wait_for(asyncwhois.aio_whois(domain), timeout=5.0)
+        parsed = result.parser_output
+        for key in ("registrant_organization", "registrant_name"):
+            value = parsed.get(key)
+            if isinstance(value, str) and len(value) >= 2 and not _is_privacy_proxy(value):
+                return value
+    except Exception as e:
+        logger.debug("WHOIS fallback failed for %s: %s", domain, e)
+    return None
+
+
 async def lookup_company(domain: str) -> str | None:
     """
     Return a registered company name for the given domain, or None if
     unavailable (privacy protection, RDAP error, rate limit, etc.).
+
+    Tries RDAP first (structured, reliable when supported), then falls back
+    to WHOIS for registrars whose RDAP endpoints omit registrant data.
 
     Results are cached in-memory — repeated calls for subdomains of the
     same registered domain are free after the first lookup.
@@ -123,22 +148,21 @@ async def lookup_company(domain: str) -> str | None:
     if reg in _cache:
         return _cache[reg]
 
+    company: str | None = None
+
     try:
         async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
             response = await client.get(
                 f"https://rdap.org/domain/{reg}",
                 headers={"Accept": "application/rdap+json"},
             )
-        if response.status_code != 200:
-            _cache[reg] = None
-            return None
-
-        data = response.json()
+        if response.status_code == 200:
+            company = _extract_org(response.json())
     except Exception as e:
         logger.debug("RDAP lookup failed for %s: %s", reg, e)
-        _cache[reg] = None
-        return None
 
-    company = _extract_org(data)
+    if company is None:
+        company = await _whois_fallback(reg)
+
     _cache[reg] = company
     return company

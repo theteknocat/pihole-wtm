@@ -84,9 +84,12 @@ Checklist for Phase 3 testing. Backend test infrastructure (pytest, pytest-async
 - [x] `extract_company_name()` — eTLD+1 extraction
 - [x] Edge cases: short domains, no match, ambiguous keywords
 
-### RDAP
+### RDAP + WHOIS
 
-- [x] `lookup_company()` — successful lookup, privacy proxy detection
+- [x] `lookup_company()` — successful RDAP lookup, privacy proxy detection
+- [x] WHOIS fallback triggered when RDAP returns no registrant
+- [x] WHOIS fallback filters privacy proxy names
+- [x] WHOIS not called when RDAP succeeds
 - [x] LRU cache behaviour
 - [x] Network error handling
 
@@ -100,7 +103,7 @@ Checklist for Phase 3 testing. Backend test infrastructure (pytest, pytest-async
 
 ## Frontend Tests (Vitest + Vue Test Utils)
 
-### Setup
+### Frontend Setup
 
 - [x] Install vitest, @vue/test-utils, jsdom
 - [x] Create `vitest.config.ts` with Vue plugin and path aliases

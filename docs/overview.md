@@ -12,7 +12,7 @@ pihole-wtm enriches your Pi-hole query history with tracker intelligence from mu
 
 - [Ghostery's TrackerDB](https://github.com/ghostery/trackerdb) — the same dataset that powers the Ghostery browser extension, mapping domains to tracker names, categories, and operating companies
 - [Disconnect.me tracking protection lists](https://github.com/disconnectme/disconnect-tracking-protection) — a complementary categorised domain database covering advertising, analytics, social, and cryptomining trackers
-- RDAP (Registration Data Access Protocol) — for domains not covered by either database, provides registrant organisation names from domain registration records (with WHOIS privacy proxy filtering)
+- RDAP and WHOIS — for domains not covered by either database, provides registrant organisation names from domain registration records. RDAP is tried first; if it returns no registrant data, a WHOIS fallback is attempted. Both paths filter out privacy proxy names.
 
 For every relevant domain in your query log, we look up:
 
@@ -72,4 +72,4 @@ It reads query data via the Pi-hole v6 HTTP API, syncing new queries periodicall
 
 The primary tracker intelligence comes from [Ghostery's TrackerDB](https://github.com/ghostery/trackerdb), which is the open-source database underlying the [WhoTracksMe](https://whotracks.me) project and the Ghostery browser extension. It is released under the Creative Commons Attribution 4.0 licence and maintained actively by Ghostery.
 
-pihole-wtm downloads the latest release of TrackerDB on startup and refreshes it periodically. Enrichment from additional sources (Disconnect.me, RDAP) supplements TrackerDB for domains it does not cover.
+pihole-wtm downloads the latest release of TrackerDB on startup and refreshes it periodically. Enrichment from additional sources (Disconnect.me, RDAP, WHOIS) supplements TrackerDB for domains it does not cover.
