@@ -75,7 +75,7 @@ async def test_lookup_company_returns_none_for_privacy_proxy() -> None:
     mock = _mock_httpx(200, _rdap_response("Domains By Proxy, LLC"))
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={})
+            mock_whois.return_value = ("", {})
             result = await lookup_company("example.com")
     assert result is None
 
@@ -84,7 +84,7 @@ async def test_lookup_company_returns_none_for_redacted() -> None:
     mock = _mock_httpx(200, _rdap_response("REDACTED FOR PRIVACY"))
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={})
+            mock_whois.return_value = ("", {})
             result = await lookup_company("example.com")
     assert result is None
 
@@ -97,7 +97,7 @@ async def test_lookup_company_returns_none_for_non_200() -> None:
     mock = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={})
+            mock_whois.return_value = ("", {})
             result = await lookup_company("example.com")
     assert result is None
 
@@ -111,7 +111,7 @@ async def test_lookup_company_returns_none_on_network_error() -> None:
 
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_client):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={})
+            mock_whois.return_value = ("", {})
             result = await lookup_company("example.com")
     assert result is None
 
@@ -147,7 +147,7 @@ async def test_lookup_company_caches_none_on_failure() -> None:
     mock = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={})
+            mock_whois.return_value = ("", {})
             await lookup_company("example.com")
             await lookup_company("example.com")
 
@@ -165,7 +165,7 @@ def _mock_whois(org: str | None = None, name: str | None = None) -> AsyncMock:
         parsed["registrant_organization"] = org
     if name is not None:
         parsed["registrant_name"] = name
-    mock = AsyncMock(return_value=MagicMock(parser_output=parsed))
+    mock = AsyncMock(return_value=("", parsed))
     return mock
 
 
@@ -174,7 +174,7 @@ async def test_whois_fallback_used_when_rdap_returns_none() -> None:
     mock_http = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_http):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={"registrant_organization": "Acme Corp"})
+            mock_whois.return_value = ("", {"registrant_organization": "Acme Corp"})
             result = await lookup_company("example.com")
 
     assert result == "Acme Corp"
@@ -185,7 +185,7 @@ async def test_whois_fallback_used_when_rdap_has_no_registrant() -> None:
     mock_http = _mock_httpx(200, {"entities": []})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_http):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={"registrant_organization": "Acme Corp"})
+            mock_whois.return_value = ("", {"registrant_organization": "Acme Corp"})
             result = await lookup_company("example.com")
 
     assert result == "Acme Corp"
@@ -196,7 +196,7 @@ async def test_whois_fallback_prefers_org_over_name() -> None:
     mock_http = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_http):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={
+            mock_whois.return_value = ("", {
                 "registrant_organization": "Acme Corp",
                 "registrant_name": "John Doe",
             })
@@ -210,7 +210,7 @@ async def test_whois_fallback_uses_name_when_no_org() -> None:
     mock_http = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_http):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={"registrant_name": "John Doe"})
+            mock_whois.return_value = ("", {"registrant_name": "John Doe"})
             result = await lookup_company("example.com")
 
     assert result == "John Doe"
@@ -221,7 +221,7 @@ async def test_whois_fallback_filters_privacy_proxy() -> None:
     mock_http = _mock_httpx(404, {})
     with patch("app.services.rdap.httpx.AsyncClient", return_value=mock_http):
         with patch("asyncwhois.aio_whois", new_callable=AsyncMock) as mock_whois:
-            mock_whois.return_value = MagicMock(parser_output={"registrant_organization": "Domains By Proxy, LLC"})
+            mock_whois.return_value = ("", {"registrant_organization": "Domains By Proxy, LLC"})
             result = await lookup_company("example.com")
 
     assert result is None
