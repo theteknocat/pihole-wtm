@@ -28,9 +28,9 @@ const PALETTE = [
   'rgba(168, 85, 247, 0.85)',   // purple
 ]
 
-const PALETTE_FILL = PALETTE.map(c => c.replace('0.85)', '0.25)'))
+const PALETTE_FILL = PALETTE.map(c => c.replace('0.85)', '0.05)'))
 const OTHER_COLOR = 'rgba(156, 163, 175, 0.85)'  // gray-400
-const OTHER_FILL = 'rgba(156, 163, 175, 0.25)'
+const OTHER_FILL = 'rgba(156, 163, 175, 0.05)'
 
 const props = defineProps<{
   clients: ClientTimelineEntry[]
@@ -66,14 +66,8 @@ function buildOtherBuckets(clients: ClientTimelineEntry[]): number[] {
 
 function buildDatasets(clients: ClientTimelineEntry[]) {
   const top = clients.slice(0, MAX_DEVICES)
-
-  // Smallest devices at the bottom of the stack, dominant on top.
-  // This keeps the small bands stable near the origin — if the dominant
-  // device were at the bottom, its fluctuations would shift everything above.
-  const reversed = [...top].reverse()
   const datasets = []
 
-  // "Other" at the very bottom — least interesting, most stable
   const otherData = buildOtherBuckets(clients)
   if (otherData.length > 0) {
     datasets.push({
@@ -82,22 +76,22 @@ function buildDatasets(clients: ClientTimelineEntry[]) {
       borderColor: OTHER_COLOR,
       backgroundColor: OTHER_FILL,
       fill: 'origin',
+      borderWidth: 2,
       tension: 0.3,
       pointRadius: 0,
       pointHitRadius: 8,
     })
   }
 
-  // The first dataset fills to the origin; all subsequent fill to the
-  // previous dataset ('-1') so each band only covers its own value.
-  for (const c of reversed) {
-    const originalIdx = top.indexOf(c)
+  for (let i = 0; i < top.length; i++) {
+    const c = top[i]
     datasets.push({
       label: deviceLabel(c),
       data: c.buckets.map(b => b.count),
-      borderColor: PALETTE[originalIdx % PALETTE.length],
-      backgroundColor: PALETTE_FILL[originalIdx % PALETTE.length],
-      fill: datasets.length === 0 ? 'origin' : '-1',
+      borderColor: PALETTE[i % PALETTE.length],
+      backgroundColor: PALETTE_FILL[i % PALETTE_FILL.length],
+      fill: 'origin',
+      borderWidth: 2,
       tension: 0.3,
       pointRadius: 0,
       pointHitRadius: 8,
@@ -168,7 +162,6 @@ const chartOptions = computed(() => {
     },
     scales: {
       x: {
-        stacked: true,
         ticks: {
           color: textColor,
           maxRotation: 45,
@@ -178,7 +171,6 @@ const chartOptions = computed(() => {
         grid: { color: gridColor },
       },
       y: {
-        stacked: true,
         beginAtZero: true,
         ticks: { color: textColor },
         grid: { color: gridColor },
