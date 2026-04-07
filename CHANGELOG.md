@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/theteknocat/pihole-wtm/compare/v1.3.0...v1.3.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* make timeline charts non-stacking ([d2cc2f7](https://github.com/theteknocat/pihole-wtm/commit/d2cc2f769a1368198ba42c6775a6020b27960684))
+
 ## [1.3.0](https://github.com/theteknocat/pihole-wtm/compare/v1.2.0...v1.3.0) (2026-04-07)
 
 
