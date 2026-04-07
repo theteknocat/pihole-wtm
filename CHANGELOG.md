@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/theteknocat/pihole-wtm/compare/v1.2.0...v1.3.0) (2026-04-07)
+
+
+### Features
+
+* allow flagging individual names for re-enrichment ([28b4732](https://github.com/theteknocat/pihole-wtm/commit/28b4732f3921f0a2e5738b0463bb03108e50df30))
+* fallback on whois for enrichment on rdap failure ([1479eac](https://github.com/theteknocat/pihole-wtm/commit/1479eaca08856dc43546e783799cfaf66ff221a3))
+
+
+### Bug Fixes
+
+* change whois fallback tests to return a tuple to match real output ([30623c7](https://github.com/theteknocat/pihole-wtm/commit/30623c7c3e8156e0f2a5ecb85292149883f81a88))
+* remove mistakenly added ripple directive ([4030200](https://github.com/theteknocat/pihole-wtm/commit/4030200b17618df910338d775a9fed423aced283))
+* tuple API mismatch caused WHOIS fallback to fail silently ([1b3ede2](https://github.com/theteknocat/pihole-wtm/commit/1b3ede2f3d278aea9eceeffc973555bceb164421))
+
 ## [1.2.0](https://github.com/theteknocat/pihole-wtm/compare/v1.1.1...v1.2.0) (2026-04-05)
 
 
