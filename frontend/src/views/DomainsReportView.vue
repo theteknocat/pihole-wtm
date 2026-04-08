@@ -15,7 +15,7 @@ import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
+import ClientBreakdownDialog from '@/components/layout/ClientBreakdownDialog.vue'
 import { formatCategory } from '@/utils/format'
 import { useReportData, type ClientOption } from '@/composables/useReportData'
 import { apiFetch } from '@/utils/api'
@@ -246,9 +246,9 @@ async function reenrichDomain(domain: string) {
       </template>
     </Card>
     <!-- Domain clients dialog -->
-    <DomainClientsDialog
+    <ClientBreakdownDialog
       v-if="inspectingDomain"
-      :domain="inspectingDomain"
+      :filter="{ type: 'domain', value: inspectingDomain }"
       @close="inspectingDomain = null"
     />
   </div>

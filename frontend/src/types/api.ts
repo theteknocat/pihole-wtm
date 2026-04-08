@@ -62,6 +62,11 @@ export interface ClientStats {
   clients: ClientStat[]
 }
 
+export type ClientFilter =
+  | { type: 'domain'; value: string }
+  | { type: 'category'; value: string }
+  | { type: 'company'; value: string }
+
 export interface TimelineBucket {
   timestamp: number
   total: number

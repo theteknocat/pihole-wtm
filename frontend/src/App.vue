@@ -46,6 +46,7 @@ watch(() => route.path, () => { mobileNavOpen.value = false })
           severity="secondary"
           variant="outlined"
           rounded
+          size="large"
           class="md:!hidden"
           aria-label="Toggle navigation"
           @click="mobileNavOpen = !mobileNavOpen"
@@ -66,10 +67,10 @@ watch(() => route.path, () => { mobileNavOpen.value = false })
         :class="mobileNavOpen ? 'border-b border-gray-200 dark:border-gray-800' : ''"
       >
         <div class="py-2 flex flex-col gap-1">
-          <div class="flex items-center justify-center gap-2 mb-1">
-            <UtilityButtons @open-settings="settingsOpen = true" />
+          <div class="flex items-center justify-center gap-4 mb-1">
+            <UtilityButtons size="large" @open-settings="settingsOpen = true" />
           </div>
-          <NavLinks />
+          <NavLinks size="large" />
         </div>
       </nav>
     </div>

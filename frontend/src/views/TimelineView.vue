@@ -79,16 +79,24 @@ watch(() => windowStore.refreshKey, fetchTimeline)
 
     <!-- Loading skeletons -->
     <template v-if="loading && !timeline">
-      <div class="grid grid-cols-3 gap-4">
-        <Card v-for="i in 3" :key="i">
-          <template #content>
-            <div class="text-center space-y-2">
-              <Skeleton width="4rem" height="1.8rem" class="mx-auto" />
-              <Skeleton width="6rem" height="0.9rem" class="mx-auto" />
+      <Card>
+        <template #content>
+          <div class="flex items-center gap-6">
+            <Skeleton shape="circle" size="6rem" class="shrink-0" />
+            <div class="flex-1 space-y-3">
+              <div class="space-y-1">
+                <Skeleton width="8rem" height="1.8rem" />
+                <Skeleton width="5rem" height="0.9rem" />
+              </div>
+              <Skeleton width="100%" height="0.5rem" />
+              <div class="space-y-1">
+                <Skeleton width="6rem" height="1.5rem" />
+                <Skeleton width="4rem" height="0.9rem" />
+              </div>
             </div>
-          </template>
-        </Card>
-      </div>
+          </div>
+        </template>
+      </Card>
       <Card>
         <template #title><Skeleton width="8rem" height="1.2rem" /></template>
         <template #content>
@@ -106,32 +114,40 @@ watch(() => windowStore.refreshKey, fetchTimeline)
     <template v-if="timeline">
 
       <!-- Summary stats -->
-      <div class="grid grid-cols-3 gap-4">
-        <Card>
-          <template #content>
-            <div class="text-center">
-              <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ totalQueries.toLocaleString() }}</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total Queries</p>
+      <Card>
+        <template #content>
+          <div class="flex flex-wrap items-center justify-center gap-6">
+            <!-- Total queries + blocked bar -->
+            <div class="flex flex-col gap-2 text-center">
+              <div>
+                <p class="text-xl font-semibold text-red-500">{{ totalBlocked.toLocaleString() }} <span class="text-xs font-light text-gray-700 dark:text-gray-300">blocked</span></p>
+              </div>
+              <div class="h-0 w-full rounded-full border-b border-b-gray-700 dark:border-b-gray-400" />
+              <div>
+                <p class="text-xl font-semibold text-gray-900 dark:text-gray-300">{{ totalQueries.toLocaleString() }} <span class="text-xs font-light text-gray-700 dark:text-gray-300">total</span></p>
+              </div>
             </div>
-          </template>
-        </Card>
-        <Card>
-          <template #content>
-            <div class="text-center">
-              <p class="text-2xl font-semibold text-red-500">{{ totalBlocked.toLocaleString() }}</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Blocked</p>
+            <!-- Block rate ring -->
+            <div class="shrink-0 flex flex-col items-center gap-1">
+              <div class="relative" style="width: 96px; height: 96px">
+                <svg width="96" height="96" viewBox="0 0 100 100" class="-rotate-90">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke-width="10" class="stroke-gray-200 dark:stroke-gray-700" />
+                  <circle
+                    cx="50" cy="50" r="40" fill="none" stroke-width="10"
+                    stroke-linecap="round"
+                    class="stroke-red-500 transition-all duration-500"
+                    :stroke-dasharray="251.33"
+                    :stroke-dashoffset="251.33 * (1 - Number(blockRate) / 100)"
+                  />
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <span class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ blockRate }}%</span>
+                </div>
+              </div>
             </div>
-          </template>
-        </Card>
-        <Card>
-          <template #content>
-            <div class="text-center">
-              <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ blockRate }}%</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Block Rate</p>
-            </div>
-          </template>
-        </Card>
-      </div>
+          </div>
+        </template>
+      </Card>
 
       <!-- Chart -->
       <Card>
