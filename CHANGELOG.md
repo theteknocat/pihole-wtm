@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/theteknocat/pihole-wtm/compare/v1.3.1...v1.4.0) (2026-04-08)
+
+
+### Features
+
+* consistent dashboard functionality ([d709cd1](https://github.com/theteknocat/pihole-wtm/commit/d709cd13f064f5d34d9a3eaadb882fd3c847dc7f))
+
+
+### Bug Fixes
+
+* horizontal scrollbar on smaller screens ([567cf54](https://github.com/theteknocat/pihole-wtm/commit/567cf54009505284def82260ad2a450b122a55e3))
+* time window nav mobile layout ([c2cd3b4](https://github.com/theteknocat/pihole-wtm/commit/c2cd3b43e20bcc6def64c6910cae30ba73adfc98))
+
 ## [1.3.1](https://github.com/theteknocat/pihole-wtm/compare/v1.3.0...v1.3.1) (2026-04-07)
 
 
