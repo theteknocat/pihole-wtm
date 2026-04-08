@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Skeleton from 'primevue/skeleton'
 import ToggleButton from 'primevue/togglebutton'
@@ -11,10 +10,9 @@ import RecentQueriesTable from '@/components/dashboard/RecentQueriesTable.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useWindowStore } from '@/stores/window'
 import { apiFetch } from '@/utils/api'
-import type { TrackerStats, GroupedQuery, CompanyStat } from '@/types/api'
-import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
+import type { TrackerStats, GroupedQuery, CompanyStat, ClientFilter } from '@/types/api'
+import ClientBreakdownDialog from '@/components/layout/ClientBreakdownDialog.vue'
 
-const router = useRouter()
 const windowStore = useWindowStore()
 const trackerOnly = ref(true)
 
@@ -25,7 +23,7 @@ const loading = ref(true)
 const recentLoading = ref(false)
 const error = ref<string | null>(null)
 
-const inspectingDomain = ref<string | null>(null)
+const inspectingFilter = ref<ClientFilter | null>(null)
 
 const allCompanies = computed<CompanyStat[]>(() => {
   if (!stats.value) return []
@@ -89,11 +87,11 @@ async function fetchStats() {
 }
 
 function drillCategory(category: string) {
-  router.push({ path: '/domains-report', query: { category } })
+  inspectingFilter.value = { type: 'category', value: category }
 }
 
 function drillCompany(company: string) {
-  router.push({ path: '/domains-report', query: { company } })
+  inspectingFilter.value = { type: 'company', value: company }
 }
 
 onMounted(fetchStats)
@@ -198,7 +196,7 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentBlocked" @inspect-domain="inspectingDomain = $event" />
+          <RecentQueriesTable v-else :queries="recentBlocked" @inspect-domain="inspectingFilter = { type: 'domain', value: $event }" />
         </template>
       </Card>
 
@@ -208,15 +206,15 @@ watch(trackerOnly, fetchRecentQueries)
           <div v-if="recentLoading" class="space-y-3 py-2">
             <Skeleton v-for="i in 5" :key="i" width="100%" height="1.2rem" />
           </div>
-          <RecentQueriesTable v-else :queries="recentAllowed" @inspect-domain="inspectingDomain = $event" />
+          <RecentQueriesTable v-else :queries="recentAllowed" @inspect-domain="inspectingFilter = { type: 'domain', value: $event }" />
         </template>
       </Card>
 
     </div>
   </div>
-  <DomainClientsDialog
-    v-if="inspectingDomain"
-    :domain="inspectingDomain"
-    @close="inspectingDomain = null"
+  <ClientBreakdownDialog
+    v-if="inspectingFilter"
+    :filter="inspectingFilter"
+    @close="inspectingFilter = null"
   />
 </template>

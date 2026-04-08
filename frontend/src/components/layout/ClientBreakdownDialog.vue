@@ -1,12 +1,15 @@
 <script setup lang="ts">
 /**
- * DomainClientsDialog — modal showing per-device query breakdown for a single domain.
+ * ClientBreakdownDialog — modal showing per-device query breakdown for a
+ * domain, category, or company.
  *
- * Displays a table of devices that queried the domain within the current time
+ * Displays a table of devices that match the filter within the current time
  * window, with allowed and blocked counts for each. Clicking a device name
- * navigates to the Devices Report filtered to that device.
+ * navigates to the Domains Report filtered to that device (and the current
+ * filter when applicable). For category/company filters a "View Domains
+ * Report" link lets the user jump straight to the full filtered report.
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import DataTable from 'primevue/datatable'
@@ -15,10 +18,11 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import { useWindowStore } from '@/stores/window'
-import type { ClientStats, ClientStat } from '@/types/api'
+import { formatCategory } from '@/utils/format'
+import type { ClientStats, ClientStat, ClientFilter } from '@/types/api'
 
 const props = defineProps<{
-  domain: string
+  filter: ClientFilter
 }>()
 
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -31,11 +35,26 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const editingClient = ref<ClientStat | null>(null)
 
+const title = computed(() => {
+  switch (props.filter.type) {
+    case 'category': return formatCategory(props.filter.value)
+    default: return props.filter.value
+  }
+})
+
+const icon = computed(() => {
+  switch (props.filter.type) {
+    case 'domain': return 'pi pi-globe'
+    case 'category': return 'pi pi-tags'
+    default: return 'pi pi-building'
+  }
+})
+
 async function fetchStats() {
   loading.value = true
   error.value = null
   try {
-    const qs = windowStore.queryParams({ domain: props.domain })
+    const qs = windowStore.queryParams({ [props.filter.type]: props.filter.value })
     const res = await fetch(`/api/stats/clients?${qs}`)
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
@@ -54,7 +73,19 @@ function onClientSaved(client: ClientStat, newName: string | null) {
 
 function inspectDevice(clientIp: string) {
   visible.value = false
-  router.push({ path: '/domains-report', query: { client_ip: clientIp } })
+  const query: Record<string, string> = { client_ip: clientIp }
+  if (props.filter.type !== 'domain') {
+    query[props.filter.type] = props.filter.value
+  }
+  router.push({ path: '/domains-report', query })
+}
+
+function viewFullReport() {
+  visible.value = false
+  router.push({
+    path: '/domains-report',
+    query: { [props.filter.type]: props.filter.value },
+  })
 }
 
 function onHide() {
@@ -76,14 +107,24 @@ watch(() => windowStore.refreshKey, fetchStats)
     @hide="onHide"
   >
     <template #header>
-      <span class="font-semibold text-lg"><i class="pi pi-globe" /> {{ domain }} — Device Breakdown</span>
+      <span class="font-semibold text-lg"><i :class="icon" /> {{ title }} — Device Breakdown</span>
     </template>
 
-    <!-- Subtitle -->
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
-      — device breakdown
-    </p>
+    <!-- Subtitle + report link -->
+    <div class="flex items-center justify-between mb-4">
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
+      </p>
+      <Button
+        v-if="filter.type !== 'domain'"
+        :label="'See all ' + title + ' Domains'"
+        icon="pi pi-external-link"
+        severity="secondary"
+        text
+        size="small"
+        @click="viewFullReport"
+      />
+    </div>
 
     <!-- Loading -->
     <div v-if="loading && !stats" class="flex flex-col items-center justify-center py-16 gap-4 text-gray-500 dark:text-gray-400">
@@ -106,7 +147,7 @@ watch(() => windowStore.refreshKey, fetchStats)
       class="text-sm"
     >
       <template #empty>
-        <p class="empty-state">No devices found for this domain</p>
+        <p class="empty-state">No devices found</p>
       </template>
       <Column field="client_ip" header="Device" style="min-width: 10rem">
         <template #body="{ data: row }">

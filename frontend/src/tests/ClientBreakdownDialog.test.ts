@@ -1,5 +1,5 @@
 /**
- * Tests for DomainClientsDialog (src/components/layout/DomainClientsDialog.vue).
+ * Tests for ClientBreakdownDialog (src/components/layout/ClientBreakdownDialog.vue).
  *
  * PrimeVue components are mocked at the module level to avoid pulling in the
  * full PrimeVue runtime. DataTable is given a minimal implementation that
@@ -12,7 +12,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import DomainClientsDialog from '@/components/layout/DomainClientsDialog.vue'
+import ClientBreakdownDialog from '@/components/layout/ClientBreakdownDialog.vue'
+import type { ClientFilter } from '@/types/api'
 
 // --- Mocks (hoisted so they're available inside vi.mock factories) -----------
 
@@ -70,7 +71,7 @@ vi.mock('primevue/column', async () => {
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
-    props: ['icon', 'severity', 'text', 'rounded', 'size', 'title', 'ariaLabel'],
+    props: ['icon', 'severity', 'text', 'rounded', 'size', 'title', 'ariaLabel', 'label'],
     emits: ['click'],
     template: '<button @click="$emit(\'click\')" />',
   },
@@ -95,9 +96,9 @@ function stubFetch(data: unknown, ok = true) {
   }))
 }
 
-function mountDialog(domain = 'ads.example.com') {
-  return mount(DomainClientsDialog, {
-    props: { domain },
+function mountDialog(filter: ClientFilter = { type: 'domain', value: 'ads.example.com' }) {
+  return mount(ClientBreakdownDialog, {
+    props: { filter },
     global: { plugins: [createPinia()] },
   })
 }
@@ -120,10 +121,10 @@ beforeEach(() => {
 
 // --- Tests ------------------------------------------------------------------
 
-describe('DomainClientsDialog', () => {
+describe('ClientBreakdownDialog', () => {
   it('fetches from /api/stats/clients with the domain param on mount', async () => {
     stubFetch(sampleClients)
-    mountDialog('ads.example.com')
+    mountDialog({ type: 'domain', value: 'ads.example.com' })
     await new Promise(resolve => setTimeout(resolve, 0))
 
     const calls = (globalThis.fetch as FetchMock).mock.calls
@@ -131,6 +132,30 @@ describe('DomainClientsDialog', () => {
     const url: string = calls[0][0]
     expect(url).toContain('/api/stats/clients')
     expect(url).toContain('domain=ads.example.com')
+  })
+
+  it('fetches with category param when filter type is category', async () => {
+    stubFetch(sampleClients)
+    mountDialog({ type: 'category', value: 'advertising' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const calls = (globalThis.fetch as FetchMock).mock.calls
+    expect(calls.length).toBe(1)
+    const url: string = calls[0][0]
+    expect(url).toContain('/api/stats/clients')
+    expect(url).toContain('category=advertising')
+  })
+
+  it('fetches with company param when filter type is company', async () => {
+    stubFetch(sampleClients)
+    mountDialog({ type: 'company', value: 'Google' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const calls = (globalThis.fetch as FetchMock).mock.calls
+    expect(calls.length).toBe(1)
+    const url: string = calls[0][0]
+    expect(url).toContain('/api/stats/clients')
+    expect(url).toContain('company=Google')
   })
 
   it('shows an error message when the fetch fails', async () => {
@@ -141,12 +166,11 @@ describe('DomainClientsDialog', () => {
     expect(wrapper.text()).toContain('Failed to load device breakdown')
   })
 
-  it('navigates to /domains-report filtered by client_ip when a device link is clicked', async () => {
+  it('navigates with only client_ip when filter is domain', async () => {
     stubFetch(sampleClients)
-    const wrapper = mountDialog()
+    const wrapper = mountDialog({ type: 'domain', value: 'ads.example.com' })
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Find the anchor for the first client (192.168.1.1 / My Laptop)
     const links = wrapper.findAll('a[href="#device-details"]')
     expect(links.length).toBeGreaterThan(0)
     await links[0].trigger('click')
@@ -154,6 +178,36 @@ describe('DomainClientsDialog', () => {
     expect(mockPush).toHaveBeenCalledWith({
       path: '/domains-report',
       query: { client_ip: '192.168.1.1' },
+    })
+  })
+
+  it('navigates with client_ip and category when filter is category', async () => {
+    stubFetch(sampleClients)
+    const wrapper = mountDialog({ type: 'category', value: 'advertising' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const links = wrapper.findAll('a[href="#device-details"]')
+    expect(links.length).toBeGreaterThan(0)
+    await links[0].trigger('click')
+
+    expect(mockPush).toHaveBeenCalledWith({
+      path: '/domains-report',
+      query: { client_ip: '192.168.1.1', category: 'advertising' },
+    })
+  })
+
+  it('navigates with client_ip and company when filter is company', async () => {
+    stubFetch(sampleClients)
+    const wrapper = mountDialog({ type: 'company', value: 'Google' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const links = wrapper.findAll('a[href="#device-details"]')
+    expect(links.length).toBeGreaterThan(0)
+    await links[0].trigger('click')
+
+    expect(mockPush).toHaveBeenCalledWith({
+      path: '/domains-report',
+      query: { client_ip: '192.168.1.1', company: 'Google' },
     })
   })
 })

@@ -32,7 +32,7 @@ Project-level instructions for Claude Code. These apply to every conversation in
 
 **Adding a new stat/data type**: DB method in `database.py` → route in `main.py` → TS interface in `api.ts`.
 
-**Adding a new dialog**: follow the `DeviceStatsDialog` / `DomainClientsDialog` pattern — `visible = ref(true)`, emits `close` on hide, mounted with `v-if` in parent view.
+**Adding a new dialog**: follow the `DeviceStatsDialog` / `ClientBreakdownDialog` pattern — `visible = ref(true)`, emits `close` on hide, mounted with `v-if` in parent view.
 
 **Report filters**: `useReportData` composable owns filter state, URL query param sync, and data fetching for both domain and client report views.
 
