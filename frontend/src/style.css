@@ -45,6 +45,10 @@
     @apply bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium;
   }
 
+  .nav-link-large {
+    @apply px-4 py-3 text-base gap-2;
+  }
+
   /* --- Status colors --- */
 
   .text-blocked {
