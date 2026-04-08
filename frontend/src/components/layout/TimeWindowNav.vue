@@ -65,39 +65,41 @@ function formatTs(ts: number): string {
   return d.toLocaleDateString(undefined, opts)
 }
 
-const rangeLabel = computed(() => {
-  const from = formatTs(windowStore.fromTs)
-  const to = formatTs(windowStore.effectiveEndTs)
-  return `${from} – ${to}`
-})
+const fromLabel = computed(() => formatTs(windowStore.fromTs))
+const toLabel = computed(() => formatTs(windowStore.effectiveEndTs))
 </script>
 
 <template>
   <div class="flex items-center gap-2">
     <!-- Time navigation -->
-    <div class="flex items-center gap-1">
-      <Button
-        icon="pi pi-angle-double-left"
-        severity="contrast"
-        variant="outlined"
-        rounded
-        :size="props.compact ? 'small' : undefined"
-        :disabled="!windowStore.canGoPrev"
-        @click="windowStore.goOldest()"
-        v-tooltip.top="windowStore.canGoPrev ? 'Oldest data' : null"
-      />
-      <Button
-        icon="pi pi-angle-left"
-        severity="contrast"
-        variant="outlined"
-        rounded
-        :size="props.compact ? 'small' : undefined"
-        :disabled="!windowStore.canGoPrev"
-        @click="windowStore.goPrev()"
-        v-tooltip.top="windowStore.canGoPrev ? 'Previous period' : null"
-      />
-      <div class="dropnav-container">
+    <div class="flex flex-wrap items-center gap-1">
+      <!-- Prev buttons: row 2 on mobile (order-2), row 1 on sm+ (order-1) -->
+      <div class="flex flex-1 sm:flex-none items-center gap-1 order-2 sm:order-1">
         <Button
+          class="flex-1 sm:flex-none !rounded-full"
+          icon="pi pi-angle-double-left"
+          severity="contrast"
+          variant="outlined"
+          :size="props.compact ? 'small' : undefined"
+          :disabled="!windowStore.canGoPrev"
+          @click="windowStore.goOldest()"
+          v-tooltip.top="windowStore.canGoPrev ? 'Oldest data' : null"
+        />
+        <Button
+          class="flex-1 sm:flex-none !rounded-full"
+          icon="pi pi-angle-left"
+          severity="contrast"
+          variant="outlined"
+          :size="props.compact ? 'small' : undefined"
+          :disabled="!windowStore.canGoPrev"
+          @click="windowStore.goPrev()"
+          v-tooltip.top="windowStore.canGoPrev ? 'Previous period' : null"
+        />
+      </div>
+      <!-- Dropdown: row 1 on mobile (order-1, full width), inline on sm+ (order-2, auto width) -->
+      <div class="dropnav-container w-full sm:w-auto order-1 sm:order-2">
+        <Button
+          class="w-full sm:w-auto"
           severity="contrast"
           variant="outlined"
           rounded
@@ -106,8 +108,14 @@ const rangeLabel = computed(() => {
           :class="{ 'pointer-events-none': windowStore.availablePeriods.length <= 1 }"
           :tabindex="windowStore.availablePeriods.length <= 1 ? -1 : 0"
         >
-          <span>{{ rangeLabel }}</span>
-          <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs" />
+          <span class="flex w-full items-center gap-2 sm:gap-4">
+            <span class="flex-1 text-left whitespace-normal leading-snug">
+              <span class="whitespace-nowrap">{{ fromLabel }}</span>
+              &ndash;
+              <span class="whitespace-nowrap"> {{ toLabel }}</span>
+            </span>
+            <i v-if="windowStore.availablePeriods.length > 1" class="pi pi-chevron-down text-xs shrink-0" />
+          </span>
         </Button>
         <Menu v-if="windowStore.availablePeriods.length > 1" ref="periodMenu" :model="periodItems" :popup="true">
           <template #item="{ item, props }">
@@ -121,26 +129,29 @@ const rangeLabel = computed(() => {
           </template>
         </Menu>
       </div>
-      <Button
-        icon="pi pi-angle-right"
-        severity="contrast"
-        variant="outlined"
-        rounded
-        :size="props.compact ? 'small' : undefined"
-        :disabled="!windowStore.canGoNext"
-        @click="windowStore.goNext()"
-        v-tooltip.top="windowStore.canGoNext ? 'Next period' : null"
-      />
-      <Button
-        icon="pi pi-angle-double-right"
-        severity="contrast"
-        variant="outlined"
-        rounded
-        :size="props.compact ? 'small' : undefined"
-        :disabled="!windowStore.canGoNext"
-        @click="windowStore.goLatest()"
-        v-tooltip.top="windowStore.canGoNext ? 'Latest data' : null"
-      />
+      <!-- Next buttons: row 2 on mobile (order-3), row 1 on sm+ (order-3) -->
+      <div class="flex flex-1 sm:flex-none items-center gap-1 order-3">
+        <Button
+          class="flex-1 sm:flex-none !rounded-full"
+          icon="pi pi-angle-right"
+          severity="contrast"
+          variant="outlined"
+          :size="props.compact ? 'small' : undefined"
+          :disabled="!windowStore.canGoNext"
+          @click="windowStore.goNext()"
+          v-tooltip.top="windowStore.canGoNext ? 'Next period' : null"
+        />
+        <Button
+          class="flex-1 sm:flex-none !rounded-full"
+          icon="pi pi-angle-double-right"
+          severity="contrast"
+          variant="outlined"
+          :size="props.compact ? 'small' : undefined"
+          :disabled="!windowStore.canGoNext"
+          @click="windowStore.goLatest()"
+          v-tooltip.top="windowStore.canGoNext ? 'Latest data' : null"
+        />
+      </div>
     </div>
   </div>
 </template>
