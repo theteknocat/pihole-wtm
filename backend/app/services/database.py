@@ -496,11 +496,33 @@ class LocalDatabase:
         hours: int = 24,
         end_ts: float | None = None,
         client_ip: str | None = None,
+        include_timeline: bool = False,
     ) -> dict[str, Any]:
         """
         Aggregate tracker stats over the given time window.
         Optionally filter to a single client device by IP.
-        Returns the same shape as the old get_tracker_stats() response.
+        When include_timeline=True, also returns bucketed timeline series for
+        category and company dimensions (used by the device stats dialog).
+        """
+        result = await self._fetch_tracker_breakdown(
+            hours=hours, end_ts=end_ts, client_ip=client_ip
+        )
+        if include_timeline:
+            timeline = await self._fetch_tracker_timeline(
+                hours=hours, end_ts=end_ts, client_ip=client_ip
+            )
+            result.update(timeline)
+        return result
+
+    async def _fetch_tracker_breakdown(
+        self,
+        hours: int = 24,
+        end_ts: float | None = None,
+        client_ip: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Core tracker breakdown query: returns category/company counts for the
+        given time window, optionally filtered to one client IP.
         """
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
@@ -600,6 +622,100 @@ class LocalDatabase:
             else 0.0,
             "truncated": False,
             "by_category": by_category,
+        }
+
+    async def _fetch_tracker_timeline(
+        self,
+        hours: int = 24,
+        end_ts: float | None = None,
+        client_ip: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return per-category and per-company tracker query counts bucketed over
+        time. Uses the same adaptive bucket sizing as fetch_timeline_stats.
+        All companies are returned; the frontend applies the top-N + Other cap.
+        """
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+
+        if hours <= 24:
+            bucket_seconds = 3600
+        elif hours <= 168:
+            bucket_seconds = 6 * 3600
+        elif hours <= 720:
+            bucket_seconds = 24 * 3600
+        else:
+            bucket_seconds = 72 * 3600
+
+        conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
+
+        if client_ip:
+            conditions.append("q.client_ip = ?")
+            params.append(client_ip)
+
+        await self._apply_exclusions(conditions, params)
+
+        where = "WHERE " + " AND ".join(conditions)
+
+        # ruff: disable[S608]
+        # Dynamic SQL uses f-strings for structure only;
+        # all user input goes through parameterised queries.
+        sql = f"""
+            SELECT
+                COALESCE(d.category, 'Uncategorized')   AS category,
+                COALESCE(d.company_name, 'Unknown')     AS company_name,
+                CAST((q.timestamp - ?) / ? AS INTEGER)  AS bucket,
+                COUNT(*)                                AS count
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            {where}
+            GROUP BY category, company_name, bucket
+            ORDER BY category, company_name, bucket
+        """
+        # ruff: enable[S608]
+
+        params = [from_ts, bucket_seconds] + params
+
+        async with self._conn.execute(sql, params) as cur:
+            rows = await cur.fetchall()
+
+        num_buckets = hours * 3600 // bucket_seconds + 1
+        bucket_timestamps = [from_ts + i * bucket_seconds for i in range(num_buckets)]
+
+        # Accumulate counts into per-category and per-company dicts keyed by bucket index
+        cat_buckets: dict[str, list[int]] = {}
+        co_buckets: dict[str, list[int]] = {}
+
+        for row in rows:
+            cat = row["category"]
+            company = row["company_name"]
+            b = int(row["bucket"])
+            if b < 0 or b >= num_buckets:
+                continue
+
+            if cat not in cat_buckets:
+                cat_buckets[cat] = [0] * num_buckets
+            cat_buckets[cat][b] += row["count"]
+
+            if company not in co_buckets:
+                co_buckets[company] = [0] * num_buckets
+            co_buckets[company][b] += row["count"]
+
+        by_category_timeline = [
+            {"category": cat, "counts": counts}
+            for cat, counts in cat_buckets.items()
+        ]
+        by_company_timeline = [
+            {"company_name": co, "counts": counts}
+            for co, counts in co_buckets.items()
+        ]
+
+        return {
+            "bucket_seconds": bucket_seconds,
+            "bucket_timestamps": bucket_timestamps,
+            "by_category_timeline": by_category_timeline,
+            "by_company_timeline": by_company_timeline,
         }
 
     async def search_domains(

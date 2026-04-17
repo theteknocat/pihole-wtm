@@ -212,6 +212,29 @@ async def test_stats_trackers_returns_shape(client: AsyncClient, db: LocalDataba
     assert "by_category" in body
 
 
+async def test_stats_trackers_include_timeline(client: AsyncClient, db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="Acme")
+    await _query(db, 1, "ads.example.com", now - 60)
+
+    res = await client.get(
+        "/api/stats/trackers",
+        params={"hours": 1, "end_ts": now, "include_timeline": "true"},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert "bucket_seconds" in body
+    assert "bucket_timestamps" in body
+    assert "by_category_timeline" in body
+    assert "by_company_timeline" in body
+    # Each timeline series should have counts aligned to the bucket_timestamps length
+    num_buckets = len(body["bucket_timestamps"])
+    for series in body["by_category_timeline"]:
+        assert len(series["counts"]) == num_buckets
+    for series in body["by_company_timeline"]:
+        assert len(series["counts"]) == num_buckets
+
+
 # ---------------------------------------------------------------------------
 # GET /api/stats/timeline
 # ---------------------------------------------------------------------------

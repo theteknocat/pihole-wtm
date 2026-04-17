@@ -148,8 +148,11 @@ async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=2160),
     end_ts: float | None = Query(default=None),
     client_ip: str | None = Query(default=None),
+    include_timeline: bool = Query(default=False),
 ) -> dict[str, Any]:
-    return await db.fetch_tracker_stats(hours=hours, end_ts=end_ts, client_ip=client_ip)
+    return await db.fetch_tracker_stats(
+        hours=hours, end_ts=end_ts, client_ip=client_ip, include_timeline=include_timeline
+    )
 
 
 @app.get("/api/stats/timeline", dependencies=[Depends(require_session)])
