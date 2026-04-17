@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * DeviceStatsDialog — near-fullscreen modal showing tracker stats for a single device.
+ * DeviceStatsDialog — maximizable modal showing tracker stats for a single device.
  *
  * Two charts are shown:
  *  1. Horizontal bar breakdown (categories or companies) — same as before.
