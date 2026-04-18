@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/theteknocat/pihole-wtm/compare/v1.5.0...v1.5.1) (2026-04-18)
+
+
+### Improvements
+
+* broadened use of device grouping, scoped report filters ([565d2d8](https://github.com/theteknocat/pihole-wtm/commit/565d2d88da5c8ca90571c44613678223bf85d7a9))
+
 ## [1.5.0](https://github.com/theteknocat/pihole-wtm/compare/v1.4.0...v1.5.0) (2026-04-18)
 
 
