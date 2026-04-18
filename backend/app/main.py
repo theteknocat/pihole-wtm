@@ -219,10 +219,14 @@ async def stats_clients(
 
 
 @app.get("/api/settings/options", dependencies=[Depends(require_session)])
-async def settings_options() -> dict[str, Any]:
-    """Return the available categories and companies from stored data."""
-    categories = await db.get_available_categories()
-    companies = await db.get_available_companies()
+async def settings_options(
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
+) -> dict[str, Any]:
+    """Return categories and companies that have queries in the active time window,
+    after applying user exclusions."""
+    categories = await db.get_available_categories(hours=hours, end_ts=end_ts)
+    companies = await db.get_available_companies(hours=hours, end_ts=end_ts)
     return {"categories": categories, "companies": companies}
 
 
@@ -277,9 +281,13 @@ async def put_setting(key: str, request: Request) -> dict[str, str]:
 
 
 @app.get("/api/clients", dependencies=[Depends(require_session)])
-async def get_clients() -> dict[str, Any]:
-    """Return all distinct client IPs with query counts and assigned names."""
-    return {"clients": await db.get_clients()}
+async def get_clients(
+    hours: int = Query(default=24, ge=1, le=2160),
+    end_ts: float | None = Query(default=None),
+) -> dict[str, Any]:
+    """Return client IPs with query counts in the active time window,
+    after applying user exclusions."""
+    return {"clients": await db.get_clients(hours=hours, end_ts=end_ts)}
 
 
 @app.put("/api/clients/{client_ip:path}", dependencies=[Depends(require_session)])

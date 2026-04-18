@@ -102,14 +102,14 @@ describe('mode: domain', () => {
     const result = await withSetup('domain')
     result.selectedCategory.value = 'advertising'
     result.selectedCompany.value = 'Acme'
-    result.selectedClientIp.value = '192.168.1.1'
+    result.selectedDeviceOption.value = { label: 'My Laptop', ips: '192.168.1.1', isGroup: false, subLabel: null }
     result.appliedDomain.value = 'example.com'
 
     result.resetFilters()
 
     expect(result.selectedCategory.value).toBeNull()
     expect(result.selectedCompany.value).toBeNull()
-    expect(result.selectedClientIp.value).toBeNull()
+    expect(result.selectedClientIp.value).toBeNull()  // computed from selectedDeviceOption
     expect(result.appliedDomain.value).toBeNull()
   })
 
@@ -124,6 +124,7 @@ describe('mode: domain', () => {
     mockApiFetch
       .mockResolvedValueOnce(mockSuccessResponse({ categories: [], companies: [] })) // fetchOptions /api/settings/options
       .mockResolvedValueOnce(mockSuccessResponse({ clients: [] }))                   // fetchOptions /api/clients
+      .mockResolvedValueOnce(mockSuccessResponse({ groups: [] }))                    // fetchOptions /api/device-groups
       .mockResolvedValueOnce({ ok: false })                                          // fetchData
     const result = await withSetup('domain')
     expect(result.error.value).toBeTruthy()

@@ -334,18 +334,25 @@ async def test_delete_config_removes_key(db: LocalDatabase) -> None:
 
 
 async def test_get_available_categories(db: LocalDatabase) -> None:
+    now = time.time()
     await _domain(db, "a.com", category="analytics")
     await _domain(db, "b.com", category="telemetry")
-    await _domain(db, "c.com")  # no category
-    cats = await db.get_available_categories()
+    await _domain(db, "c.com")  # no category — should not appear
+    await _query(db, 1, "a.com", now - 60)
+    await _query(db, 2, "b.com", now - 120)
+    # c.com has no query in window — its absence of category is moot anyway
+    cats = await db.get_available_categories(end_ts=now)
     assert set(cats) == {"analytics", "telemetry"}
 
 
 async def test_get_available_companies(db: LocalDatabase) -> None:
+    now = time.time()
     await _domain(db, "a.com", company_name="Acme")
     await _domain(db, "b.com", company_name="Globex")
-    await _domain(db, "c.com")  # no company
-    companies = await db.get_available_companies()
+    await _domain(db, "c.com")  # no company — no query added either
+    await _query(db, 1, "a.com", now - 60)
+    await _query(db, 2, "b.com", now - 120)
+    companies = await db.get_available_companies(end_ts=now)
     assert set(companies) == {"Acme", "Globex"}
 
 

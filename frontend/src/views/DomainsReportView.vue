@@ -17,14 +17,15 @@ import Button from 'primevue/button'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import ClientBreakdownDialog from '@/components/layout/ClientBreakdownDialog.vue'
 import { formatCategory } from '@/utils/format'
-import { useReportData, type ClientOption } from '@/composables/useReportData'
+import { useReportData } from '@/composables/useReportData'
 import { apiFetch } from '@/utils/api'
 import type { DomainStats } from '@/types/api'
 
 const {
   data, loading, error, hasFilters,
-  selectedCategory, selectedCompany, selectedClientIp,
-  categoryOptions, companyOptions, clientOptions,
+  selectedCategory, selectedCompany,
+  categoryOptions, companyOptions,
+  selectedDeviceOption, deviceOptions,
   domainInput, appliedDomain, domainExact, domainSuggestions,
   resetFilters, searchDomains, applyDomainFilter,
   onDomainSelect, onDomainClear,
@@ -82,38 +83,26 @@ async function reenrichDomain(domain: string) {
         class="w-full md:w-64"
       />
 
-      <!-- Multi-IP chip (read-only, from group navigation) -->
-      <div
-        v-if="Array.isArray(selectedClientIp)"
-        class="flex items-center gap-1 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm w-full md:w-64"
-      >
-        <span class="flex-1 text-gray-700 dark:text-gray-200">{{ selectedClientIp.length }} devices</span>
-        <button
-          class="pi pi-times text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-          aria-label="Clear device filter"
-          @click="selectedClientIp = null"
-        />
-      </div>
-
-      <!-- Single-IP dropdown -->
+      <!-- Device / group filter -->
       <Select
-        v-else
-        v-model="selectedClientIp"
-        :options="clientOptions"
-        option-value="client_ip"
-        :option-label="(c: ClientOption) => c.client_name ?? c.client_ip"
+        v-model="selectedDeviceOption"
+        :options="deviceOptions"
+        option-label="label"
         placeholder="All devices"
         filter
         showClear
         class="w-full md:w-64"
       >
         <template #value="{ value }">
-          {{ value ? (clientOptions.find(c => c.client_ip === value)?.client_name ?? value) : 'All devices' }}
+          {{ value ? value.label : 'All devices' }}
         </template>
         <template #option="{ option }">
           <span class="block">
-            {{ option.client_name ?? option.client_ip }}
-            <span v-if="option.client_name" class="text-xs block text-gray-400 font-mono">{{ option.client_ip }}</span>
+            {{ option.label }}
+            <span v-if="option.isGroup" class="text-xs flex items-center gap-1 text-gray-400">
+              <i class="pi pi-link" />{{ option.subLabel }}
+            </span>
+            <span v-else-if="option.subLabel" class="text-xs block text-gray-400 font-mono">{{ option.subLabel }}</span>
           </span>
         </template>
       </Select>
