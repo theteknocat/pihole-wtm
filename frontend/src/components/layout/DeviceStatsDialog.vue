@@ -12,6 +12,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
 import PvChart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -36,7 +37,10 @@ const props = defineProps<{
   clientName: string | null
 }>()
 
-const emit = defineEmits<{ (e: 'close'): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'navigate'): void
+}>()
 
 const router = useRouter()
 const windowStore = useWindowStore()
@@ -175,6 +179,24 @@ async function fetchStats() {
   }
 }
 
+const domainsReportQuery = computed<Record<string, string | string[]>>(() => {
+  const query: Record<string, string | string[]> = {}
+  query.client_ip = props.clientIps.length === 1 ? props.clientIps[0] : props.clientIps
+  return query
+})
+
+const domainsReportHref = computed(() =>
+  router.resolve({ path: '/domains-report', query: domainsReportQuery.value }).href
+)
+
+function viewDomainsReport(event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return
+  event.preventDefault()
+  emit('navigate')
+  visible.value = false
+  router.push({ path: '/domains-report', query: domainsReportQuery.value })
+}
+
 function onHide() {
   emit('close')
 }
@@ -213,16 +235,29 @@ watch(() => windowStore.refreshKey, fetchStats)
       </div>
     </template>
 
-    <!-- Subtitle -->
-    <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">
-      <template v-if="stats">
-        {{ stats.tracker_queries.toLocaleString() }}
-      </template>
-      <template v-else>
-        No
-      </template>
-      Queries
-    </h3>
+    <!-- Subtitle + domains report link -->
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300">
+        <template v-if="stats">
+          {{ stats.tracker_queries.toLocaleString() }}
+        </template>
+        <template v-else>
+          No
+        </template>
+        Queries
+      </h3>
+      <Button
+        as="a"
+        :href="domainsReportHref"
+        label="View Domains Report"
+        icon="pi pi-external-link"
+        severity="secondary"
+        text
+        size="small"
+        class="domains-report-link"
+        @click="viewDomainsReport"
+      />
+    </div>
 
     <!-- Loading -->
     <div v-if="loading && !stats" class="flex flex-col items-center justify-center py-16 gap-4 text-gray-500 dark:text-gray-400">
@@ -260,3 +295,9 @@ watch(() => windowStore.refreshKey, fetchStats)
     </template>
   </Dialog>
 </template>
+
+<style scoped>
+:deep(.domains-report-link):hover {
+  text-decoration: none;
+}
+</style>

@@ -1149,19 +1149,52 @@ class LocalDatabase:
         await self._conn.execute("DELETE FROM user_config WHERE key = ?", (key,))
         await self._conn.commit()
 
-    async def get_available_categories(self) -> list[str]:
-        """Return distinct category values from enriched domains."""
-        async with self._conn.execute(
-            "SELECT DISTINCT category FROM domains WHERE category IS NOT NULL ORDER BY category"
-        ) as cur:
+    async def get_available_categories(
+        self, hours: int = 24, end_ts: float | None = None
+    ) -> list[str]:
+        """Return distinct categories that have queries in the active time window,
+        after applying user exclusions."""
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions: list[str] = ["q.timestamp >= ?", "q.timestamp <= ?",
+                                  "d.category IS NOT NULL"]
+        params: list[Any] = [from_ts, anchor]
+        await self._apply_exclusions(conditions, params)
+        where = "WHERE " + " AND ".join(conditions)
+        # ruff: disable[S608]
+        sql = f"""
+            SELECT DISTINCT d.category
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            {where}
+            ORDER BY d.category
+        """
+        # ruff: enable[S608]
+        async with self._conn.execute(sql, params) as cur:
             return [r[0] for r in await cur.fetchall()]
 
-    async def get_available_companies(self) -> list[str]:
-        """Return distinct company names from enriched domains."""
-        async with self._conn.execute(
-            "SELECT DISTINCT company_name FROM domains"
-            " WHERE company_name IS NOT NULL ORDER BY company_name"
-        ) as cur:
+    async def get_available_companies(
+        self, hours: int = 24, end_ts: float | None = None
+    ) -> list[str]:
+        """Return distinct company names that have queries in the active time window,
+        after applying user exclusions."""
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions: list[str] = ["q.timestamp >= ?", "q.timestamp <= ?",
+                                  "d.company_name IS NOT NULL"]
+        params: list[Any] = [from_ts, anchor]
+        await self._apply_exclusions(conditions, params)
+        where = "WHERE " + " AND ".join(conditions)
+        # ruff: disable[S608]
+        sql = f"""
+            SELECT DISTINCT d.company_name
+            FROM queries q
+            JOIN domains d ON q.domain = d.domain
+            {where}
+            ORDER BY d.company_name
+        """
+        # ruff: enable[S608]
+        async with self._conn.execute(sql, params) as cur:
             return [r[0] for r in await cur.fetchall()]
 
     # -------------------------------------------------------------------------
@@ -1175,15 +1208,29 @@ class LocalDatabase:
         ) as cur:
             return {r[0]: r[1] for r in await cur.fetchall()}
 
-    async def get_clients(self) -> list[dict[str, Any]]:
-        """Return all distinct client IPs with query counts and any assigned names."""
-        async with self._conn.execute("""
+    async def get_clients(
+        self, hours: int = 24, end_ts: float | None = None
+    ) -> list[dict[str, Any]]:
+        """Return distinct client IPs with query counts in the active time window,
+        after applying user exclusions."""
+        anchor = end_ts or time.time()
+        from_ts = anchor - hours * 3600
+        conditions: list[str] = ["q.timestamp >= ?", "q.timestamp <= ?"]
+        params: list[Any] = [from_ts, anchor]
+        await self._apply_exclusions(conditions, params)
+        where = "WHERE " + " AND ".join(conditions)
+        # ruff: disable[S608]
+        sql = f"""
             SELECT q.client_ip, cn.name AS client_name, COUNT(*) AS query_count
             FROM queries q
             LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            LEFT JOIN domains d ON q.domain = d.domain
+            {where}
             GROUP BY q.client_ip
             ORDER BY query_count DESC
-        """) as cur:
+        """
+        # ruff: enable[S608]
+        async with self._conn.execute(sql, params) as cur:
             return [
                 {"client_ip": r["client_ip"], "client_name": r["client_name"],
                  "query_count": r["query_count"]}

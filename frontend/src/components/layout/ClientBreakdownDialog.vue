@@ -3,11 +3,12 @@
  * ClientBreakdownDialog — modal showing per-device query breakdown for a
  * domain, category, or company.
  *
- * Displays a table of devices that match the filter within the current time
- * window, with allowed and blocked counts for each. Clicking a device name
- * navigates to the Domains Report filtered to that device (and the current
- * filter when applicable). For category/company filters a "View Domains
- * Report" link lets the user jump straight to the full filtered report.
+ * Devices that belong to a linked group appear as a single merged row with
+ * combined stats. The individual member names and IPs are shown inline below
+ * the group name. Clicking any device or group name opens DeviceStatsDialog
+ * on top rather than navigating away. For category/company filters a
+ * "View Domains Report" link lets the user jump straight to the full filtered
+ * report.
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -17,7 +18,10 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
+import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
 import { useWindowStore } from '@/stores/window'
+import { useDeviceGroups } from '@/composables/useDeviceGroups'
+import type { TableRow } from '@/composables/useDeviceGroups'
 import { formatCategory } from '@/utils/format'
 import type { ClientStats, ClientStat, ClientFilter } from '@/types/api'
 
@@ -50,6 +54,29 @@ const icon = computed(() => {
   }
 })
 
+// ---- Device groups ----------------------------------------------------------
+
+const clients = computed(() => stats.value?.clients ?? [])
+const { fetchGroups, tableRows } = useDeviceGroups(clients)
+
+// ---- Device stats dialog (opens on top of this dialog) ----------------------
+
+const inspectingDevice = ref<{ clientIps: string[]; clientName: string | null } | null>(null)
+
+function openDeviceStats(clientIps: string[], clientName: string | null) {
+  inspectingDevice.value = { clientIps, clientName }
+}
+
+function inspectRow(row: TableRow) {
+  if (row._type === 'group') {
+    openDeviceStats(row.group.members.map(m => m.client_ip), row.group.name)
+  } else {
+    openDeviceStats([row.client_ip], row.client_name)
+  }
+}
+
+// ---- Data fetch -------------------------------------------------------------
+
 async function fetchStats() {
   loading.value = true
   error.value = null
@@ -71,15 +98,6 @@ function onClientSaved(client: ClientStat, newName: string | null) {
   windowStore.triggerRefresh()
 }
 
-function inspectDevice(clientIp: string) {
-  visible.value = false
-  const query: Record<string, string> = { client_ip: clientIp }
-  if (props.filter.type !== 'domain') {
-    query[props.filter.type] = props.filter.value
-  }
-  router.push({ path: '/domains-report', query })
-}
-
 function viewFullReport() {
   visible.value = false
   router.push({
@@ -92,8 +110,13 @@ function onHide() {
   emit('close')
 }
 
-onMounted(fetchStats)
-watch(() => windowStore.refreshKey, fetchStats)
+onMounted(async () => {
+  await Promise.all([fetchStats(), fetchGroups()])
+})
+watch(() => windowStore.refreshKey, () => {
+  fetchStats()
+  fetchGroups()
+})
 </script>
 
 <template>
@@ -140,7 +163,8 @@ watch(() => windowStore.refreshKey, fetchStats)
     <!-- Table -->
     <DataTable
       v-if="stats"
-      :value="stats.clients"
+      :value="tableRows"
+      data-key="_key"
       sort-field="query_count"
       :sort-order="-1"
       striped-rows
@@ -149,9 +173,32 @@ watch(() => windowStore.refreshKey, fetchStats)
       <template #empty>
         <p class="empty-state">No devices found</p>
       </template>
-      <Column field="client_ip" header="Device" style="min-width: 10rem">
+      <Column header="Device" style="min-width: 10rem">
         <template #body="{ data: row }">
-          <div class="flex items-center gap-2">
+          <!-- Group row: link icon + group name + member list -->
+          <div v-if="row._type === 'group'" class="flex items-center gap-2">
+            <span class="flex items-center justify-center flex-shrink-0 text-gray-400" style="width: 1.5rem; height: 1.5rem">
+              <i class="pi pi-link text-sm" />
+            </span>
+            <span class="block">
+              <a
+                href="#device-stats"
+                v-tooltip.top="'Tracker breakdown'"
+                @click.prevent="inspectRow(row)"
+              >{{ row.group.name }}</a>
+              <span
+                v-for="member in row.member_stats"
+                :key="member.client_ip"
+                class="text-xs flex gap-1 text-gray-400"
+              >
+                <span>{{ member.client_name ?? member.client_ip }}</span>
+                <span v-if="member.client_name" class="font-mono">{{ member.client_ip }}</span>
+              </span>
+            </span>
+          </div>
+
+          <!-- Single row: pencil + name -->
+          <div v-else class="flex items-center gap-2">
             <Button
               icon="pi pi-pencil"
               severity="secondary"
@@ -165,8 +212,9 @@ watch(() => windowStore.refreshKey, fetchStats)
             />
             <span class="block">
               <a
-                href="#device-details"
-                @click.prevent="inspectDevice(row.client_ip)"
+                href="#device-stats"
+                v-tooltip.top="'Tracker breakdown'"
+                @click.prevent="inspectRow(row)"
               >{{ row.client_name ?? row.client_ip }}</a>
               <span v-if="row.client_name" class="text-xs block text-gray-400 font-mono">{{ row.client_ip }}</span>
             </span>
@@ -193,5 +241,14 @@ watch(() => windowStore.refreshKey, fetchStats)
     :current-name="editingClient.client_name"
     @close="editingClient = null"
     @saved="onClientSaved(editingClient!, $event)"
+  />
+
+  <!-- Device stats dialog — opens on top of this dialog -->
+  <DeviceStatsDialog
+    v-if="inspectingDevice"
+    :client-ips="inspectingDevice.clientIps"
+    :client-name="inspectingDevice.clientName"
+    @close="inspectingDevice = null"
+    @navigate="visible = false"
   />
 </template>

@@ -21,9 +21,10 @@ import DeviceLinkDialog from '@/components/layout/DeviceLinkDialog.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { formatCategory } from '@/utils/format'
 import { useReportData } from '@/composables/useReportData'
+import { useDeviceGroups } from '@/composables/useDeviceGroups'
+import type { GroupRow } from '@/composables/useDeviceGroups'
 import { useWindowStore } from '@/stores/window'
-import { apiFetch } from '@/utils/api'
-import type { ClientStats, ClientStat, DeviceGroup } from '@/types/api'
+import type { ClientStats, ClientStat } from '@/types/api'
 
 const windowStore = useWindowStore()
 
@@ -38,82 +39,11 @@ const clientData = computed(() => data.value as ClientStats | null)
 
 // ---- Device groups ----------------------------------------------------------
 
-const groups = ref<DeviceGroup[]>([])
-
-async function fetchGroups() {
-  try {
-    const res = await apiFetch('/api/device-groups')
-    if (res.ok) {
-      const json = await res.json()
-      groups.value = json.groups ?? []
-    }
-  } catch {
-    // Non-fatal; groups just won't be shown
-  }
-}
+const clients = computed(() => clientData.value?.clients ?? [])
+const { fetchGroups, ipToGroup, tableRows } = useDeviceGroups(clients)
 
 onMounted(fetchGroups)
 watch(() => windowStore.refreshKey, fetchGroups)
-
-/** Map from client_ip → the group it belongs to */
-const ipToGroup = computed(() => {
-  const m = new Map<string, DeviceGroup>()
-  for (const g of groups.value) {
-    for (const member of g.members) m.set(member.client_ip, g)
-  }
-  return m
-})
-
-// ---- Table rows -------------------------------------------------------------
-
-type GroupRow = {
-  _type: 'group'
-  _key: string
-  group: DeviceGroup
-  client_name: string
-  query_count: number
-  blocked_count: number
-  allowed_count: number
-  block_rate: number
-  member_stats: ClientStat[]
-}
-
-type SingleRow = ClientStat & { _type: 'single'; _key: string }
-
-type TableRow = GroupRow | SingleRow
-
-const tableRows = computed<TableRow[]>(() => {
-  const seenGroups = new Set<number>()
-  const result: TableRow[] = []
-
-  for (const stat of clientData.value?.clients ?? []) {
-    const group = ipToGroup.value.get(stat.client_ip)
-    if (group) {
-      if (seenGroups.has(group.id)) continue
-      seenGroups.add(group.id)
-      const memberStats = (clientData.value?.clients ?? []).filter(c =>
-        group.members.some(m => m.client_ip === c.client_ip)
-      )
-      const qc = memberStats.reduce((s, c) => s + c.query_count, 0)
-      const bc = memberStats.reduce((s, c) => s + c.blocked_count, 0)
-      const ac = memberStats.reduce((s, c) => s + c.allowed_count, 0)
-      result.push({
-        _type: 'group',
-        _key: `group-${group.id}`,
-        group,
-        client_name: group.name,
-        query_count: qc,
-        blocked_count: bc,
-        allowed_count: ac,
-        block_rate: qc ? Math.round(bc / qc * 1000) / 10 : 0,
-        member_stats: memberStats,
-      })
-    } else {
-      result.push({ _type: 'single', _key: `single-${stat.client_ip}`, ...stat })
-    }
-  }
-  return result
-})
 
 // ---- Expansion --------------------------------------------------------------
 

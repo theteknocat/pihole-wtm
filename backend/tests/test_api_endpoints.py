@@ -332,9 +332,11 @@ async def test_stats_clients_domain_filter(client: AsyncClient, db: LocalDatabas
 async def test_settings_options_returns_categories_and_companies(
     client: AsyncClient, db: LocalDatabase
 ) -> None:
+    now = time.time()
     await _domain(db, "a.com", category="analytics", company_name="Acme")
+    await _query(db, 1, "a.com", now - 60)
 
-    res = await client.get("/api/settings/options")
+    res = await client.get("/api/settings/options", params={"end_ts": now})
     assert res.status_code == 200
     body = res.json()
     assert "analytics" in body["categories"]

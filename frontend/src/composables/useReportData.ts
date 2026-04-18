@@ -9,11 +9,24 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWindowStore } from '@/stores/window'
 import { apiFetch } from '@/utils/api'
+import type { DeviceGroup } from '@/types/api'
 
 export interface ClientOption {
   client_ip: string
   client_name: string | null
   query_count: number
+}
+
+/** A single entry in the combined device filter Select. */
+export interface DeviceOption {
+  /** Display label (group name or device name/IP). */
+  label: string
+  /** IP(s) to filter on — array for groups, single string for individuals. */
+  ips: string | string[]
+  /** True when this entry represents a device group. */
+  isGroup: boolean
+  /** Shown as a second line: IP for named individuals, member count for groups. */
+  subLabel: string | null
 }
 
 export function useReportData(mode: 'domain' | 'client') {
@@ -26,10 +39,67 @@ export function useReportData(mode: 'domain' | 'client') {
   const selectedCompany = ref<string | null>((route.query.company as string) ?? null)
   const categoryOptions = ref<string[]>([])
   const companyOptions = ref<string[]>([])
+
+  // Domain-only filter state — device groups + combined Select model
+  const deviceGroups = ref<DeviceGroup[]>([])
   const clientOptions = ref<ClientOption[]>([])
 
-  // Domain-only filter state
-  const selectedClientIp = ref<string | string[] | null>(
+  /**
+   * Combined device option list: groups and ungrouped individuals, sorted
+   * alphabetically. Individuals that belong to a group are excluded.
+   */
+  const groupedIps = computed(() => {
+    const s = new Set<string>()
+    for (const g of deviceGroups.value) for (const m of g.members) s.add(m.client_ip)
+    return s
+  })
+
+  const deviceOptions = computed<DeviceOption[]>(() => {
+    const opts: DeviceOption[] = []
+    for (const g of deviceGroups.value) {
+      opts.push({
+        label: g.name,
+        ips: g.members.map(m => m.client_ip),
+        isGroup: true,
+        subLabel: `${g.members.length} devices`,
+      })
+    }
+    for (const c of clientOptions.value) {
+      if (groupedIps.value.has(c.client_ip)) continue
+      opts.push({
+        label: c.client_name ?? c.client_ip,
+        ips: c.client_ip,
+        isGroup: false,
+        subLabel: c.client_name ? c.client_ip : null,
+      })
+    }
+    opts.sort((a, b) => a.label.localeCompare(b.label))
+    return opts
+  })
+
+  /**
+   * Try to find a DeviceOption matching a given set of IPs (used when restoring
+   * from URL). Returns null if no group matches exactly.
+   */
+  function findDeviceOption(ips: string | string[]): DeviceOption | null {
+    const target = Array.isArray(ips) ? [...ips].sort().join(',') : ips
+    for (const opt of deviceOptions.value) {
+      const optIps = Array.isArray(opt.ips) ? [...opt.ips].sort().join(',') : opt.ips
+      if (optIps === target) return opt
+    }
+    return null
+  }
+
+  // The Select's bound model. null = "All devices".
+  const selectedDeviceOption = ref<DeviceOption | null>(null)
+
+  // Derive selectedClientIp from the Select model (used by fetch + URL sync).
+  const selectedClientIp = computed<string | string[] | null>(
+    () => selectedDeviceOption.value?.ips ?? null
+  )
+
+  // Raw multi-IP value from URL (only set on init when no group matched yet).
+  const pendingUrlIps = ref<string | string[] | null>(
     (() => {
       const v = route.query.client_ip
       if (!v) return null
@@ -69,16 +139,29 @@ export function useReportData(mode: 'domain' | 'client') {
 
   async function fetchOptions() {
     try {
-      const [configRes, clientsRes] = await Promise.all([
-        apiFetch('/api/settings/options'),
-        apiFetch('/api/clients'),
-      ])
+      const qs = windowStore.queryParams({})
+      const requests: Promise<Response>[] = [
+        apiFetch(`/api/settings/options?${qs}`),
+        apiFetch(`/api/clients?${qs}`),
+      ]
+      if (mode === 'domain') requests.push(apiFetch('/api/device-groups'))
+      const [configRes, clientsRes, groupsRes] = await Promise.all(requests)
       if (!configRes.ok || !clientsRes.ok) throw new Error('Failed to fetch filter options')
       const configJson = await configRes.json()
       categoryOptions.value = configJson.categories ?? []
       companyOptions.value = configJson.companies ?? []
       const clientsJson = await clientsRes.json()
       clientOptions.value = clientsJson.clients ?? []
+      if (groupsRes?.ok) {
+        const groupsJson = await groupsRes.json()
+        deviceGroups.value = groupsJson.groups ?? []
+      }
+      // Resolve any pending URL selection (set before options were loaded)
+      if (mode === 'domain' && pendingUrlIps.value !== null) {
+        const match = findDeviceOption(pendingUrlIps.value)
+        if (match) selectedDeviceOption.value = match
+        pendingUrlIps.value = null
+      }
     } catch (e) {
       console.warn('Failed to fetch filter options:', e)
     }
@@ -162,7 +245,7 @@ export function useReportData(mode: 'domain' | 'client') {
     selectedCategory.value = null
     selectedCompany.value = null
     if (mode === 'domain') {
-      selectedClientIp.value = null
+      selectedDeviceOption.value = null
       domainInput.value = null
       appliedDomain.value = null
       domainExact.value = false
@@ -175,7 +258,7 @@ export function useReportData(mode: 'domain' | 'client') {
   watch(() => windowStore.refreshKey, () => { fetchOptions(); fetchData() })
 
   const watchSources = mode === 'domain'
-    ? [selectedCategory, selectedCompany, selectedClientIp, appliedDomain]
+    ? [selectedCategory, selectedCompany, selectedDeviceOption, appliedDomain]
     : [selectedCategory, selectedCompany]
 
   watch(watchSources, () => { syncUrlParams(); fetchData() })
@@ -184,7 +267,7 @@ export function useReportData(mode: 'domain' | 'client') {
     watch(domainExact, () => { if (appliedDomain.value) applyDomainFilter() })
   }
 
-  // Sync refs when route query changes externally
+  // Sync refs when route query changes externally (e.g. browser back/forward)
   watch(() => route.query, (q) => {
     const cat = (q.category as string) ?? null
     const co = (q.company as string) ?? null
@@ -199,7 +282,9 @@ export function useReportData(mode: 'domain' | 'client') {
           : (rawIp as string)
       const dom = (q.domain as string) ?? null
       const exact = q.domain_exact === '1'
-      if (JSON.stringify(ip) !== JSON.stringify(selectedClientIp.value)) selectedClientIp.value = ip
+      if (JSON.stringify(ip) !== JSON.stringify(selectedClientIp.value)) {
+        selectedDeviceOption.value = ip ? (findDeviceOption(ip) ?? null) : null
+      }
       if (dom !== appliedDomain.value) {
         domainInput.value = dom
         appliedDomain.value = dom
@@ -214,10 +299,11 @@ export function useReportData(mode: 'domain' | 'client') {
     // Shared
     data, loading, error, hasFilters,
     selectedCategory, selectedCompany,
-    categoryOptions, companyOptions, clientOptions,
+    categoryOptions, companyOptions,
     resetFilters, fetchData,
     // Domain-only
-    selectedClientIp, domainInput, appliedDomain, domainExact,
+    selectedClientIp, selectedDeviceOption, deviceOptions,
+    domainInput, appliedDomain, domainExact,
     domainSuggestions, searchDomains, applyDomainFilter,
     onDomainSelect, onDomainClear,
   }
