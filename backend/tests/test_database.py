@@ -480,7 +480,7 @@ async def test_fetch_tracker_stats_filter_by_client(db: LocalDatabase) -> None:
     await _query(db, 1, "a.example.com", now - 60, client_ip="192.168.1.1")
     await _query(db, 2, "a.example.com", now - 60, client_ip="192.168.1.2")
 
-    result = await db.fetch_tracker_stats(hours=1, end_ts=now, client_ip="192.168.1.1")
+    result = await db.fetch_tracker_stats(hours=1, end_ts=now, client_ips=["192.168.1.1"])
     assert result["total_queries"] == 1
 
 
@@ -650,3 +650,127 @@ async def test_fetch_client_stats_domain_filter_is_exact_match(db: LocalDatabase
 
     assert "192.168.1.1" in client_ips
     assert "192.168.1.2" not in client_ips  # sub.target.com must not match
+
+
+# ---------------------------------------------------------------------------
+# Device groups
+# ---------------------------------------------------------------------------
+
+async def test_create_and_get_device_groups(db: LocalDatabase) -> None:
+    group_id = await db.create_device_group("My Laptop", ["192.168.1.1", "192.168.1.2"])
+    assert isinstance(group_id, int)
+
+    groups = await db.get_device_groups()
+    assert len(groups) == 1
+    g = groups[0]
+    assert g["id"] == group_id
+    assert g["name"] == "My Laptop"
+    member_ips = {m["client_ip"] for m in g["members"]}
+    assert member_ips == {"192.168.1.1", "192.168.1.2"}
+
+
+async def test_get_device_group_includes_friendly_name(db: LocalDatabase) -> None:
+    await db.set_client_name("192.168.1.1", "Wired")
+    group_id = await db.create_device_group("Laptop", ["192.168.1.1", "192.168.1.2"])
+
+    g = await db.get_device_group(group_id)
+    assert g is not None
+    names = {m["client_ip"]: m["client_name"] for m in g["members"]}
+    assert names["192.168.1.1"] == "Wired"
+    assert names["192.168.1.2"] is None
+
+
+async def test_get_device_group_returns_none_for_missing(db: LocalDatabase) -> None:
+    result = await db.get_device_group(999)
+    assert result is None
+
+
+async def test_update_device_group(db: LocalDatabase) -> None:
+    group_id = await db.create_device_group("Old Name", ["192.168.1.1", "192.168.1.2"])
+    updated = await db.update_device_group(group_id, "New Name", ["192.168.1.3", "192.168.1.4"])
+    assert updated is True
+
+    g = await db.get_device_group(group_id)
+    assert g is not None
+    assert g["name"] == "New Name"
+    member_ips = {m["client_ip"] for m in g["members"]}
+    assert member_ips == {"192.168.1.3", "192.168.1.4"}
+
+
+async def test_update_device_group_returns_false_for_missing(db: LocalDatabase) -> None:
+    result = await db.update_device_group(999, "X", ["1.1.1.1", "2.2.2.2"])
+    assert result is False
+
+
+async def test_delete_device_group_cascades(db: LocalDatabase) -> None:
+    group_id = await db.create_device_group("ToDelete", ["10.0.0.1", "10.0.0.2"])
+    deleted = await db.delete_device_group(group_id)
+    assert deleted is True
+
+    # Group is gone
+    assert await db.get_device_group(group_id) is None
+
+    # Members table is empty for this group
+    async with db._db.execute(
+        "SELECT COUNT(*) FROM device_group_members WHERE group_id = ?", (group_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    assert row[0] == 0
+
+
+async def test_delete_device_group_returns_false_for_missing(db: LocalDatabase) -> None:
+    result = await db.delete_device_group(999)
+    assert result is False
+
+
+async def test_create_device_group_requires_two_ips(db: LocalDatabase) -> None:
+    import pytest
+    with pytest.raises(ValueError, match="at least 2"):
+        await db.create_device_group("Solo", ["192.168.1.1"])
+
+
+# ---------------------------------------------------------------------------
+# Multi-IP tracker stats
+# ---------------------------------------------------------------------------
+
+async def test_fetch_tracker_stats_multi_ip(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="AdCo")
+    await _query(db, 1, "ads.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "ads.example.com", now - 60, client_ip="192.168.1.2")
+    await _query(db, 3, "ads.example.com", now - 60, client_ip="192.168.1.3")
+
+    # Filter to two IPs — should sum their queries only
+    result = await db.fetch_tracker_stats(
+        hours=1, end_ts=now, client_ips=["192.168.1.1", "192.168.1.2"]
+    )
+    assert result["total_queries"] == 2
+
+
+async def test_fetch_tracker_stats_single_ip_still_works(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="AdCo")
+    await _query(db, 1, "ads.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "ads.example.com", now - 60, client_ip="192.168.1.2")
+
+    result = await db.fetch_tracker_stats(
+        hours=1, end_ts=now, client_ips=["192.168.1.1"]
+    )
+    assert result["total_queries"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Multi-IP domain stats
+# ---------------------------------------------------------------------------
+
+async def test_fetch_domain_stats_multi_ip(db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="AdCo")
+    await _query(db, 1, "ads.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "ads.example.com", now - 60, client_ip="192.168.1.2")
+    await _query(db, 3, "ads.example.com", now - 60, client_ip="192.168.1.3")
+
+    result = await db.fetch_domain_stats(
+        hours=1, end_ts=now, client_ips=["192.168.1.1", "192.168.1.2"]
+    )
+    assert result["domains"][0]["query_count"] == 2

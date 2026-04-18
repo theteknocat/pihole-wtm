@@ -513,3 +513,110 @@ async def test_admin_reset_clears_data(client: AsyncClient, db: LocalDatabase) -
     results, _ = await db.fetch_queries(limit=10)
     assert results == []
     assert await db.get_last_query_id() == 0
+
+
+# ---------------------------------------------------------------------------
+# GET/POST/PUT/DELETE /api/device-groups
+# ---------------------------------------------------------------------------
+
+async def test_get_device_groups_empty(client: AsyncClient) -> None:
+    res = await client.get("/api/device-groups")
+    assert res.status_code == 200
+    assert res.json() == {"groups": []}
+
+
+async def test_create_device_group(client: AsyncClient, db: LocalDatabase) -> None:
+    res = await client.post(
+        "/api/device-groups",
+        json={"name": "My Laptop", "member_ips": ["192.168.1.1", "192.168.1.2"]},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["id"], int)
+
+    groups = await db.get_device_groups()
+    assert len(groups) == 1
+    assert groups[0]["name"] == "My Laptop"
+
+
+async def test_create_group_requires_two_members(client: AsyncClient) -> None:
+    res = await client.post(
+        "/api/device-groups",
+        json={"name": "Solo", "member_ips": ["192.168.1.1"]},
+    )
+    assert res.status_code == 422
+
+
+async def test_update_device_group(client: AsyncClient, db: LocalDatabase) -> None:
+    group_id = await db.create_device_group("OldName", ["10.0.0.1", "10.0.0.2"])
+
+    res = await client.put(
+        f"/api/device-groups/{group_id}",
+        json={"name": "NewName", "member_ips": ["10.0.0.3", "10.0.0.4"]},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "ok"
+
+    g = await db.get_device_group(group_id)
+    assert g is not None
+    assert g["name"] == "NewName"
+
+
+async def test_update_device_group_not_found(client: AsyncClient) -> None:
+    res = await client.put(
+        "/api/device-groups/999",
+        json={"name": "X", "member_ips": ["1.1.1.1", "2.2.2.2"]},
+    )
+    assert res.status_code == 404
+
+
+async def test_delete_device_group(client: AsyncClient, db: LocalDatabase) -> None:
+    group_id = await db.create_device_group("ToDelete", ["10.0.0.1", "10.0.0.2"])
+
+    res = await client.delete(f"/api/device-groups/{group_id}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "ok"
+
+    assert await db.get_device_group(group_id) is None
+
+
+async def test_delete_device_group_not_found(client: AsyncClient) -> None:
+    res = await client.delete("/api/device-groups/999")
+    assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Multi-IP stats endpoints
+# ---------------------------------------------------------------------------
+
+async def test_stats_trackers_multi_ip(client: AsyncClient, db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="AdCo")
+    await _query(db, 1, "ads.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "ads.example.com", now - 60, client_ip="192.168.1.2")
+    await _query(db, 3, "ads.example.com", now - 60, client_ip="192.168.1.3")
+
+    res = await client.get(
+        "/api/stats/trackers",
+        params=[("hours", 1), ("client_ip", "192.168.1.1"), ("client_ip", "192.168.1.2")],
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total_queries"] == 2
+
+
+async def test_stats_domains_multi_ip(client: AsyncClient, db: LocalDatabase) -> None:
+    now = time.time()
+    await _domain(db, "ads.example.com", category="advertising", company_name="AdCo")
+    await _query(db, 1, "ads.example.com", now - 60, client_ip="192.168.1.1")
+    await _query(db, 2, "ads.example.com", now - 60, client_ip="192.168.1.2")
+    await _query(db, 3, "ads.example.com", now - 60, client_ip="192.168.1.3")
+
+    res = await client.get(
+        "/api/stats/domains",
+        params=[("hours", 1), ("client_ip", "192.168.1.1"), ("client_ip", "192.168.1.2")],
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["domains"][0]["query_count"] == 2

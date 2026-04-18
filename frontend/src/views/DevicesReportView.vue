@@ -3,9 +3,12 @@
  * DevicesReportView — query breakdown grouped by client device.
  *
  * Filters: category, company. Includes inline name editing and
- * device stats inspection via dialogs.
+ * device stats inspection via dialogs. Grouped devices (linked by
+ * the user) appear as a single expandable row with combined stats.
+ * Expanding a group reveals a nested table whose columns are aligned
+ * with the parent table via matching fixed column widths.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -14,11 +17,13 @@ import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
+import DeviceLinkDialog from '@/components/layout/DeviceLinkDialog.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { formatCategory } from '@/utils/format'
 import { useReportData } from '@/composables/useReportData'
 import { useWindowStore } from '@/stores/window'
-import type { ClientStats, ClientStat } from '@/types/api'
+import { apiFetch } from '@/utils/api'
+import type { ClientStats, ClientStat, DeviceGroup } from '@/types/api'
 
 const windowStore = useWindowStore()
 
@@ -31,12 +36,114 @@ const {
 
 const clientData = computed(() => data.value as ClientStats | null)
 
+// ---- Device groups ----------------------------------------------------------
+
+const groups = ref<DeviceGroup[]>([])
+
+async function fetchGroups() {
+  try {
+    const res = await apiFetch('/api/device-groups')
+    if (res.ok) {
+      const json = await res.json()
+      groups.value = json.groups ?? []
+    }
+  } catch {
+    // Non-fatal; groups just won't be shown
+  }
+}
+
+onMounted(fetchGroups)
+watch(() => windowStore.refreshKey, fetchGroups)
+
+/** Map from client_ip → the group it belongs to */
+const ipToGroup = computed(() => {
+  const m = new Map<string, DeviceGroup>()
+  for (const g of groups.value) {
+    for (const member of g.members) m.set(member.client_ip, g)
+  }
+  return m
+})
+
+// ---- Table rows -------------------------------------------------------------
+
+type GroupRow = {
+  _type: 'group'
+  _key: string
+  group: DeviceGroup
+  client_name: string
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+  block_rate: number
+  member_stats: ClientStat[]
+}
+
+type SingleRow = ClientStat & { _type: 'single'; _key: string }
+
+type TableRow = GroupRow | SingleRow
+
+const tableRows = computed<TableRow[]>(() => {
+  const seenGroups = new Set<number>()
+  const result: TableRow[] = []
+
+  for (const stat of clientData.value?.clients ?? []) {
+    const group = ipToGroup.value.get(stat.client_ip)
+    if (group) {
+      if (seenGroups.has(group.id)) continue
+      seenGroups.add(group.id)
+      const memberStats = (clientData.value?.clients ?? []).filter(c =>
+        group.members.some(m => m.client_ip === c.client_ip)
+      )
+      const qc = memberStats.reduce((s, c) => s + c.query_count, 0)
+      const bc = memberStats.reduce((s, c) => s + c.blocked_count, 0)
+      const ac = memberStats.reduce((s, c) => s + c.allowed_count, 0)
+      result.push({
+        _type: 'group',
+        _key: `group-${group.id}`,
+        group,
+        client_name: group.name,
+        query_count: qc,
+        blocked_count: bc,
+        allowed_count: ac,
+        block_rate: qc ? Math.round(bc / qc * 1000) / 10 : 0,
+        member_stats: memberStats,
+      })
+    } else {
+      result.push({ _type: 'single', _key: `single-${stat.client_ip}`, ...stat })
+    }
+  }
+  return result
+})
+
+// ---- Expansion --------------------------------------------------------------
+
+const expandedRows = ref<Record<string, boolean>>({})
+
+function toggleRow(key: string) {
+  const next = { ...expandedRows.value }
+  if (next[key]) {
+    delete next[key]
+  } else {
+    next[key] = true
+  }
+  expandedRows.value = next
+}
+
+// ---- Dialogs ----------------------------------------------------------------
+
 const editingClient = ref<ClientStat | null>(null)
 const inspectingClient = ref<ClientStat | null>(null)
+const inspectingGroup = ref<GroupRow | null>(null)
+const linkingClient = ref<ClientStat | null>(null)
 
 function onClientSaved(client: ClientStat, newName: string | null) {
   client.client_name = newName
   editingClient.value = null
+  windowStore.triggerRefresh()
+}
+
+function onGroupSaved() {
+  linkingClient.value = null
   windowStore.triggerRefresh()
 }
 </script>
@@ -112,7 +219,9 @@ function onClientSaved(client: ClientStat, newName: string | null) {
     <Card v-if="clientData">
       <template #content>
         <DataTable
-          :value="clientData.clients"
+          :value="tableRows"
+          v-model:expandedRows="expandedRows"
+          data-key="_key"
           :rows="50"
           paginator
           :rows-per-page-options="[25, 50, 100]"
@@ -126,12 +235,74 @@ function onClientSaved(client: ClientStat, newName: string | null) {
               {{ hasFilters ? 'No devices match your filters' : 'No device data for this time window' }}
             </p>
           </template>
-          <Column field="client_name" header="Device" sortable style="min-width: 14rem">
+
+          <!-- Expander/link column:
+               groups → chevron to expand/collapse
+               singles → link button to create a group
+               Both actions are vertically aligned. -->
+          <Column style="width: 3rem; padding-right: 0">
             <template #body="{ data: row }">
-              <div class="flex items-center gap-2">
+              <Button
+                v-if="row._type === 'group'"
+                :icon="expandedRows[row._key] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                severity="contrast"
+                variant="text"
+                rounded
+                size="small"
+                class="!p-2"
+                :aria-label="expandedRows[row._key] ? 'Collapse' : 'Expand'"
+                @click="toggleRow(row._key)"
+              />
+              <Button
+                v-else
+                icon="pi pi-link"
+                severity="secondary"
+                variant="text"
+                rounded
+                size="small"
+                class="!p-2"
+                aria-label="Link devices"
+                v-tooltip.top="'Link devices into a group'"
+                @click="linkingClient = row"
+              />
+            </template>
+          </Column>
+
+          <!-- Device column (flexible — absorbs remaining width).
+               Pencil buttons for all rows are vertically aligned. -->
+          <Column field="client_name" header="Device" sortable>
+            <template #body="{ data: row }">
+              <!-- Group row: pencil opens group editor; link icon labels the member count -->
+              <div v-if="row._type === 'group'" class="flex items-center gap-2">
                 <Button
                   icon="pi pi-pencil"
-                  severity="contrast"
+                  severity="secondary"
+                  variant="text"
+                  rounded
+                  size="small"
+                  class="!p-2"
+                  aria-label="Edit device group"
+                  v-tooltip.top="'Edit device group'"
+                  @click="linkingClient = row.member_stats[0] ?? null"
+                />
+                <span class="block">
+                  <a
+                    href="#group-details"
+                    v-tooltip.top="'Tracker breakdown'"
+                    @click.prevent="inspectingGroup = row"
+                  >{{ row.group.name }}</a>
+                  <span class="text-xs flex items-center gap-1 text-gray-400">
+                    <i class="pi pi-link" />
+                    {{ row.group.members.length }} devices
+                  </span>
+                </span>
+              </div>
+
+              <!-- Single row: pencil opens name editor -->
+              <div v-else class="flex items-center gap-2">
+                <Button
+                  icon="pi pi-pencil"
+                  severity="secondary"
                   variant="text"
                   rounded
                   size="small"
@@ -151,26 +322,73 @@ function onClientSaved(client: ClientStat, newName: string | null) {
               </div>
             </template>
           </Column>
-          <Column field="query_count" header="Total" sortable style="text-align: right" />
-          <Column field="blocked_count" header="Blocked" sortable>
+
+          <Column field="query_count" header="Total" sortable style="width: 5.5rem; text-align: right" />
+
+          <Column field="blocked_count" header="Blocked" sortable style="width: 6.5rem">
             <template #body="{ data: row }">
-              <span class="text-blocked">
-                {{ row.blocked_count.toLocaleString() }}
-              </span>
+              <span class="text-blocked">{{ row.blocked_count.toLocaleString() }}</span>
             </template>
           </Column>
-          <Column field="allowed_count" header="Allowed" sortable>
+
+          <Column field="allowed_count" header="Allowed" sortable style="width: 6.5rem">
             <template #body="{ data: row }">
-              <span class="text-allowed">
-                {{ row.allowed_count.toLocaleString() }}
-              </span>
+              <span class="text-allowed">{{ row.allowed_count.toLocaleString() }}</span>
             </template>
           </Column>
-          <Column field="block_rate" header="Block rate" sortable>
+
+          <Column field="block_rate" header="Block rate" sortable style="width: 6.5rem">
             <template #body="{ data: row }">
               {{ row.block_rate }}%
             </template>
           </Column>
+
+          <!-- Expansion: nested table with matching column widths, no headers -->
+          <template #expansion="{ data: row }">
+            <table v-if="row._type === 'group'" class="member-table">
+              <colgroup>
+                <!-- Must match parent Column widths exactly -->
+                <col style="width: 3rem" />    <!-- expander spacer -->
+                <col />                         <!-- device (flexible) -->
+                <col style="width: 5.5rem" />  <!-- total -->
+                <col style="width: 6.5rem" />  <!-- blocked -->
+                <col style="width: 6.5rem" />  <!-- allowed -->
+                <col style="width: 6.5rem" />  <!-- block rate -->
+              </colgroup>
+              <tbody>
+                <tr v-for="member in row.member_stats" :key="member.client_ip">
+                  <td></td>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <Button
+                        icon="pi pi-pencil"
+                        severity="secondary"
+                        variant="text"
+                        rounded
+                        size="small"
+                        class="!p-2"
+                        aria-label="Edit device name"
+                        v-tooltip.top="'Edit device name'"
+                        @click="editingClient = member"
+                      />
+                      <span class="block">
+                        <a
+                          href="#client-details"
+                          v-tooltip.top="'Tracker breakdown'"
+                          @click.prevent="inspectingClient = member"
+                        >{{ member.client_name ?? member.client_ip }}</a>
+                        <span v-if="member.client_name" class="text-xs block text-gray-400 font-mono">{{ member.client_ip }}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td style="text-align: right">{{ member.query_count.toLocaleString() }}</td>
+                  <td><span class="text-blocked">{{ member.blocked_count.toLocaleString() }}</span></td>
+                  <td><span class="text-allowed">{{ member.allowed_count.toLocaleString() }}</span></td>
+                  <td>{{ member.block_rate }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
         </DataTable>
       </template>
     </Card>
@@ -184,12 +402,70 @@ function onClientSaved(client: ClientStat, newName: string | null) {
       @saved="(name) => onClientSaved(editingClient!, name)"
     />
 
-    <!-- Device stats dialog -->
+    <!-- Device stats dialog — group -->
+    <DeviceStatsDialog
+      v-if="inspectingGroup"
+      :client-ips="inspectingGroup.group.members.map(m => m.client_ip)"
+      :client-name="inspectingGroup.group.name"
+      @close="inspectingGroup = null"
+    />
+
+    <!-- Device stats dialog — single -->
     <DeviceStatsDialog
       v-if="inspectingClient"
-      :client-ip="inspectingClient.client_ip"
+      :client-ips="[inspectingClient.client_ip]"
       :client-name="inspectingClient.client_name"
       @close="inspectingClient = null"
     />
+
+    <!-- Device link dialog -->
+    <DeviceLinkDialog
+      v-if="linkingClient"
+      :anchor-ip="linkingClient.client_ip"
+      :anchor-name="linkingClient.client_name"
+      :all-clients="clientData?.clients ?? []"
+      :existing-group="ipToGroup.get(linkingClient.client_ip) ?? null"
+      @close="linkingClient = null"
+      @saved="onGroupSaved"
+    />
   </div>
 </template>
+
+<style scoped>
+/* Fixed table layout so explicit Column widths are honoured exactly,
+   which is required for the nested member table to align its columns. */
+:deep(.p-datatable-table) {
+  table-layout: fixed;
+}
+
+/* Zero out the expansion cell's padding so the inner table sits flush
+   with the parent table's left edge and matches its full width. */
+:deep(.p-datatable-row-expansion > td) {
+  padding: 0;
+}
+
+/* PrimeVue stripes even rows via nth-child. The expansion <tr> is always
+   the next sibling after its parent, so it's always at the opposite parity.
+   Invert the rule for expansion rows so they match the parent row's stripe. */
+:deep(.p-datatable-striped .p-datatable-row-expansion:nth-child(even)) {
+  background: transparent;
+}
+:deep(.p-datatable-striped .p-datatable-row-expansion:nth-child(odd)) {
+  background: var(--p-datatable-row-striped-background);
+}
+
+/* Member table: inherit full width, use same fixed layout, no borders. */
+.member-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+/* Cells: match parent horizontal padding (1rem), reduce vertical,
+   slight size reduction and opacity to read as subordinate rows. */
+.member-table td {
+  padding: 0.3rem 1rem;
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+</style>

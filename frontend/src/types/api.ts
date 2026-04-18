@@ -125,6 +125,17 @@ export interface EnrichedQuery {
   company_country: string | null
 }
 
+export interface DeviceGroupMember {
+  client_ip: string
+  client_name: string | null
+}
+
+export interface DeviceGroup {
+  id: number
+  name: string
+  members: DeviceGroupMember[]
+}
+
 export interface GroupedQuery {
   domain: string
   timestamp: number

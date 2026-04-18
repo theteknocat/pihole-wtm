@@ -32,7 +32,7 @@ interface ChartItem {
 const TOP_COMPANIES = 10
 
 const props = defineProps<{
-  clientIp: string
+  clientIps: string[]
   clientName: string | null
 }>()
 
@@ -119,7 +119,8 @@ const chartOptions = computed(() => ({
     if (!elements.length) return
     const item = chartItems.value[elements[0].index]
     if (item.key === '__other__') return
-    const query: Record<string, string> = { client_ip: props.clientIp }
+    const query: Record<string, string | string[]> = {}
+    query.client_ip = props.clientIps.length === 1 ? props.clientIps[0] : props.clientIps
     if (selectedMode.value.value === 'category') {
       query.category = item.key
     } else {
@@ -162,8 +163,9 @@ async function fetchStats() {
   loading.value = true
   error.value = null
   try {
-    const qs = windowStore.queryParams({ client_ip: props.clientIp, include_timeline: 'true' })
-    const res = await fetch(`/api/stats/trackers?${qs}`)
+    const base = windowStore.queryParams({ include_timeline: 'true' })
+    const ipParams = props.clientIps.map(ip => `client_ip=${encodeURIComponent(ip)}`).join('&')
+    const res = await fetch(`/api/stats/trackers?${base}&${ipParams}`)
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
   } catch {
@@ -193,12 +195,15 @@ watch(() => windowStore.refreshKey, fetchStats)
   >
     <template #header>
       <div class="flex flex-col items-start gap-2 w-full pr-2 md:flex-row md:items-center md:justify-between">
-        <span class="font-semibold text-lg">
-          <i class="pi pi-mobile" /> {{ clientName ?? clientIp }} — Tracker Breakdown
+        <div class="font-semibold">
+          <span class="text-lg"><i class="pi pi-mobile" /> {{ clientName ?? clientIps.join(', ') }} — Tracker Breakdown</span>
           <span class="text-sm text-gray-500 dark:text-gray-400">
             (past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }})
           </span>
-        </span>
+          <div v-if="clientIps.length > 1" class="text-base text-gray-600 dark:text-gray-400">
+            <i class="pi pi-link"/> {{ clientIps.length }} devices
+          </div>
+        </div>
         <SelectButton
           v-model="selectedMode"
           :options="chartModeOptions"

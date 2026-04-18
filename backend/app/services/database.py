@@ -103,6 +103,25 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         );
         """,
     ),
+    (
+        4,
+        "add device groups",
+        """
+        CREATE TABLE IF NOT EXISTS device_groups (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            name    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS device_group_members (
+            group_id    INTEGER NOT NULL REFERENCES device_groups(id) ON DELETE CASCADE,
+            client_ip   TEXT NOT NULL,
+            PRIMARY KEY (group_id, client_ip)
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dgm_unique_client ON device_group_members(client_ip);
+        CREATE INDEX IF NOT EXISTS idx_dgm_group ON device_group_members(group_id);
+        """,
+    ),
 ]
 
 
@@ -495,21 +514,21 @@ class LocalDatabase:
         self,
         hours: int = 24,
         end_ts: float | None = None,
-        client_ip: str | None = None,
+        client_ips: list[str] | None = None,
         include_timeline: bool = False,
     ) -> dict[str, Any]:
         """
         Aggregate tracker stats over the given time window.
-        Optionally filter to a single client device by IP.
+        Optionally filter to one or more client devices by IP.
         When include_timeline=True, also returns bucketed timeline series for
         category and company dimensions (used by the device stats dialog).
         """
         result = await self._fetch_tracker_breakdown(
-            hours=hours, end_ts=end_ts, client_ip=client_ip
+            hours=hours, end_ts=end_ts, client_ips=client_ips
         )
         if include_timeline:
             timeline = await self._fetch_tracker_timeline(
-                hours=hours, end_ts=end_ts, client_ip=client_ip
+                hours=hours, end_ts=end_ts, client_ips=client_ips
             )
             result.update(timeline)
         return result
@@ -518,20 +537,21 @@ class LocalDatabase:
         self,
         hours: int = 24,
         end_ts: float | None = None,
-        client_ip: str | None = None,
+        client_ips: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Core tracker breakdown query: returns category/company counts for the
-        given time window, optionally filtered to one client IP.
+        given time window, optionally filtered to one or more client IPs.
         """
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
         conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
         params: list[Any] = [from_ts, anchor]
 
-        if client_ip:
-            conditions.append("q.client_ip = ?")
-            params.append(client_ip)
+        if client_ips:
+            placeholders = ",".join("?" for _ in client_ips)
+            conditions.append(f"q.client_ip IN ({placeholders})")
+            params.extend(client_ips)
 
         await self._apply_exclusions(conditions, params)
 
@@ -628,7 +648,7 @@ class LocalDatabase:
         self,
         hours: int = 24,
         end_ts: float | None = None,
-        client_ip: str | None = None,
+        client_ips: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Return per-category and per-company tracker query counts bucketed over
@@ -650,9 +670,10 @@ class LocalDatabase:
         conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
         params: list[Any] = [from_ts, anchor]
 
-        if client_ip:
-            conditions.append("q.client_ip = ?")
-            params.append(client_ip)
+        if client_ips:
+            placeholders = ",".join("?" for _ in client_ips)
+            conditions.append(f"q.client_ip IN ({placeholders})")
+            params.extend(client_ips)
 
         await self._apply_exclusions(conditions, params)
 
@@ -742,22 +763,23 @@ class LocalDatabase:
         end_ts: float | None = None,
         category: str | None = None,
         company: str | None = None,
-        client_ip: str | None = None,
+        client_ips: list[str] | None = None,
         domain: str | None = None,
         domain_exact: bool = False,
     ) -> dict[str, Any]:
         """
         Return per-domain query counts for the given time window, optionally
-        filtered to a single tracker category, company, or client device.
+        filtered to a tracker category, company, or one or more client devices.
         """
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
         conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
         params: list[Any] = [from_ts, anchor]
 
-        if client_ip is not None:
-            conditions.append("q.client_ip = ?")
-            params.append(client_ip)
+        if client_ips:
+            placeholders = ",".join("?" for _ in client_ips)
+            conditions.append(f"q.client_ip IN ({placeholders})")
+            params.extend(client_ips)
 
         if category is not None:
             conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
@@ -1180,6 +1202,112 @@ class LocalDatabase:
         """Remove a client name mapping."""
         await self._conn.execute("DELETE FROM client_names WHERE client_ip = ?", (client_ip,))
         await self._conn.commit()
+
+    # -------------------------------------------------------------------------
+    # Device groups
+    # -------------------------------------------------------------------------
+
+    async def get_device_groups(self) -> list[dict[str, Any]]:
+        """Return all device groups with their members (including friendly names)."""
+        async with self._conn.execute(
+            "SELECT id, name FROM device_groups ORDER BY name"
+        ) as cur:
+            groups: list[dict[str, Any]] = [
+                {"id": r["id"], "name": r["name"], "members": []}
+                for r in await cur.fetchall()
+            ]
+        if not groups:
+            return groups
+        group_map = {g["id"]: g for g in groups}
+        async with self._conn.execute("""
+            SELECT dgm.group_id, dgm.client_ip, cn.name AS client_name
+            FROM device_group_members dgm
+            LEFT JOIN client_names cn ON dgm.client_ip = cn.client_ip
+            ORDER BY dgm.group_id, dgm.client_ip
+        """) as cur:
+            for row in await cur.fetchall():
+                g = group_map.get(row["group_id"])
+                if g is not None:
+                    g["members"].append({
+                        "client_ip": row["client_ip"],
+                        "client_name": row["client_name"],
+                    })
+        return groups
+
+    async def get_device_group(self, group_id: int) -> dict[str, Any] | None:
+        """Return a single device group with its members, or None if not found."""
+        async with self._conn.execute(
+            "SELECT id, name FROM device_groups WHERE id = ?", (group_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return None
+        group: dict[str, Any] = {"id": row["id"], "name": row["name"], "members": []}
+        async with self._conn.execute("""
+            SELECT dgm.client_ip, cn.name AS client_name
+            FROM device_group_members dgm
+            LEFT JOIN client_names cn ON dgm.client_ip = cn.client_ip
+            WHERE dgm.group_id = ?
+            ORDER BY dgm.client_ip
+        """, (group_id,)) as cur:
+            for r in await cur.fetchall():
+                group["members"].append({
+                    "client_ip": r["client_ip"],
+                    "client_name": r["client_name"],
+                })
+        return group
+
+    async def create_device_group(self, name: str, member_ips: list[str]) -> int:
+        """Create a device group. Returns the new group ID. Raises ValueError if < 2 IPs."""
+        if len(member_ips) < 2:
+            raise ValueError("A device group requires at least 2 member IPs")
+        async with self._conn.execute(
+            "INSERT INTO device_groups (name) VALUES (?)", (name,)
+        ) as cur:
+            group_id = cur.lastrowid
+        if group_id is None:
+            raise RuntimeError("INSERT did not return a row ID")
+        await self._conn.executemany(
+            "INSERT INTO device_group_members (group_id, client_ip) VALUES (?, ?)",
+            [(group_id, ip) for ip in member_ips],
+        )
+        await self._conn.commit()
+        return group_id
+
+    async def update_device_group(
+        self, group_id: int, name: str, member_ips: list[str]
+    ) -> bool:
+        """Update a group's name and full member list. Returns False if not found."""
+        async with self._conn.execute(
+            "SELECT id FROM device_groups WHERE id = ?", (group_id,)
+        ) as cur:
+            if not await cur.fetchone():
+                return False
+        await self._conn.execute(
+            "UPDATE device_groups SET name = ? WHERE id = ?", (name, group_id)
+        )
+        await self._conn.execute(
+            "DELETE FROM device_group_members WHERE group_id = ?", (group_id,)
+        )
+        await self._conn.executemany(
+            "INSERT INTO device_group_members (group_id, client_ip) VALUES (?, ?)",
+            [(group_id, ip) for ip in member_ips],
+        )
+        await self._conn.commit()
+        return True
+
+    async def delete_device_group(self, group_id: int) -> bool:
+        """Delete a group (cascade removes members). Returns False if not found."""
+        async with self._conn.execute(
+            "SELECT id FROM device_groups WHERE id = ?", (group_id,)
+        ) as cur:
+            if not await cur.fetchone():
+                return False
+        await self._conn.execute(
+            "DELETE FROM device_groups WHERE id = ?", (group_id,)
+        )
+        await self._conn.commit()
+        return True
 
     # -------------------------------------------------------------------------
     # Sync status
