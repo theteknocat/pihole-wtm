@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0](https://github.com/theteknocat/pihole-wtm/compare/v1.4.0...v1.5.0) (2026-04-18)
+
+
+### Features
+
+* device grouping to account for same device, multiple IPs ([2920d90](https://github.com/theteknocat/pihole-wtm/commit/2920d907a86339c022a55dd08081cc0a8c0d6e75))
+* device stats timeline bar chart ([a179d81](https://github.com/theteknocat/pihole-wtm/commit/a179d81343e7b97d7abd30124a911ca411d2221b))
+* device tracker breakdown timelines ([b5fed52](https://github.com/theteknocat/pihole-wtm/commit/b5fed5233c1731927cdb151e6f751c9df0206f2a))
+
 ## [1.4.0](https://github.com/theteknocat/pihole-wtm/compare/v1.3.1...v1.4.0) (2026-04-08)
 
 
