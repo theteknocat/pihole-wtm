@@ -1,6 +1,6 @@
 [project]
 name = "pihole-wtm"
-version = "1.4.0"
+version = "1.5.0"
 description = "Pi-hole dashboard enriched with WhoTracksMe/Ghostery tracker intelligence"
 requires-python = ">=3.12"
 dependencies = [
