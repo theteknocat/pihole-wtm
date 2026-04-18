@@ -203,24 +203,25 @@ async function reenrichDomain(domain: string) {
               <div class="flex items-center justify-between gap-1">
                 <span>{{ row.company_name }}</span>
                 <span>
+                  <span
+                    v-if="row.rdap_pending || domainReenrichState[row.domain] === 'queued'"
+                    class="flex items-center p-button-icon-only p-button-sm"
+                    v-tooltip.top="'RDAP/WHOIS enrichment pending'"
+                  >
+                    <i
+                      class="p-button-icon pi pi-circle text-amber-600"
+                    />
+                  </span>
                   <Button
-                    v-if="row.can_reenrich"
-                    :icon="domainReenrichState[row.domain] === 'queued' ? 'pi pi-check' : 'pi pi-refresh'"
+                    v-else-if="row.can_reenrich"
+                    icon="pi pi-refresh"
                     :loading="domainReenrichState[row.domain] === 'loading'"
-                    :disabled="domainReenrichState[row.domain] !== undefined"
                     size="small"
                     text
                     rounded
-                    v-tooltip.top="domainReenrichState[row.domain] === 'queued'
-                      ? 'Queued for re-enrichment'
-                      : 'Retry RDAP/WHOIS enrichment'"
+                    v-tooltip.top="'Retry RDAP/WHOIS enrichment'"
                     aria-label="Retry enrichment"
                     @click="reenrichDomain(row.domain)"
-                  />
-                  <i
-                    v-else-if="row.rdap_pending"
-                    class="pi pi-circle text-sm text-amber-600 px-2"
-                    v-tooltip.top="'RDAP/WHOIS enrichment pending'"
                   />
                 </span>
               </div>
