@@ -29,7 +29,14 @@ export function useReportData(mode: 'domain' | 'client') {
   const clientOptions = ref<ClientOption[]>([])
 
   // Domain-only filter state
-  const selectedClientIp = ref<string | null>((route.query.client_ip as string) ?? null)
+  const selectedClientIp = ref<string | string[] | null>(
+    (() => {
+      const v = route.query.client_ip
+      if (!v) return null
+      if (Array.isArray(v)) return v.filter(Boolean) as string[]
+      return v as string
+    })()
+  )
   const domainInput = ref<string | null>((route.query.domain as string) ?? null)
   const appliedDomain = ref<string | null>((route.query.domain as string) ?? null)
   const domainExact = ref(route.query.domain_exact === '1')
@@ -49,7 +56,7 @@ export function useReportData(mode: 'domain' | 'client') {
   const routePath = mode === 'domain' ? '/domains-report' : '/devices-report'
 
   function syncUrlParams() {
-    const query: Record<string, string> = {}
+    const query: Record<string, string | string[]> = {}
     if (selectedCategory.value) query.category = selectedCategory.value
     if (selectedCompany.value) query.company = selectedCompany.value
     if (mode === 'domain') {
@@ -94,13 +101,17 @@ export function useReportData(mode: 'domain' | 'client') {
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         data.value = await res.json()
       } else {
-        const qs = windowStore.queryParams({
+        const base = windowStore.queryParams({
           category: selectedCategory.value,
           company: selectedCompany.value,
-          client_ip: selectedClientIp.value,
           domain: appliedDomain.value,
           domain_exact: appliedDomain.value && domainExact.value ? true : undefined,
         })
+        const ips = selectedClientIp.value
+          ? (Array.isArray(selectedClientIp.value) ? selectedClientIp.value : [selectedClientIp.value])
+          : []
+        const ipPart = ips.map(ip => `client_ip=${encodeURIComponent(ip)}`).join('&')
+        const qs = [base, ipPart].filter(Boolean).join('&')
         const res = await apiFetch(`/api/stats/domains?${qs}`, { signal: controller.signal })
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         data.value = await res.json()
@@ -180,10 +191,15 @@ export function useReportData(mode: 'domain' | 'client') {
     if (cat !== selectedCategory.value) selectedCategory.value = cat
     if (co !== selectedCompany.value) selectedCompany.value = co
     if (mode === 'domain') {
-      const ip = (q.client_ip as string) ?? null
+      const rawIp = q.client_ip
+      const ip: string | string[] | null = !rawIp
+        ? null
+        : Array.isArray(rawIp)
+          ? (rawIp.filter(Boolean) as string[])
+          : (rawIp as string)
       const dom = (q.domain as string) ?? null
       const exact = q.domain_exact === '1'
-      if (ip !== selectedClientIp.value) selectedClientIp.value = ip
+      if (JSON.stringify(ip) !== JSON.stringify(selectedClientIp.value)) selectedClientIp.value = ip
       if (dom !== appliedDomain.value) {
         domainInput.value = dom
         appliedDomain.value = dom

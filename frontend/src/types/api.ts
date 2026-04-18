@@ -19,6 +19,11 @@ export interface CategoryStat {
   companies: CompanyStat[]
 }
 
+export interface TrackerTimelineSeries {
+  label: string
+  counts: number[]
+}
+
 export interface TrackerStats {
   window_hours: number
   total_queries: number
@@ -26,6 +31,11 @@ export interface TrackerStats {
   tracker_percent: number
   truncated: boolean
   by_category: CategoryStat[]
+  // Present only when include_timeline=true is requested
+  bucket_seconds?: number
+  bucket_timestamps?: number[]
+  by_category_timeline?: { category: string; counts: number[] }[]
+  by_company_timeline?: { company_name: string; counts: number[] }[]
 }
 
 export interface DomainStat {
@@ -113,6 +123,17 @@ export interface EnrichedQuery {
   category: string | null
   company_name: string | null
   company_country: string | null
+}
+
+export interface DeviceGroupMember {
+  client_ip: string
+  client_name: string | null
+}
+
+export interface DeviceGroup {
+  id: number
+  name: string
+  members: DeviceGroupMember[]
 }
 
 export interface GroupedQuery {

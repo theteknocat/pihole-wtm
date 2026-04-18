@@ -82,7 +82,22 @@ async function reenrichDomain(domain: string) {
         class="w-full md:w-64"
       />
 
+      <!-- Multi-IP chip (read-only, from group navigation) -->
+      <div
+        v-if="Array.isArray(selectedClientIp)"
+        class="flex items-center gap-1 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm w-full md:w-64"
+      >
+        <span class="flex-1 text-gray-700 dark:text-gray-200">{{ selectedClientIp.length }} devices</span>
+        <button
+          class="pi pi-times text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          aria-label="Clear device filter"
+          @click="selectedClientIp = null"
+        />
+      </div>
+
+      <!-- Single-IP dropdown -->
       <Select
+        v-else
         v-model="selectedClientIp"
         :options="clientOptions"
         option-value="client_ip"

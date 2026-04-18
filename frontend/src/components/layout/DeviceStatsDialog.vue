@@ -1,10 +1,13 @@
 <script setup lang="ts">
 /**
- * DeviceStatsDialog — near-fullscreen modal showing tracker stats for a single device.
+ * DeviceStatsDialog — maximizable modal showing tracker stats for a single device.
  *
- * Uses a single Chart.js instance with useTrackerBarChart. Toggling between
- * categories and companies swaps the data fed to the composable, which updates
- * the chart in place for smooth animated transitions.
+ * Two charts are shown:
+ *  1. Horizontal bar breakdown (categories or companies) — same as before.
+ *  2. Stacked bar timeline (categories or companies over time) — new.
+ *
+ * Both are driven by the same Categories / Companies toggle. Data for both
+ * arrives in a single fetch via include_timeline=true.
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -15,7 +18,8 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useWindowStore } from '@/stores/window'
 import { useTrackerBarChart } from '@/composables/useTrackerBarChart'
 import { formatCategory } from '@/utils/format'
-import type { TrackerStats, CompanyStat } from '@/types/api'
+import TrackerTimelineChart from '@/components/timeline/TrackerTimelineChart.vue'
+import type { TrackerStats, CompanyStat, TrackerTimelineSeries } from '@/types/api'
 
 interface ChartItem {
   name: string
@@ -25,8 +29,10 @@ interface ChartItem {
   allowed_count: number
 }
 
+const TOP_COMPANIES = 10
+
 const props = defineProps<{
-  clientIp: string
+  clientIps: string[]
   clientName: string | null
 }>()
 
@@ -66,6 +72,7 @@ const allCompanies = computed<CompanyStat[]>(() => {
 })
 
 // Normalize both data shapes into a common ChartItem array.
+// Top-15 companies are shown individually; the rest are collapsed into "Other".
 // The composable watches this ref and updates the chart in place.
 const chartItems = computed<ChartItem[]>(() => {
   if (!stats.value) return []
@@ -74,10 +81,26 @@ const chartItems = computed<ChartItem[]>(() => {
       .sort((a, b) => b.query_count - a.query_count)
       .map(c => ({ name: formatCategory(c.category), key: c.category, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
   }
-  return [...allCompanies.value]
-    .sort((a, b) => b.query_count - a.query_count)
-    .slice(0, 15)
-    .map(c => ({ name: c.company_name, key: c.company_name, query_count: c.query_count, blocked_count: c.blocked_count, allowed_count: c.allowed_count }))
+  const sorted = [...allCompanies.value].sort((a, b) => b.query_count - a.query_count)
+  const top = sorted.slice(0, TOP_COMPANIES)
+  const rest = sorted.slice(TOP_COMPANIES)
+  const items = top.map(c => ({
+    name: c.company_name,
+    key: c.company_name,
+    query_count: c.query_count,
+    blocked_count: c.blocked_count,
+    allowed_count: c.allowed_count,
+  }))
+  if (rest.length > 0) {
+    items.push({
+      name: 'Other',
+      key: '__other__',
+      query_count: rest.reduce((s, c) => s + c.query_count, 0),
+      blocked_count: rest.reduce((s, c) => s + c.blocked_count, 0),
+      allowed_count: rest.reduce((s, c) => s + c.allowed_count, 0),
+    })
+  }
+  return items
 })
 
 const trackerQueries = computed(() => stats.value?.tracker_queries ?? 0)
@@ -95,7 +118,9 @@ const chartOptions = computed(() => ({
   onClick: (_: unknown, elements: { index: number }[]) => {
     if (!elements.length) return
     const item = chartItems.value[elements[0].index]
-    const query: Record<string, string> = { client_ip: props.clientIp }
+    if (item.key === '__other__') return
+    const query: Record<string, string | string[]> = {}
+    query.client_ip = props.clientIps.length === 1 ? props.clientIps[0] : props.clientIps
     if (selectedMode.value.value === 'category') {
       query.category = item.key
     } else {
@@ -104,18 +129,43 @@ const chartOptions = computed(() => ({
     visible.value = false
     router.push({ path: '/domains-report', query })
   },
-  onHover: (event: { native: MouseEvent | null }, elements: unknown[]) => {
-    if (event.native?.target)
-      (event.native.target as HTMLElement).style.cursor = elements.length ? 'pointer' : 'default'
+  onHover: (event: { native: MouseEvent | null }, elements: { index: number }[]) => {
+    if (!event.native?.target) return
+    const el = event.native.target as HTMLElement
+    if (!elements.length) {
+      el.style.cursor = 'default'
+      return
+    }
+    const item = chartItems.value[elements[0].index]
+    el.style.cursor = item.key === '__other__' ? 'default' : 'pointer'
   },
 }))
+
+// Timeline series derived from the stats payload for the active mode
+const timelineSeries = computed<TrackerTimelineSeries[]>(() => {
+  if (!stats.value) return []
+  if (selectedMode.value.value === 'category') {
+    return (stats.value.by_category_timeline ?? []).map(s => ({
+      label: formatCategory(s.category),
+      counts: s.counts,
+    }))
+  }
+  return (stats.value.by_company_timeline ?? []).map(s => ({
+    label: s.company_name,
+    counts: s.counts,
+  }))
+})
+
+const bucketTimestamps = computed(() => stats.value?.bucket_timestamps ?? [])
+const bucketSeconds = computed(() => stats.value?.bucket_seconds ?? 3600)
 
 async function fetchStats() {
   loading.value = true
   error.value = null
   try {
-    const qs = windowStore.queryParams({ client_ip: props.clientIp })
-    const res = await fetch(`/api/stats/trackers?${qs}`)
+    const base = windowStore.queryParams({ include_timeline: 'true' })
+    const ipParams = props.clientIps.map(ip => `client_ip=${encodeURIComponent(ip)}`).join('&')
+    const res = await fetch(`/api/stats/trackers?${base}&${ipParams}`)
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
   } catch {
@@ -136,16 +186,24 @@ watch(() => windowStore.refreshKey, fetchStats)
 <template>
   <Dialog
     v-model:visible="visible"
+    maximizable
     modal
     :closable="true"
-    position="top"
     :draggable="false"
-    :style="{ width: '90vw', maxWidth: '1100px' }"
+    :style="{ width: '90vw' }"
     @hide="onHide"
   >
     <template #header>
       <div class="flex flex-col items-start gap-2 w-full pr-2 md:flex-row md:items-center md:justify-between">
-        <span class="font-semibold text-lg"><i class="pi pi-mobile" /> {{ clientName ?? clientIp }} — Tracker Breakdown</span>
+        <div class="font-semibold">
+          <span class="text-lg"><i class="pi pi-mobile" /> {{ clientName ?? clientIps.join(', ') }} — Tracker Breakdown</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            (past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }})
+          </span>
+          <div v-if="clientIps.length > 1" class="text-base text-gray-600 dark:text-gray-400">
+            <i class="pi pi-link"/> {{ clientIps.length }} devices
+          </div>
+        </div>
         <SelectButton
           v-model="selectedMode"
           :options="chartModeOptions"
@@ -156,10 +214,15 @@ watch(() => windowStore.refreshKey, fetchStats)
     </template>
 
     <!-- Subtitle -->
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
-      <template v-if="stats"> — {{ stats.tracker_queries.toLocaleString() }} tracker queries</template>
-    </p>
+    <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">
+      <template v-if="stats">
+        {{ stats.tracker_queries.toLocaleString() }}
+      </template>
+      <template v-else>
+        No
+      </template>
+      Queries
+    </h3>
 
     <!-- Loading -->
     <div v-if="loading && !stats" class="flex flex-col items-center justify-center py-16 gap-4 text-gray-500 dark:text-gray-400">
@@ -172,15 +235,28 @@ watch(() => windowStore.refreshKey, fetchStats)
       <p class="text-red-500">{{ error }}</p>
     </div>
 
-    <!-- Chart -->
-    <PvChart
-      v-if="stats"
-      ref="chartRef"
-      type="bar"
-      :data="chartData"
-      :options="chartOptions"
-      :key="isDark ? 'dark' : 'light'"
-      :style="{ height: `${chartHeight}px` }"
-    />
+    <template v-if="stats">
+      <!-- Breakdown bar chart -->
+      <PvChart
+        ref="chartRef"
+        type="bar"
+        :data="chartData"
+        :options="chartOptions"
+        :key="isDark ? 'dark' : 'light'"
+        :style="{ height: `${chartHeight}px` }"
+      />
+
+      <!-- Timeline stacked bar chart -->
+      <template v-if="bucketTimestamps.length > 0">
+        <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mt-8 mb-3">
+          Timeline
+        </h3>
+        <TrackerTimelineChart
+          :series="timelineSeries"
+          :bucket-timestamps="bucketTimestamps"
+          :bucket-seconds="bucketSeconds"
+        />
+      </template>
+    </template>
   </Dialog>
 </template>

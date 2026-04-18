@@ -6,6 +6,7 @@ from importlib.metadata import version as pkg_version
 from typing import Any, Literal, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel
 
 import app.services.sync_manager as sync_manager
 from app.log import setup_logging
@@ -147,9 +148,15 @@ _EXCLUSION_KEYS = ("excluded_categories", "excluded_companies", "excluded_domain
 async def stats_trackers(
     hours: int = Query(default=24, ge=1, le=2160),
     end_ts: float | None = Query(default=None),
-    client_ip: str | None = Query(default=None),
+    client_ip: list[str] = Query(default=[]),  # noqa: B008
+    include_timeline: bool = Query(default=False),
 ) -> dict[str, Any]:
-    return await db.fetch_tracker_stats(hours=hours, end_ts=end_ts, client_ip=client_ip)
+    return await db.fetch_tracker_stats(
+        hours=hours,
+        end_ts=end_ts,
+        client_ips=client_ip or None,
+        include_timeline=include_timeline,
+    )
 
 
 @app.get("/api/stats/timeline", dependencies=[Depends(require_session)])
@@ -174,13 +181,18 @@ async def stats_domains(
     end_ts: float | None = Query(default=None),
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
-    client_ip: str | None = Query(default=None),
+    client_ip: list[str] = Query(default=[]),  # noqa: B008
     domain: str | None = Query(default=None),
     domain_exact: bool = Query(default=False),
 ) -> dict[str, Any]:
     return await db.fetch_domain_stats(
-        hours=hours, end_ts=end_ts, category=category, company=company,
-        client_ip=client_ip, domain=domain, domain_exact=domain_exact,
+        hours=hours,
+        end_ts=end_ts,
+        category=category,
+        company=company,
+        client_ips=client_ip or None,
+        domain=domain,
+        domain_exact=domain_exact,
     )
 
 
@@ -287,6 +299,60 @@ async def set_client(client_ip: str, request: Request) -> dict[str, str]:
 async def delete_client(client_ip: str) -> dict[str, str]:
     """Remove a client name mapping."""
     await db.delete_client_name(client_ip)
+    return {"status": "ok"}
+
+
+# ---- Device groups ----------------------------------------------------------
+
+class DeviceGroupRequest(BaseModel):
+    name: str
+    member_ips: list[str]
+
+
+@app.get("/api/device-groups", dependencies=[Depends(require_session)])
+async def get_device_groups() -> dict[str, Any]:
+    """Return all device groups with their members."""
+    return {"groups": await db.get_device_groups()}
+
+
+@app.post("/api/device-groups", dependencies=[Depends(require_session)])
+async def create_device_group(body: DeviceGroupRequest) -> dict[str, Any]:
+    """Create a new device group."""
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    if len(name) > 64:
+        raise HTTPException(status_code=422, detail="name must be 64 characters or fewer")
+    try:
+        group_id = await db.create_device_group(name, body.member_ips)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return {"status": "ok", "id": group_id}
+
+
+@app.put("/api/device-groups/{group_id}", dependencies=[Depends(require_session)])
+async def update_device_group(group_id: int, body: DeviceGroupRequest) -> dict[str, str]:
+    """Update a device group's name and member list."""
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    if len(name) > 64:
+        raise HTTPException(status_code=422, detail="name must be 64 characters or fewer")
+    try:
+        found = await db.update_device_group(group_id, name, body.member_ips)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    if not found:
+        raise HTTPException(status_code=404, detail="Device group not found")
+    return {"status": "ok"}
+
+
+@app.delete("/api/device-groups/{group_id}", dependencies=[Depends(require_session)])
+async def delete_device_group(group_id: int) -> dict[str, str]:
+    """Delete a device group."""
+    found = await db.delete_device_group(group_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Device group not found")
     return {"status": "ok"}
 
 
