@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/theteknocat/pihole-wtm/compare/v1.5.1...v1.6.0) (2026-04-28)
+
+
+### Features
+
+* improved device breakdown dialog with bar and timeline charts ([4dcce12](https://github.com/theteknocat/pihole-wtm/commit/4dcce1209e90d31e9121e46e2a6693aa07fd2632))
+
 ## [1.5.1](https://github.com/theteknocat/pihole-wtm/compare/v1.5.0...v1.5.1) (2026-04-18)
 
 
