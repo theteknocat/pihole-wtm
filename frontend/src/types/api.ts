@@ -67,9 +67,19 @@ export interface ClientStat {
   block_rate: number
 }
 
+export interface ClientTimelineSeries {
+  client_ip: string
+  client_name: string | null
+  counts: number[]
+}
+
 export interface ClientStats {
   window_hours: number
   clients: ClientStat[]
+  // Present only when include_timeline=true is requested
+  bucket_seconds?: number
+  bucket_timestamps?: number[]
+  by_client_timeline?: ClientTimelineSeries[]
 }
 
 export type ClientFilter =
@@ -90,21 +100,16 @@ export interface TimelineStats {
   buckets: TimelineBucket[]
 }
 
-export interface ClientTimelineBucket {
-  timestamp: number
-  count: number
-}
-
 export interface ClientTimelineEntry {
   client_ip: string
   client_name: string | null
-  total: number
-  buckets: ClientTimelineBucket[]
+  counts: number[]
 }
 
 export interface ClientTimelineStats {
   window_hours: number
   bucket_seconds: number
+  bucket_timestamps: number[]
   clients: ClientTimelineEntry[]
 }
 

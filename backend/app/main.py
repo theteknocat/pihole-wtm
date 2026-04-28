@@ -212,9 +212,11 @@ async def stats_clients(
     category: str | None = Query(default=None),
     company: str | None = Query(default=None),
     domain: str | None = Query(default=None),
+    include_timeline: bool = Query(default=False),
 ) -> dict[str, Any]:
     return await db.fetch_client_stats(
-        hours=hours, end_ts=end_ts, category=category, company=company, domain=domain
+        hours=hours, end_ts=end_ts, category=category, company=company, domain=domain,
+        include_timeline=include_timeline,
     )
 
 

@@ -168,6 +168,7 @@ watch(() => windowStore.refreshKey, fetchTimeline)
         <template #content>
           <DeviceTimelineChart
             :clients="clientTimeline.clients"
+            :bucket-timestamps="clientTimeline.bucket_timestamps"
             :bucket-seconds="clientTimeline.bucket_seconds"
           />
         </template>

@@ -2,8 +2,8 @@
  * Tests for ClientBreakdownDialog (src/components/layout/ClientBreakdownDialog.vue).
  *
  * PrimeVue components are mocked at the module level to avoid pulling in the
- * full PrimeVue runtime. DataTable is given a minimal implementation that
- * iterates its `value` prop and renders the Column body slot per row.
+ * full PrimeVue runtime. PvChart is given a minimal stub so we can read chart
+ * data/options and simulate bar clicks by calling options.onClick() directly.
  *
  * @/utils/api is mocked so apiFetch (used by useDeviceGroups) doesn't pull
  * in the real router. fetch is stubbed per-test for the /api/stats/clients call.
@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { nextTick } from 'vue'
 import ClientBreakdownDialog from '@/components/layout/ClientBreakdownDialog.vue'
 import { apiFetch } from '@/utils/api'
 import type { ClientFilter } from '@/types/api'
@@ -47,40 +48,21 @@ vi.mock('primevue/dialog', () => ({
   },
 }))
 
-// DataTable iterates `value` and exposes each row to the Column body slot.
-vi.mock('primevue/datatable', async () => {
-  const { h, provide, computed } = await import('vue')
-  return {
-    default: {
-      name: 'DataTable',
-      props: ['value'],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setup(props: any, ctx: any) {
-        provide('dtRows', computed(() => props.value ?? []))
-        return () => h('div', { class: 'data-table' }, ctx.slots.default?.())
-      },
-    },
-  }
-})
+vi.mock('primevue/chart', () => ({
+  default: {
+    name: 'PvChart',
+    props: ['type', 'data', 'options'],
+    template: '<canvas data-testid="pv-chart" />',
+  },
+}))
 
-vi.mock('primevue/column', async () => {
-  const { h, inject, computed } = await import('vue')
-  return {
-    default: {
-      name: 'Column',
-      props: ['field', 'header'],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setup(_props: any, ctx: any) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = inject('dtRows', computed(() => [])) as any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return () => h('div', { class: 'column' }, rows.value.map((row: any, i: number) =>
-          ctx.slots.body?.({ data: row, index: i })
-        ))
-      },
-    },
-  }
-})
+vi.mock('@/components/timeline/TrackerTimelineChart.vue', () => ({
+  default: {
+    name: 'TrackerTimelineChart',
+    props: ['series', 'bucketTimestamps', 'bucketSeconds'],
+    template: '<div data-testid="tracker-timeline" />',
+  },
+}))
 
 vi.mock('primevue/button', () => ({
   default: {
@@ -93,10 +75,6 @@ vi.mock('primevue/button', () => ({
 
 vi.mock('primevue/progressspinner', () => ({
   default: { name: 'ProgressSpinner', template: '<div class="spinner" />' },
-}))
-
-vi.mock('@/components/layout/ClientNameDialog.vue', () => ({
-  default: { name: 'ClientNameDialog', template: '<div />' },
 }))
 
 // --- Helpers -----------------------------------------------------------------
@@ -155,7 +133,7 @@ beforeEach(() => {
 // --- Tests ------------------------------------------------------------------
 
 describe('ClientBreakdownDialog', () => {
-  it('fetches from /api/stats/clients with the domain param on mount', async () => {
+  it('fetches from /api/stats/clients with the correct params on mount', async () => {
     stubFetch(sampleClients)
     mountDialog({ type: 'domain', value: 'ads.example.com' })
     await tick()
@@ -165,6 +143,7 @@ describe('ClientBreakdownDialog', () => {
     const url: string = calls[0][0]
     expect(url).toContain('/api/stats/clients')
     expect(url).toContain('domain=ads.example.com')
+    expect(url).toContain('include_timeline=true')
   })
 
   it('fetches with category param when filter type is category', async () => {
@@ -175,8 +154,8 @@ describe('ClientBreakdownDialog', () => {
     const calls = (globalThis.fetch as FetchMock).mock.calls
     expect(calls.length).toBe(1)
     const url: string = calls[0][0]
-    expect(url).toContain('/api/stats/clients')
     expect(url).toContain('category=advertising')
+    expect(url).toContain('include_timeline=true')
   })
 
   it('fetches with company param when filter type is company', async () => {
@@ -187,8 +166,8 @@ describe('ClientBreakdownDialog', () => {
     const calls = (globalThis.fetch as FetchMock).mock.calls
     expect(calls.length).toBe(1)
     const url: string = calls[0][0]
-    expect(url).toContain('/api/stats/clients')
     expect(url).toContain('company=Google')
+    expect(url).toContain('include_timeline=true')
   })
 
   it('shows an error message when the fetch fails', async () => {
@@ -199,50 +178,62 @@ describe('ClientBreakdownDialog', () => {
     expect(wrapper.text()).toContain('Failed to load device breakdown')
   })
 
-  it('opens DeviceStatsDialog when a device name is clicked', async () => {
-    stubFetch(sampleClients)
-    const wrapper = mountDialog({ type: 'domain', value: 'ads.example.com' })
-    await tick()
-
-    const links = wrapper.findAll('a[href="#device-stats"]')
-    expect(links.length).toBeGreaterThan(0)
-    await links[0].trigger('click')
-
-    const statsDialog = wrapper.findComponent({ name: 'DeviceStatsDialog' })
-    expect(statsDialog.exists()).toBe(true)
-    expect(statsDialog.props('clientIps')).toEqual(['192.168.1.1'])
-  })
-
-  it('passes client_name to DeviceStatsDialog for a named device', async () => {
+  it('renders a bar chart with device labels after successful fetch', async () => {
     stubFetch(sampleClients)
     const wrapper = mountDialog()
     await tick()
 
-    const links = wrapper.findAll('a[href="#device-stats"]')
-    await links[0].trigger('click')
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    expect(chart.exists()).toBe(true)
+    expect(chart.props('data').labels).toContain('My Laptop')
+    expect(chart.props('data').labels).toContain('192.168.1.2')
+  })
+
+  it('opens DeviceStatsDialog when a bar is clicked', async () => {
+    stubFetch(sampleClients)
+    const wrapper = mountDialog()
+    await tick()
+
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    chart.props('options').onClick(null, [{ index: 0 }])
+    await nextTick()
+
+    expect(wrapper.findComponent({ name: 'DeviceStatsDialog' }).exists()).toBe(true)
+  })
+
+  it('passes clientIps and clientName to DeviceStatsDialog for a named device', async () => {
+    stubFetch(sampleClients)
+    const wrapper = mountDialog()
+    await tick()
+
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    chart.props('options').onClick(null, [{ index: 0 }])
+    await nextTick()
 
     const statsDialog = wrapper.findComponent({ name: 'DeviceStatsDialog' })
+    expect(statsDialog.props('clientIps')).toEqual(['192.168.1.1'])
     expect(statsDialog.props('clientName')).toBe('My Laptop')
   })
 
-  it('shows a group row when 2+ group members appear in the data', async () => {
+  it('merges group members into a single bar when a group is configured', async () => {
     stubFetch(sampleClients)
     stubGroups([sampleGroup])
     const wrapper = mountDialog()
     await tick()
 
-    expect(wrapper.text()).toContain('Home Devices')
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    expect(chart.props('data').labels).toEqual(['Home Devices'])
   })
 
-  it('opens DeviceStatsDialog with all member IPs when a group name is clicked', async () => {
+  it('opens DeviceStatsDialog with all member IPs when a group bar is clicked', async () => {
     stubFetch(sampleClients)
     stubGroups([sampleGroup])
     const wrapper = mountDialog()
     await tick()
 
-    const links = wrapper.findAll('a[href="#device-stats"]')
-    expect(links.length).toBeGreaterThan(0)
-    await links[0].trigger('click')
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    chart.props('options').onClick(null, [{ index: 0 }])
+    await nextTick()
 
     const statsDialog = wrapper.findComponent({ name: 'DeviceStatsDialog' })
     expect(statsDialog.exists()).toBe(true)
@@ -250,14 +241,29 @@ describe('ClientBreakdownDialog', () => {
     expect(statsDialog.props('clientName')).toBe('Home Devices')
   })
 
-  it('shows device as a single row when only 1 group member appears in the data', async () => {
-    // Only one member present — group threshold not met, shown as plain device
+  it('shows individual device bars when only 1 group member appears in the data', async () => {
     stubFetch({ ...sampleClients, clients: [sampleClients.clients[0]] })
     stubGroups([sampleGroup])
     const wrapper = mountDialog()
     await tick()
 
-    expect(wrapper.text()).not.toContain('Home Devices')
-    expect(wrapper.text()).toContain('My Laptop')
+    const chart = wrapper.findComponent({ name: 'PvChart' })
+    expect(chart.props('data').labels).not.toContain('Home Devices')
+    expect(chart.props('data').labels).toContain('My Laptop')
+  })
+
+  it('shows TrackerTimelineChart when timeline data is present', async () => {
+    stubFetch({
+      ...sampleClients,
+      bucket_seconds: 3600,
+      bucket_timestamps: [1700000000, 1700003600],
+      by_client_timeline: [
+        { client_ip: '192.168.1.1', client_name: 'My Laptop', counts: [3, 2] },
+      ],
+    })
+    const wrapper = mountDialog()
+    await tick()
+
+    expect(wrapper.findComponent({ name: 'TrackerTimelineChart' }).exists()).toBe(true)
   })
 })

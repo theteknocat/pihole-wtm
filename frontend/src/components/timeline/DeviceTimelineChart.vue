@@ -34,6 +34,7 @@ const OTHER_FILL = 'rgba(156, 163, 175, 0.05)'
 
 const props = defineProps<{
   clients: ClientTimelineEntry[]
+  bucketTimestamps: number[]
   bucketSeconds: number
 }>()
 
@@ -54,11 +55,11 @@ function deviceLabel(c: ClientTimelineEntry): string {
 function buildOtherBuckets(clients: ClientTimelineEntry[]): number[] {
   if (clients.length <= MAX_DEVICES) return []
   const rest = clients.slice(MAX_DEVICES)
-  const len = rest[0]?.buckets.length ?? 0
+  const len = rest[0]?.counts.length ?? 0
   const sums = new Array<number>(len).fill(0)
   for (const c of rest) {
     for (let i = 0; i < len; i++) {
-      sums[i] += c.buckets[i].count
+      sums[i] += c.counts[i] ?? 0
     }
   }
   return sums
@@ -87,7 +88,7 @@ function buildDatasets(clients: ClientTimelineEntry[]) {
     const c = top[i]
     datasets.push({
       label: deviceLabel(c),
-      data: c.buckets.map(b => b.count),
+      data: c.counts,
       borderColor: PALETTE[i % PALETTE.length],
       backgroundColor: PALETTE_FILL[i % PALETTE_FILL.length],
       fill: 'origin',
@@ -101,13 +102,8 @@ function buildDatasets(clients: ClientTimelineEntry[]) {
   return datasets
 }
 
-function getLabels(clients: ClientTimelineEntry[]): string[] {
-  if (!clients.length) return []
-  return clients[0].buckets.map(b => formatTime(b.timestamp))
-}
-
 const chartData = shallowRef({
-  labels: getLabels(props.clients),
+  labels: props.bucketTimestamps.map(formatTime),
   datasets: buildDatasets(props.clients),
 })
 
@@ -116,7 +112,7 @@ watch(() => props.clients, (clients) => {
   if (!instance) return
 
   const newDatasets = buildDatasets(clients)
-  instance.data.labels = getLabels(clients)
+  instance.data.labels = props.bucketTimestamps.map(formatTime)
 
   // Resize datasets array to match
   while (instance.data.datasets.length > newDatasets.length) {

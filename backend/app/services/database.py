@@ -855,6 +855,7 @@ class LocalDatabase:
         category: str | None = None,
         company: str | None = None,
         domain: str | None = None,
+        include_timeline: bool = False,
     ) -> dict[str, Any]:
         """
         Return per-client query counts for the given time window,
@@ -904,7 +905,7 @@ class LocalDatabase:
         async with self._conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
 
-        return {
+        result: dict[str, Any] = {
             "window_hours": hours,
             "clients": [
                 {
@@ -919,6 +920,14 @@ class LocalDatabase:
                 for row in rows
             ],
         }
+        if include_timeline:
+            timeline = await self.fetch_client_timeline_stats(
+                hours=hours, end_ts=end_ts, category=category, company=company, domain=domain
+            )
+            result["bucket_seconds"] = timeline["bucket_seconds"]
+            result["bucket_timestamps"] = timeline["bucket_timestamps"]
+            result["by_client_timeline"] = timeline["clients"]
+        return result
 
     async def fetch_timeline_stats(
         self,
@@ -996,10 +1005,14 @@ class LocalDatabase:
         self,
         hours: int = 24,
         end_ts: float | None = None,
+        category: str | None = None,
+        company: str | None = None,
+        domain: str | None = None,
     ) -> dict[str, Any]:
         """
-        Return per-client query counts bucketed over time.
-        Same bucketing as fetch_timeline_stats but grouped by client_ip.
+        Return per-client query counts bucketed over time, optionally filtered
+        to a specific category, company, or domain. Exclusions are applied
+        unless a domain filter is present (same logic as fetch_client_stats).
         """
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
@@ -1016,7 +1029,17 @@ class LocalDatabase:
         conditions = ["q.timestamp >= ?", "q.timestamp <= ?"]
         params: list[Any] = [from_ts, anchor]
 
-        await self._apply_exclusions(conditions, params)
+        if category is not None:
+            conditions.append("COALESCE(d.category, 'Uncategorized') = ?")
+            params.append(category)
+        if company is not None:
+            conditions.append("COALESCE(d.company_name, 'Unknown') = ?")
+            params.append(company)
+        if domain is not None:
+            conditions.append("q.domain = ?")
+            params.append(domain)
+        else:
+            await self._apply_exclusions(conditions, params)
 
         where = "WHERE " + " AND ".join(conditions)
 
@@ -1043,40 +1066,36 @@ class LocalDatabase:
         async with self._conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
 
-        # Build per-client bucket maps
         num_buckets = hours * 3600 // bucket_seconds + 1
+        bucket_timestamps = [from_ts + i * bucket_seconds for i in range(num_buckets)]
+
         client_data: dict[str, dict[str, Any]] = {}
         for row in rows:
             ip = row["client_ip"]
+            b = int(row["bucket"])
+            if b >= num_buckets:
+                continue
             if ip not in client_data:
                 client_data[ip] = {
                     "client_ip": ip,
                     "client_name": row["client_name"],
-                    "bucket_map": {},
-                    "total": 0,
+                    "counts": [0] * num_buckets,
                 }
-            client_data[ip]["bucket_map"][row["bucket"]] = row["count"]
-            client_data[ip]["total"] += row["count"]
+            client_data[ip]["counts"][b] += row["count"]
 
-        # Build complete bucket series for each client, sorted by total descending
-        clients = []
-        for info in sorted(client_data.values(), key=lambda c: -c["total"]):
-            buckets = []
-            for i in range(num_buckets):
-                buckets.append({
-                    "timestamp": from_ts + i * bucket_seconds,
-                    "count": info["bucket_map"].get(i, 0),
-                })
-            clients.append({
+        clients = [
+            {
                 "client_ip": info["client_ip"],
                 "client_name": info["client_name"],
-                "total": info["total"],
-                "buckets": buckets,
-            })
+                "counts": info["counts"],
+            }
+            for info in sorted(client_data.values(), key=lambda c: -sum(c["counts"]))
+        ]
 
         return {
             "window_hours": hours,
             "bucket_seconds": bucket_seconds,
+            "bucket_timestamps": bucket_timestamps,
             "clients": clients,
         }
 

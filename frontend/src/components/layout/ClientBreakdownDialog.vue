@@ -3,27 +3,22 @@
  * ClientBreakdownDialog — modal showing per-device query breakdown for a
  * domain, category, or company.
  *
- * Devices that belong to a linked group appear as a single merged row with
- * combined stats. The individual member names and IPs are shown inline below
- * the group name. Clicking any device or group name opens DeviceStatsDialog
- * on top rather than navigating away. For category/company filters a
- * "View Domains Report" link lets the user jump straight to the full filtered
- * report.
+ * Shows a horizontal bar chart (one bar per device/group) followed by a
+ * stacked timeline. Clicking a bar opens DeviceStatsDialog for that device.
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Button from 'primevue/button'
+import PvChart from 'primevue/chart'
 import ProgressSpinner from 'primevue/progressspinner'
-import ClientNameDialog from '@/components/layout/ClientNameDialog.vue'
 import DeviceStatsDialog from '@/components/layout/DeviceStatsDialog.vue'
+import TrackerTimelineChart from '@/components/timeline/TrackerTimelineChart.vue'
 import { useWindowStore } from '@/stores/window'
 import { useDeviceGroups } from '@/composables/useDeviceGroups'
-import type { TableRow } from '@/composables/useDeviceGroups'
+import { useTrackerBarChart } from '@/composables/useTrackerBarChart'
 import { formatCategory } from '@/utils/format'
-import type { ClientStats, ClientStat, ClientFilter } from '@/types/api'
+import type { ClientStats, ClientFilter, TrackerTimelineSeries } from '@/types/api'
 
 const props = defineProps<{
   filter: ClientFilter
@@ -37,7 +32,6 @@ const visible = ref(true)
 const stats = ref<ClientStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const editingClient = ref<ClientStat | null>(null)
 
 const title = computed(() => {
   switch (props.filter.type) {
@@ -57,23 +51,99 @@ const icon = computed(() => {
 // ---- Device groups ----------------------------------------------------------
 
 const clients = computed(() => stats.value?.clients ?? [])
-const { fetchGroups, tableRows } = useDeviceGroups(clients)
+const { fetchGroups, ipToGroup, tableRows } = useDeviceGroups(clients)
 
-// ---- Device stats dialog (opens on top of this dialog) ----------------------
+// ---- Bar chart --------------------------------------------------------------
+
+interface DeviceChartItem {
+  name: string
+  clientIps: string[]
+  clientName: string | null
+  query_count: number
+  blocked_count: number
+  allowed_count: number
+}
+
+const chartItems = computed<DeviceChartItem[]>(() =>
+  tableRows.value.map(row => {
+    if (row._type === 'group') {
+      return {
+        name: row.group.name,
+        clientIps: row.group.members.map(m => m.client_ip),
+        clientName: row.group.name,
+        query_count: row.query_count,
+        blocked_count: row.blocked_count,
+        allowed_count: row.allowed_count,
+      }
+    }
+    return {
+      name: row.client_name ?? row.client_ip,
+      clientIps: [row.client_ip],
+      clientName: row.client_name,
+      query_count: row.query_count,
+      blocked_count: row.blocked_count,
+      allowed_count: row.allowed_count,
+    }
+  })
+)
+
+const totalQueries = computed(() =>
+  chartItems.value.reduce((s, c) => s + c.query_count, 0)
+)
+
+const { isDark, chartRef, chartHeight, chartData, chartOptions: baseOptions } = useTrackerBarChart({
+  items: chartItems,
+  totalTrackerQueries: totalQueries,
+  label: c => c.name,
+  tooltipTitle: c => `${c.name} — ${c.query_count.toLocaleString()} queries`,
+  rowHeight: 38,
+})
+
+// ---- Device stats dialog (opens on bar click) -------------------------------
 
 const inspectingDevice = ref<{ clientIps: string[]; clientName: string | null } | null>(null)
 
-function openDeviceStats(clientIps: string[], clientName: string | null) {
-  inspectingDevice.value = { clientIps, clientName }
-}
+const chartOptions = computed(() => ({
+  ...baseOptions.value,
+  onClick: (_: unknown, elements: { index: number }[]) => {
+    if (!elements.length) return
+    const item = chartItems.value[elements[0].index]
+    inspectingDevice.value = { clientIps: item.clientIps, clientName: item.clientName }
+  },
+  onHover: (event: { native: MouseEvent | null }, elements: { index: number }[]) => {
+    if (!event.native?.target) return
+    const el = event.native.target as HTMLElement
+    el.style.cursor = elements.length ? 'pointer' : 'default'
+  },
+}))
 
-function inspectRow(row: TableRow) {
-  if (row._type === 'group') {
-    openDeviceStats(row.group.members.map(m => m.client_ip), row.group.name)
-  } else {
-    openDeviceStats([row.client_ip], row.client_name)
+// ---- Timeline ---------------------------------------------------------------
+
+const timelineSeries = computed<TrackerTimelineSeries[]>(() => {
+  const timeline = stats.value?.by_client_timeline
+  if (!timeline?.length) return []
+
+  // Aggregate per-IP series into per-device/group series using the group map
+  const seriesMap = new Map<string, { label: string; counts: number[] }>()
+  for (const entry of timeline) {
+    const group = ipToGroup.value.get(entry.client_ip)
+    const key = group ? `group-${group.id}` : entry.client_ip
+    const label = group ? group.name : (entry.client_name ?? entry.client_ip)
+    const existing = seriesMap.get(key)
+    if (existing) {
+      for (let i = 0; i < entry.counts.length; i++) {
+        existing.counts[i] = (existing.counts[i] ?? 0) + entry.counts[i]
+      }
+    } else {
+      seriesMap.set(key, { label, counts: [...entry.counts] })
+    }
   }
-}
+
+  return [...seriesMap.values()].map(s => ({ label: s.label, counts: s.counts }))
+})
+
+const bucketTimestamps = computed(() => stats.value?.bucket_timestamps ?? [])
+const bucketSeconds = computed(() => stats.value?.bucket_seconds ?? 3600)
 
 // ---- Data fetch -------------------------------------------------------------
 
@@ -81,7 +151,10 @@ async function fetchStats() {
   loading.value = true
   error.value = null
   try {
-    const qs = windowStore.queryParams({ [props.filter.type]: props.filter.value })
+    const qs = windowStore.queryParams({
+      [props.filter.type]: props.filter.value,
+      include_timeline: 'true',
+    })
     const res = await fetch(`/api/stats/clients?${qs}`)
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     stats.value = await res.json()
@@ -90,12 +163,6 @@ async function fetchStats() {
   } finally {
     loading.value = false
   }
-}
-
-function onClientSaved(client: ClientStat, newName: string | null) {
-  client.client_name = newName
-  editingClient.value = null
-  windowStore.triggerRefresh()
 }
 
 function viewFullReport() {
@@ -122,22 +189,31 @@ watch(() => windowStore.refreshKey, () => {
 <template>
   <Dialog
     v-model:visible="visible"
+    maximizable
     modal
     :closable="true"
-    position="top"
     :draggable="false"
-    :style="{ width: '90vw', maxWidth: '700px' }"
+    :style="{ width: '90vw' }"
     @hide="onHide"
   >
     <template #header>
-      <span class="font-semibold text-lg"><i :class="icon" /> {{ title }} — Device Breakdown</span>
+      <div class="font-semibold">
+        <span class="text-lg"><i :class="icon" /> {{ title }} — Device Breakdown</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">
+          (past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }})
+        </span>
+      </div>
     </template>
 
     <!-- Subtitle + report link -->
-    <div class="flex items-center justify-between mb-4">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
-        Past {{ windowStore.availablePeriods.find(o => o.value === windowStore.hours)?.label ?? `${windowStore.hours}h` }}
-      </p>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300">
+        <template v-if="stats">
+          {{ totalQueries.toLocaleString() }}
+        </template>
+        <template v-else>No</template>
+        Queries
+      </h3>
       <Button
         v-if="filter.type !== 'domain'"
         :label="'See all ' + title + ' Domains'"
@@ -160,90 +236,32 @@ watch(() => windowStore.refreshKey, () => {
       <p class="text-red-500">{{ error }}</p>
     </div>
 
-    <!-- Table -->
-    <DataTable
-      v-if="stats"
-      :value="tableRows"
-      data-key="_key"
-      sort-field="query_count"
-      :sort-order="-1"
-      striped-rows
-      class="text-sm"
-    >
-      <template #empty>
-        <p class="empty-state">No devices found</p>
-      </template>
-      <Column header="Device" style="min-width: 10rem">
-        <template #body="{ data: row }">
-          <!-- Group row: link icon + group name + member list -->
-          <div v-if="row._type === 'group'" class="flex items-center gap-2">
-            <span class="flex items-center justify-center flex-shrink-0 text-gray-400" style="width: 1.5rem; height: 1.5rem">
-              <i class="pi pi-link text-sm" />
-            </span>
-            <span class="block">
-              <a
-                href="#device-stats"
-                v-tooltip.top="'Tracker breakdown'"
-                @click.prevent="inspectRow(row)"
-              >{{ row.group.name }}</a>
-              <span
-                v-for="member in row.member_stats"
-                :key="member.client_ip"
-                class="text-xs flex gap-1 text-gray-400"
-              >
-                <span>{{ member.client_name ?? member.client_ip }}</span>
-                <span v-if="member.client_name" class="font-mono">{{ member.client_ip }}</span>
-              </span>
-            </span>
-          </div>
+    <template v-if="stats">
+      <!-- Device bar chart -->
+      <PvChart
+        ref="chartRef"
+        type="bar"
+        :data="chartData"
+        :options="chartOptions"
+        :key="isDark ? 'dark' : 'light'"
+        :style="{ height: `${chartHeight}px` }"
+      />
 
-          <!-- Single row: pencil + name -->
-          <div v-else class="flex items-center gap-2">
-            <Button
-              icon="pi pi-pencil"
-              severity="secondary"
-              text
-              rounded
-              size="small"
-              class="!w-6 !h-6"
-              title="Edit device name"
-              aria-label="Edit device name"
-              @click="editingClient = row"
-            />
-            <span class="block">
-              <a
-                href="#device-stats"
-                v-tooltip.top="'Tracker breakdown'"
-                @click.prevent="inspectRow(row)"
-              >{{ row.client_name ?? row.client_ip }}</a>
-              <span v-if="row.client_name" class="text-xs block text-gray-400 font-mono">{{ row.client_ip }}</span>
-            </span>
-          </div>
-        </template>
-      </Column>
-      <Column field="allowed_count" header="Allowed" sortable style="text-align: right">
-        <template #body="{ data: row }">
-          <span class="text-allowed">{{ row.allowed_count.toLocaleString() }}</span>
-        </template>
-      </Column>
-      <Column field="blocked_count" header="Blocked" sortable style="text-align: right">
-        <template #body="{ data: row }">
-          <span class="text-blocked">{{ row.blocked_count.toLocaleString() }}</span>
-        </template>
-      </Column>
-      <Column field="query_count" header="Total" sortable style="text-align: right" />
-    </DataTable>
+      <!-- Timeline -->
+      <template v-if="bucketTimestamps.length > 0">
+        <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mt-8 mb-3">
+          Timeline
+        </h3>
+        <TrackerTimelineChart
+          :series="timelineSeries"
+          :bucket-timestamps="bucketTimestamps"
+          :bucket-seconds="bucketSeconds"
+        />
+      </template>
+    </template>
   </Dialog>
 
-  <ClientNameDialog
-    v-if="editingClient"
-    :client-ip="editingClient.client_ip"
-    :current-name="editingClient.client_name"
-    @close="editingClient = null"
-    @saved="onClientSaved(editingClient!, $event)"
-  />
-
-  <!-- Device stats dialog — opens on top of this dialog -->
+  <!-- Device stats dialog — opens on bar click -->
   <DeviceStatsDialog
     v-if="inspectingDevice"
     :client-ips="inspectingDevice.clientIps"
