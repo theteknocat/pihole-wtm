@@ -24,3 +24,6 @@ Thumbs.db
 
 # Vscode workspace
 .vscode/*
+
+# Claude session tracking file.
+/SESSION.md
