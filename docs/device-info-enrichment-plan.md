@@ -71,6 +71,7 @@ If multicast is blocked, we skip the mDNS feature and note it as a known limitat
 Uses `zeroconf` (add to `pyproject.toml` dependencies). Browses for all service types on the local network and maps them to per-IP records. Falls back silently (logs a warning) if multicast is unavailable.
 
 Key service-type mappings:
+
 - `_ipp._tcp` / `_pdl-datastream._tcp` → printer
 - `_airplay._tcp` / `_appletv._tcp` → Apple TV
 - `_raop._tcp` → AirPlay speaker
@@ -83,11 +84,13 @@ Stores service list as JSON in `device_info.mdns_services`, hostname in `device_
 ### 4. Backend: `database.py` additions
 
 **Rename all existing methods** from `*_client_name*` → `*_device_info*` / `*_name*` as appropriate:
-- `get_client_names()` → `get_device_names()` (or keep as-is, internal only)
+
+- `get_device_info()` → `get_device_names()` (or keep as-is, internal only)
 - `set_client_name(ip, name)` → updates only the `name` column in `device_info`
 - `delete_client_name(ip)` → changed from DELETE row to `SET name = NULL` (preserves device info)
 
 **New methods:**
+
 - `upsert_device_info(client_ip, hostname, mac_address, mac_vendor)` — INSERT OR IGNORE + UPDATE device columns only, preserving user-set `name`
 - `update_mdns_info(client_ip, mdns_name, mdns_services)` — partial update for mDNS results
 
@@ -108,6 +111,7 @@ The 5 affected query sites are at approximately lines 378, 446, 898, 1057, 1245.
 ### 5. Backend: sync integration
 
 **`backend/app/services/sync.py`** — add a device sync pass that runs:
+
 - Once at startup (after first query sync completes)
 - Every N cycles (e.g. every 10 cycles, same cadence as RDAP reenrich)
 
@@ -118,6 +122,7 @@ Pass fetches Pi-hole network devices → calls `upsert_device_info` for each IP 
 ### 6. Backend: API response update
 
 **`backend/app/main.py`** — update `GET /api/clients` response model to include:
+
 - `mac_vendor: str | None`
 - `hostname: str | None`
 - `mdns_services: list[str]`
@@ -139,6 +144,7 @@ Install `@fortawesome/fontawesome-free` (npm). Import CSS in `main.ts`. Provides
 Props: `macVendor: string | null`, `mdnsServices: string[]`
 
 Icon resolution order:
+
 1. mDNS service types → device function icon (printer, TV, speaker)
 2. MAC vendor keyword → brand icon (Apple → fa-apple, Microsoft → fa-windows, Raspberry Pi → fa-raspberry-pi)
 3. Fallback → `pi pi-mobile` (existing PrimeIcon)
@@ -148,6 +154,7 @@ Icon resolution order:
 ### 9. Frontend: `api.ts` type update
 
 Add to `ClientStat`:
+
 ```typescript
 mac_vendor: string | null
 hostname: string | null
@@ -158,7 +165,7 @@ mdns_services: string[]
 
 ### 10. Frontend: `ClientNameDialog.vue` update
 
-When `hostname` or `mac_vendor` is present, show a "Suggested: <value>" hint below the name input field. Clicking it fills the input. This helps users quickly assign a meaningful name based on auto-detected info.
+When `hostname` or `mac_vendor` is present, show a `Suggested: <value>` hint below the name input field. Clicking it fills the input. This helps users quickly assign a meaningful name based on auto-detected info.
 
 ---
 
@@ -170,19 +177,19 @@ Add an icon column (or prepend icon to the name cell) using `DeviceIcon.vue`. Sh
 
 ## Critical Files
 
-| File | Change |
-|------|--------|
-| `backend/app/services/database.py` | Migration 5 (rename `client_names` → `device_info`, add columns), update all query sites + method renames |
-| `backend/app/services/pihole/api_client.py` | Add `get_network_devices()` |
-| `backend/app/services/sync.py` | Add device sync pass |
-| `backend/app/services/mdns_scanner.py` | **New** — zeroconf mDNS browser |
-| `backend/app/main.py` | Update `/api/clients` response model |
-| `backend/pyproject.toml` | Add `zeroconf` dependency |
-| `frontend/src/types/api.ts` | Add fields to `ClientStat` |
-| `frontend/src/components/layout/DeviceIcon.vue` | **New** — icon component |
-| `frontend/src/components/layout/ClientNameDialog.vue` | Add suggestion hint |
-| `frontend/src/views/DevicesReportView.vue` | Add icon column |
-| `frontend/package.json` | Add `@fortawesome/fontawesome-free` |
+| File                                                  | Change                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `backend/app/services/database.py`                    | Migration 5 (rename `client_names` → `device_info`, add columns), update all query sites + method renames |
+| `backend/app/services/pihole/api_client.py`           | Add `get_network_devices()`                                                                               |
+| `backend/app/services/sync.py`                        | Add device sync pass                                                                                      |
+| `backend/app/services/mdns_scanner.py`                | **New** — zeroconf mDNS browser                                                                           |
+| `backend/app/main.py`                                 | Update `/api/clients` response model                                                                      |
+| `backend/pyproject.toml`                              | Add `zeroconf` dependency                                                                                 |
+| `frontend/src/types/api.ts`                           | Add fields to `ClientStat`                                                                                |
+| `frontend/src/components/layout/DeviceIcon.vue`       | **New** — icon component                                                                                  |
+| `frontend/src/components/layout/ClientNameDialog.vue` | Add suggestion hint                                                                                       |
+| `frontend/src/views/DevicesReportView.vue`            | Add icon column                                                                                           |
+| `frontend/package.json`                               | Add `@fortawesome/fontawesome-free`                                                                       |
 
 ---
 
