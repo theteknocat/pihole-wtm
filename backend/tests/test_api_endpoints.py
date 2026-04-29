@@ -432,7 +432,7 @@ async def test_get_clients_returns_seeded_data(client: AsyncClient, db: LocalDat
 async def test_set_client_name(client: AsyncClient, db: LocalDatabase) -> None:
     res = await client.put("/api/clients/192.168.1.1", json={"name": "My Laptop"})
     assert res.status_code == 200
-    names = await db.get_client_names()
+    names = await db.get_device_info()
     assert names["192.168.1.1"] == "My Laptop"
 
 
@@ -455,7 +455,7 @@ async def test_delete_client_name(client: AsyncClient, db: LocalDatabase) -> Non
 
     res = await client.delete("/api/clients/192.168.1.1")
     assert res.status_code == 200
-    assert "192.168.1.1" not in await db.get_client_names()
+    assert "192.168.1.1" not in await db.get_device_info()
 
 
 async def test_delete_client_name_nonexistent_is_safe(client: AsyncClient) -> None:

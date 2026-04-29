@@ -81,7 +81,7 @@ async def test_init_creates_all_tables(db: LocalDatabase) -> None:
         rows = await cur.fetchall()
         tables = {r[0] for r in rows}
 
-    assert {"queries", "domains", "sync_state", "schema_version", "user_config", "client_names"} <= tables
+    assert {"queries", "domains", "sync_state", "schema_version", "user_config", "device_info"} <= tables
 
 
 async def test_init_seeds_sync_state_row(db: LocalDatabase) -> None:
@@ -360,22 +360,22 @@ async def test_get_available_companies(db: LocalDatabase) -> None:
 # Client names
 # ---------------------------------------------------------------------------
 
-async def test_set_and_get_client_names(db: LocalDatabase) -> None:
+async def test_set_and_get_device_info(db: LocalDatabase) -> None:
     await db.set_client_name("192.168.1.1", "My Phone")
-    names = await db.get_client_names()
+    names = await db.get_device_info()
     assert names["192.168.1.1"] == "My Phone"
 
 
 async def test_set_client_name_upserts(db: LocalDatabase) -> None:
     await db.set_client_name("192.168.1.1", "Old Name")
     await db.set_client_name("192.168.1.1", "New Name")
-    assert (await db.get_client_names())["192.168.1.1"] == "New Name"
+    assert (await db.get_device_info())["192.168.1.1"] == "New Name"
 
 
 async def test_delete_client_name(db: LocalDatabase) -> None:
     await db.set_client_name("192.168.1.1", "My Phone")
     await db.delete_client_name("192.168.1.1")
-    assert "192.168.1.1" not in await db.get_client_names()
+    assert "192.168.1.1" not in await db.get_device_info()
 
 
 async def test_delete_client_name_nonexistent_is_safe(db: LocalDatabase) -> None:

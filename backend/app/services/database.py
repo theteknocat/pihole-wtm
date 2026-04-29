@@ -122,6 +122,25 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_dgm_group ON device_group_members(group_id);
         """,
     ),
+    (
+        5,
+        "rename client_names to device_info, add device enrichment columns",
+        """
+        CREATE TABLE IF NOT EXISTS device_info (
+            client_ip      TEXT PRIMARY KEY,
+            name           TEXT,
+            hostname       TEXT,
+            mac_address    TEXT,
+            mac_vendor     TEXT,
+            mdns_name      TEXT,
+            mdns_services  TEXT,
+            last_synced    INTEGER
+        );
+        INSERT OR IGNORE INTO device_info (client_ip, name)
+            SELECT client_ip, name FROM client_names;
+        DROP TABLE IF EXISTS client_names;
+        """,
+    ),
 ]
 
 
@@ -370,12 +389,12 @@ class LocalDatabase:
         # all user input goes through parameterised queries.
         sql = f"""
             SELECT q.id, q.timestamp, q.domain, q.client_ip,
-                   cn.name AS client_name,
+                   COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name,
                    q.status, q.query_type, q.reply_type, q.reply_time,
                    d.tracker_name, d.category, d.company_name, d.company_country
             FROM queries q
             LEFT JOIN domains d ON q.domain = d.domain
-            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON q.client_ip = di.client_ip
             {where}
             ORDER BY q.id DESC
             LIMIT ?
@@ -443,7 +462,7 @@ class LocalDatabase:
                     d.tracker_name, d.category, d.company_name, d.company_country
                 FROM queries q
                 LEFT JOIN domains d ON q.domain = d.domain
-                LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+                LEFT JOIN device_info di ON q.client_ip = di.client_ip
                 {where}
                 ORDER BY q.id DESC
                 LIMIT ?
@@ -860,7 +879,7 @@ class LocalDatabase:
         """
         Return per-client query counts for the given time window,
         optionally filtered to a single category, company, or domain.
-        Joins client_names to include user-defined friendly names.
+        Joins device_info to include user-defined friendly names.
         """
         anchor = end_ts or time.time()
         from_ts = anchor - hours * 3600
@@ -889,13 +908,13 @@ class LocalDatabase:
         sql = f"""
             SELECT
                 q.client_ip,
-                cn.name AS client_name,
+                COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name,
                 COUNT(*)                                AS query_count,
                 SUM(CASE WHEN q.status IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS blocked_count,
                 SUM(CASE WHEN q.status NOT IN ({_BLOCKED_IN}) THEN 1 ELSE 0 END) AS allowed_count
             FROM queries q
             JOIN domains d ON q.domain = d.domain
-            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON q.client_ip = di.client_ip
             {where}
             GROUP BY q.client_ip
             ORDER BY query_count DESC
@@ -1049,12 +1068,12 @@ class LocalDatabase:
         sql = f"""
             SELECT
                 q.client_ip,
-                cn.name AS client_name,
+                COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name,
                 CAST((q.timestamp - ?) / ? AS INTEGER) AS bucket,
                 COUNT(*) AS count
             FROM queries q
             JOIN domains d ON q.domain = d.domain
-            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON q.client_ip = di.client_ip
             {where}
             GROUP BY q.client_ip, bucket
             ORDER BY q.client_ip, bucket
@@ -1220,10 +1239,10 @@ class LocalDatabase:
     # Client names
     # -------------------------------------------------------------------------
 
-    async def get_client_names(self) -> dict[str, str]:
+    async def get_device_info(self) -> dict[str, str]:
         """Return all client IP → name mappings."""
         async with self._conn.execute(
-            "SELECT client_ip, name FROM client_names ORDER BY name"
+            "SELECT client_ip, name FROM device_info WHERE name IS NOT NULL ORDER BY name"
         ) as cur:
             return {r[0]: r[1] for r in await cur.fetchall()}
 
@@ -1240,9 +1259,12 @@ class LocalDatabase:
         where = "WHERE " + " AND ".join(conditions)
         # ruff: disable[S608]
         sql = f"""
-            SELECT q.client_ip, cn.name AS client_name, COUNT(*) AS query_count
+            SELECT q.client_ip,
+                   COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name,
+                   COUNT(*) AS query_count,
+                   di.hostname, di.mac_vendor, di.mdns_services
             FROM queries q
-            LEFT JOIN client_names cn ON q.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON q.client_ip = di.client_ip
             LEFT JOIN domains d ON q.domain = d.domain
             {where}
             GROUP BY q.client_ip
@@ -1251,22 +1273,70 @@ class LocalDatabase:
         # ruff: enable[S608]
         async with self._conn.execute(sql, params) as cur:
             return [
-                {"client_ip": r["client_ip"], "client_name": r["client_name"],
-                 "query_count": r["query_count"]}
+                {
+                    "client_ip": r["client_ip"],
+                    "client_name": r["client_name"],
+                    "query_count": r["query_count"],
+                    "hostname": r["hostname"],
+                    "mac_vendor": r["mac_vendor"],
+                    "mdns_services": r["mdns_services"],
+                }
                 for r in await cur.fetchall()
             ]
 
     async def set_client_name(self, client_ip: str, name: str) -> None:
         """Set or update a client name for an IP."""
         await self._conn.execute(
-            "INSERT OR REPLACE INTO client_names (client_ip, name) VALUES (?, ?)",
+            """INSERT INTO device_info (client_ip, name) VALUES (?, ?)
+               ON CONFLICT(client_ip) DO UPDATE SET name = excluded.name""",
             (client_ip, name),
         )
         await self._conn.commit()
 
     async def delete_client_name(self, client_ip: str) -> None:
         """Remove a client name mapping."""
-        await self._conn.execute("DELETE FROM client_names WHERE client_ip = ?", (client_ip,))
+        await self._conn.execute(
+            "UPDATE device_info SET name = NULL WHERE client_ip = ?", (client_ip,)
+        )
+        await self._conn.commit()
+
+    async def upsert_device_info(
+        self,
+        client_ip: str,
+        hostname: str | None,
+        mac_address: str | None,
+        mac_vendor: str | None,
+    ) -> None:
+        """Insert or update Pi-hole-sourced device info, preserving user-set name."""
+        import time as _time
+        await self._conn.execute(
+            """INSERT INTO device_info (client_ip, hostname, mac_address, mac_vendor, last_synced)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(client_ip) DO UPDATE SET
+                   hostname    = excluded.hostname,
+                   mac_address = excluded.mac_address,
+                   mac_vendor  = excluded.mac_vendor,
+                   last_synced = excluded.last_synced""",
+            (client_ip, hostname, mac_address, mac_vendor, int(_time.time())),
+        )
+        await self._conn.commit()
+
+    async def update_mdns_info(
+        self,
+        client_ip: str,
+        mdns_name: str | None,
+        mdns_services: list[str],
+    ) -> None:
+        """Update mDNS-discovered name and service list for a device."""
+        import json as _json
+        await self._conn.execute(
+            """INSERT INTO device_info (client_ip, mdns_name, mdns_services)
+               VALUES (?, ?, ?)
+               ON CONFLICT(client_ip) DO UPDATE SET
+                   mdns_name     = excluded.mdns_name,
+                   mdns_services = excluded.mdns_services""",
+            (client_ip, mdns_name, _json.dumps(mdns_services)),
+        )
         await self._conn.commit()
 
     # -------------------------------------------------------------------------
@@ -1286,9 +1356,10 @@ class LocalDatabase:
             return groups
         group_map = {g["id"]: g for g in groups}
         async with self._conn.execute("""
-            SELECT dgm.group_id, dgm.client_ip, cn.name AS client_name
+            SELECT dgm.group_id, dgm.client_ip,
+                   COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name
             FROM device_group_members dgm
-            LEFT JOIN client_names cn ON dgm.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON dgm.client_ip = di.client_ip
             ORDER BY dgm.group_id, dgm.client_ip
         """) as cur:
             for row in await cur.fetchall():
@@ -1310,9 +1381,10 @@ class LocalDatabase:
             return None
         group: dict[str, Any] = {"id": row["id"], "name": row["name"], "members": []}
         async with self._conn.execute("""
-            SELECT dgm.client_ip, cn.name AS client_name
+            SELECT dgm.client_ip,
+                   COALESCE(di.name, di.hostname, di.mac_vendor) AS client_name
             FROM device_group_members dgm
-            LEFT JOIN client_names cn ON dgm.client_ip = cn.client_ip
+            LEFT JOIN device_info di ON dgm.client_ip = di.client_ip
             WHERE dgm.group_id = ?
             ORDER BY dgm.client_ip
         """, (group_id,)) as cur:
